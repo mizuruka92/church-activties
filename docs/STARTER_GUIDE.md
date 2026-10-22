@@ -445,7 +445,7 @@ Write down the **exact message** and the **step** where it appeared. Do not edit
 | `FETCH` fails with "authentication" or "not found" | The repository is private and the token is missing, expired, or lacks **Contents: read**. Create a new token and run `CREATE OR REPLACE SECRET` again. |
 | `LS @...PARISH_REPO/branches/main/sql/` shows nothing | `main` may not contain the files yet (see part 2), or `FETCH` has not run. Run `SHOW GIT BRANCHES IN GIT REPOSITORY PUSAT_INFORMASI_PAROKI.PUBLIC.PARISH_REPO;` to see which branches Snowflake has. |
 | A step says a table or schema "does not exist" | A previous step was skipped. Run the steps in order. |
-| A column or table "does not exist" after updating to a newer version | The tables changed and the database comes from an older version. Reset (see part 5), then run the setup again. |
+| A column or table "does not exist" after updating to a newer version | The tables changed and the database comes from an older version. Reset (see part 5), then run the setup again. For the single column `NAMA_BERKAS_SUMBER` (the link from a report to its PDF) a small `ALTER TABLE` is enough, see "Adding the source-file column without a reset" in [SETUP_SNOWFLAKE.md](SETUP_SNOWFLAKE.md). |
 | A statement fails with a syntax error | Note the file and the statement and report it. The SQL was tested on a different database engine and has not run in Snowflake yet. |
 | The validation shows `FAIL` rows | Filter `RESULT = 'FAIL'`. If the row-count or `VIEWS` rows fail, a step did not finish: run steps 3, 4a to 4f and 5 again. |
 | `EXECUTE IMMEDIATE FROM` fails for a big file | Run that file with copy and paste instead (Path A). |

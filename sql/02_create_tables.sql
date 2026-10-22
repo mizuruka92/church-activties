@@ -476,7 +476,9 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.LAPORAN_KEGIATAN (
     EVALUASI_LOGISTIK VARCHAR(2000) COMMENT 'Evaluasi perlengkapan, tempat, dan konsumsi',
     HASIL_KEGIATAN VARCHAR(2000) COMMENT 'Hasil atau capaian kegiatan',
     REKOMENDASI_TINDAK_LANJUT VARCHAR(2000) COMMENT 'Rekomendasi tindak lanjut, kosong jika belum diisi',
+    NAMA_BERKAS_SUMBER VARCHAR(200) COMMENT 'Nama berkas PDF dokumen sumber laporan, tanpa folder dan diawali nomor laporan, kosong jika laporan tidak berasal dari dokumen',
     CONSTRAINT PK_LAPORAN_KEGIATAN PRIMARY KEY (ID_LAPORAN),
     CONSTRAINT UQ_LAPORAN_KEGIATAN UNIQUE (ID_KEGIATAN),
+    CONSTRAINT UQ_LAPORAN_KEGIATAN_BERKAS UNIQUE (NAMA_BERKAS_SUMBER),
     CONSTRAINT FK_LAPORAN_KEGIATAN FOREIGN KEY (ID_KEGIATAN) REFERENCES DATA_OPERASIONAL.KEGIATAN (ID_KEGIATAN)
 ) COMMENT = 'Laporan pascakegiatan. Tidak semua kegiatan memiliki laporan, dan sebagian laporan belum lengkap | Granularitas: satu baris per kegiatan yang dilaporkan | Klasifikasi: Internal';

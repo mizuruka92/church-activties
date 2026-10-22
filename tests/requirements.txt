@@ -2,8 +2,10 @@
 # The generator itself and tests/test_generator.py use the standard library only.
 #   tests/test_sql_local.py needs: duckdb, sqlglot
 #   tests/test_app.py (the Streamlit dashboard) needs: duckdb, streamlit, altair, pandas
+#   tests/test_documents.py (mock PDF reports) needs nothing; pypdf is optional and adds an independent-reader check
 duckdb>=1.4
 sqlglot>=25
 streamlit>=1.35
 altair>=4.2
 pandas
+pypdf

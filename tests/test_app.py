@@ -305,6 +305,15 @@ class PageTests(unittest.TestCase):
         self.assertTrue(table["Jam mulai"].str.fullmatch(r"\d\d:\d\d").all())
         self.assertTrue(table["Tanggal"].str.contains("Oktober 2026").all())
 
+    def test_event_list_shows_the_document_each_report_came_from(self):
+        at = self.pages["Rencana, anggaran, kegiatan"]
+        table = next(d.value for d in at.dataframe if "Berkas laporan" in d.value.columns)
+        reported = table[table["Laporan"].isin(["Final", "Draf", "Perlu Revisi"])]
+        self.assertGreater(len(reported), 100)
+        self.assertTrue(reported["Berkas laporan"].str.fullmatch(r"LPK-\d{4}_.+\.pdf").all())
+        unreported = table[table["Laporan"].isin(["Belum ada laporan", "Belum diperlukan"])]
+        self.assertEqual(set(unreported["Berkas laporan"]), {"-"})
+
     def test_survey_page_shows_aggregates_only(self):
         text = page_text(self.pages["Survei umat"])
         self.assertIn("responden", text)

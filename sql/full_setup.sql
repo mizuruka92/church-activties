@@ -557,8 +557,10 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.LAPORAN_KEGIATAN (
     EVALUASI_LOGISTIK VARCHAR(2000) COMMENT 'Evaluasi perlengkapan, tempat, dan konsumsi',
     HASIL_KEGIATAN VARCHAR(2000) COMMENT 'Hasil atau capaian kegiatan',
     REKOMENDASI_TINDAK_LANJUT VARCHAR(2000) COMMENT 'Rekomendasi tindak lanjut, kosong jika belum diisi',
+    NAMA_BERKAS_SUMBER VARCHAR(200) COMMENT 'Nama berkas PDF dokumen sumber laporan, tanpa folder dan diawali nomor laporan, kosong jika laporan tidak berasal dari dokumen',
     CONSTRAINT PK_LAPORAN_KEGIATAN PRIMARY KEY (ID_LAPORAN),
     CONSTRAINT UQ_LAPORAN_KEGIATAN UNIQUE (ID_KEGIATAN),
+    CONSTRAINT UQ_LAPORAN_KEGIATAN_BERKAS UNIQUE (NAMA_BERKAS_SUMBER),
     CONSTRAINT FK_LAPORAN_KEGIATAN FOREIGN KEY (ID_KEGIATAN) REFERENCES DATA_OPERASIONAL.KEGIATAN (ID_KEGIATAN)
 ) COMMENT = 'Laporan pascakegiatan. Tidak semua kegiatan memiliki laporan, dan sebagian laporan belum lengkap | Granularitas: satu baris per kegiatan yang dilaporkan | Klasifikasi: Internal';
 
@@ -13607,141 +13609,142 @@ USING (
         CAST(v.REALISASI_BIAYA AS NUMBER(18,0)) AS REALISASI_BIAYA,
         v.EVALUASI_LOGISTIK AS EVALUASI_LOGISTIK,
         v.HASIL_KEGIATAN AS HASIL_KEGIATAN,
-        v.REKOMENDASI_TINDAK_LANJUT AS REKOMENDASI_TINDAK_LANJUT
+        v.REKOMENDASI_TINDAK_LANJUT AS REKOMENDASI_TINDAK_LANJUT,
+        v.NAMA_BERKAS_SUMBER AS NAMA_BERKAS_SUMBER
     FROM (VALUES
-            ('LPK-0001', 'KGT-0001', '2021-02-26', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2021 di Aula Paroki Santa Maria Contoh dengan 29 peserta dari target 30 peserta.', 29, 1740000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0002', 'KGT-0003', '2021-04-15', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 1 sampai 4 April 2021 di Gereja Santa Maria Contoh dengan 470 peserta dari target 450 peserta.', 470, 6945000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0003', 'KGT-0004', '2021-04-14', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2021 di Aula Paroki Santa Maria Contoh dengan 93 peserta dari target 115 peserta.', 93, 8490000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0004', 'KGT-0005', '2021-05-16', 'Final', 'Lokakarya Penulisan Warta Paroki dilaksanakan pada 9 Mei 2021 di Ruang Rapat Paroki dengan 9 peserta dari target 10 peserta.', 9, 930000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Relawan menulis contoh warta dan menerima masukan penyuntingan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0005', 'KGT-0006', '2021-06-08', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2021 di Aula Paroki Santa Maria Contoh dengan 20 peserta dari target 25 peserta.', 20, 3435000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0006', 'KGT-0007', '2021-06-12', 'Final', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2021 di Aula Paroki Santa Maria Contoh dengan 47 peserta dari target 45 peserta.', 47, 2385000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0007', 'KGT-0008', '2021-10-07', 'Final', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2021 sampai 26 September 2021 di Ruang Katekese Paroki dengan 29 peserta dari target 30 peserta.', 29, 3335000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0008', 'KGT-0009', '2021-08-02', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2021 di Ruang Rapat Paroki dengan 16 peserta dari target 15 peserta.', 16, 1360000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0009', 'KGT-0010', '2021-09-23', 'Final', 'Bakti Sosial Orang Muda di Panti Asuhan dilaksanakan pada 19 September 2021 di Panti Asuhan Kasih Sejahtera dengan 24 peserta dari target 25 peserta.', 24, 1435000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Orang muda mengunjungi panti asuhan, bermain bersama anak-anak, dan menyerahkan bantuan perlengkapan sekolah.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0010', 'KGT-0011', '2021-10-16', 'Final', 'Misa Syukur Hari Ulang Tahun Paroki dilaksanakan pada 11 Oktober 2021 di Gereja Santa Maria Contoh dengan 210 peserta dari target 265 peserta.', 210, 5405000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0011', 'KGT-0012', '2021-11-17', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2021 di Ruang Rapat Paroki dengan 26 peserta dari target 30 peserta.', 26, 765000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0012', 'KGT-0013', '2021-12-02', 'Final', 'Temu Relawan Media Paroki dilaksanakan pada 21 November 2021 di Ruang Rapat Paroki dengan 21 peserta dari target 20 peserta.', 21, 465000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0013', 'KGT-0014', '2021-12-22', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2021 di Lokasi Perkemahan Bukit Damai dengan 48 peserta dari target 45 peserta.', 48, 4050000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0014', 'KGT-0015', '2022-01-01', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2021 di Gereja Santa Maria Contoh dengan 671 peserta dari target 650 peserta.', 671, 9495000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0015', 'KGT-0016', '2022-03-21', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2022 sampai 14 Maret 2022 di Ruang Katekese Paroki dengan 26 peserta dari target 25 peserta.', 26, 4305000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0016', 'KGT-0017', '2022-02-22', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2022 di Aula Paroki Santa Maria Contoh dengan 28 peserta dari target 30 peserta.', 28, 2635000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0017', 'KGT-0018', '2022-03-24', 'Final', 'Kursus Persiapan Perkawinan Angkatan I dilaksanakan pada 14 sampai 15 Maret 2022 di Wisma Retret Damai Sejahtera dengan 15 peserta dari target 15 peserta.', 15, 7270000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Para calon pasangan menyelesaikan seluruh materi dan menyatakan lebih siap membangun keluarga.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0018', 'KGT-0020', '2022-04-15', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2022 di Aula Paroki Santa Maria Contoh dengan 100 peserta dari target 120 peserta.', 100, 13375000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0019', 'KGT-0021', '2022-04-21', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 14 sampai 17 April 2022 di Gereja Santa Maria Contoh dengan 503 peserta dari target 480 peserta.', 503, 9120000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0020', 'KGT-0023', '2022-06-08', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2022 di Aula Paroki Santa Maria Contoh dengan 31 peserta dari target 30 peserta.', 31, 6050000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0021', 'KGT-0025', '2022-06-23', 'Final', 'Pelatihan Pertolongan Pertama dilaksanakan pada 13 Juni 2022 di Aula Paroki Santa Maria Contoh dengan 23 peserta dari target 25 peserta.', 23, 2170000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0022', 'KGT-0026', '2022-06-27', 'Final', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2022 di Gereja Santa Maria Contoh dengan 21 peserta dari target 20 peserta.', 21, 830000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0023', 'KGT-0027', '2022-10-08', 'Final', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2022 sampai 26 September 2022 di Ruang Katekese Paroki dengan 33 peserta dari target 30 peserta.', 33, 5510000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0024', 'KGT-0028', '2022-07-17', 'Final', 'Kunjungan dan Santunan Lansia dilaksanakan pada 11 Juli 2022 di Rumah Umat di Lingkungan dengan 52 peserta dari target 50 peserta.', 52, 3985000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0025', 'KGT-0029', '2022-07-29', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2022 di Ruang Rapat Paroki dengan 15 peserta dari target 15 peserta.', 15, 2335000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0026', 'KGT-0032', '2022-11-18', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2022 di Ruang Rapat Paroki dengan 28 peserta dari target 30 peserta.', 28, 1205000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0027', 'KGT-0033', '2022-11-30', 'Final', 'Temu Relawan Media Paroki dilaksanakan pada 21 November 2022 di Ruang Rapat Paroki dengan 16 peserta dari target 20 peserta.', 16, 760000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0028', 'KGT-0034', '2022-12-07', 'Final', 'Pendalaman Kitab Suci Masa Adven dilaksanakan pada 29 November 2022 di Aula Paroki Santa Maria Contoh dengan 85 peserta dari target 80 peserta.', 85, 1900000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0029', 'KGT-0035', '2022-12-16', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2022 di Lokasi Perkemahan Bukit Damai dengan 52 peserta dari target 50 peserta.', 52, 7925000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0030', 'KGT-0036', '2022-12-30', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2022 di Gereja Santa Maria Contoh dengan 692 peserta dari target 700 peserta.', 692, 12555000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0031', 'KGT-0037', '2023-03-20', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2023 sampai 14 Maret 2023 di Ruang Katekese Paroki dengan 24 peserta dari target 25 peserta.', 24, 4695000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0032', 'KGT-0038', '2023-05-07', 'Final', 'Katekese Persiapan Komuni Pertama dilaksanakan pada 7 Februari 2023 sampai 25 April 2023 di Ruang Katekese Paroki dengan 24 peserta dari target 30 peserta.', 24, 4850000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Anak-anak mengikuti seluruh rangkaian pertemuan dan siap menerima Komuni Pertama, orang tua terlibat aktif dalam pendampingan.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0033', 'KGT-0039', '2023-02-22', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2023 di Aula Paroki Santa Maria Contoh dengan 32 peserta dari target 35 peserta.', 32, 2570000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0034', 'KGT-0040', '2023-03-26', 'Final', 'Kursus Persiapan Perkawinan Angkatan I dilaksanakan pada 14 sampai 15 Maret 2023 di Wisma Retret Damai Sejahtera dengan 12 peserta dari target 15 peserta.', 12, 6905000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Para calon pasangan menyelesaikan seluruh materi dan menyatakan lebih siap membangun keluarga.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0035', 'KGT-0041', '2023-04-02', 'Final', 'Pelatihan Fotografi dan Videografi Liturgi dilaksanakan pada 21 Maret 2023 di Aula Paroki Santa Maria Contoh dengan 13 peserta dari target 15 peserta.', 13, 2255000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Relawan berlatih mengambil gambar dengan sikap menghormati perayaan dan menyepakati aturan dokumentasi.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0036', 'KGT-0042', '2023-04-16', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 6 sampai 9 April 2023 di Gereja Santa Maria Contoh dengan 497 peserta dari target 520 peserta.', 497, 10995000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0037', 'KGT-0043', '2023-04-21', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2023 di Aula Paroki Santa Maria Contoh dengan 109 peserta dari target 130 peserta.', 109, 11905000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0038', 'KGT-0045', '2023-05-20', 'Final', 'Lokakarya Penulisan Warta Paroki dilaksanakan pada 9 Mei 2023 di Ruang Rapat Paroki dengan 16 peserta dari target 15 peserta.', 16, 1190000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Relawan menulis contoh warta dan menerima masukan penyuntingan.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0039', 'KGT-0046', '2023-06-09', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2023 di Aula Paroki Santa Maria Contoh dengan 33 peserta dari target 30 peserta.', 33, 5350000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0040', 'KGT-0047', '2023-06-17', 'Final', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2023 di Aula Paroki Santa Maria Contoh dengan 47 peserta dari target 50 peserta.', 47, 3765000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0041', 'KGT-0048', '2023-06-18', 'Final', 'Pelatihan Pertolongan Pertama dilaksanakan pada 13 Juni 2023 di Aula Paroki Santa Maria Contoh dengan 20 peserta dari target 25 peserta.', 20, 2175000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0042', 'KGT-0049', '2023-06-24', 'Final', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2023 di Gereja Santa Maria Contoh dengan 16 peserta dari target 20 peserta.', 16, 795000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0043', 'KGT-0050', '2023-10-01', 'Final', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2023 sampai 26 September 2023 di Ruang Katekese Paroki dengan 33 peserta dari target 35 peserta.', 33, 6180000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0044', 'KGT-0051', '2023-07-16', 'Final', 'Kunjungan dan Santunan Lansia dilaksanakan pada 11 Juli 2023 di Rumah Umat di Lingkungan dengan 45 peserta dari target 50 peserta.', 45, 4905000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0045', 'KGT-0052', '2023-07-25', 'Final', 'Pelatihan Operator Tata Suara dan Perangkat Baru dilaksanakan pada 18 Juli 2023 di Gereja Santa Maria Contoh dengan 9 peserta dari target 10 peserta.', 9, 10450000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0046', 'KGT-0053', '2023-08-06', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2023 di Ruang Rapat Paroki dengan 16 peserta dari target 15 peserta.', 16, 2170000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0047', 'KGT-0054', '2023-09-10', 'Final', 'Seminar Pengasuhan Anak di Era Digital dilaksanakan pada 5 September 2023 di Aula Paroki Santa Maria Contoh dengan 72 peserta dari target 70 peserta.', 72, 4320000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0048', 'KGT-0055', '2023-09-25', 'Final', 'Bakti Sosial Orang Muda di Panti Asuhan dilaksanakan pada 19 September 2023 di Panti Asuhan Kasih Sejahtera dengan 28 peserta dari target 25 peserta.', 28, 2280000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Orang muda mengunjungi panti asuhan, bermain bersama anak-anak, dan menyerahkan bantuan perlengkapan sekolah.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0049', 'KGT-0056', '2023-10-14', 'Final', 'Misa Syukur Hari Ulang Tahun Paroki dilaksanakan pada 11 Oktober 2023 di Gereja Santa Maria Contoh dengan 267 peserta dari target 300 peserta.', 267, 8645000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0050', 'KGT-0057', '2023-11-02', 'Final', 'Misa Syukur Ulang Tahun Perkawinan dilaksanakan pada 24 Oktober 2023 di Gereja Santa Maria Contoh dengan 67 peserta dari target 60 peserta.', 67, 3215000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0051', 'KGT-0058', '2023-11-11', 'Final', 'Latihan Koor Gabungan Persiapan Natal dilaksanakan pada 7 November 2023 di Aula Paroki Santa Maria Contoh dengan 67 peserta dari target 70 peserta.', 67, 1620000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0052', 'KGT-0059', '2023-11-17', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2023 di Ruang Rapat Paroki dengan 33 peserta dari target 35 peserta.', 33, 1070000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0053', 'KGT-0061', '2023-12-07', 'Final', 'Pendalaman Kitab Suci Masa Adven dilaksanakan pada 29 November 2023 di Aula Paroki Santa Maria Contoh dengan 66 peserta dari target 85 peserta.', 66, 1595000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0054', 'KGT-0062', '2023-12-16', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2023 di Lokasi Perkemahan Bukit Damai dengan 47 peserta dari target 50 peserta.', 47, 5925000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0055', 'KGT-0063', '2024-01-06', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2023 di Gereja Santa Maria Contoh dengan 778 peserta dari target 760 peserta.', 778, 16145000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0056', 'KGT-0064', '2024-03-19', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2024 sampai 14 Maret 2024 di Ruang Katekese Paroki dengan 21 peserta dari target 25 peserta.', 21, 4725000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0057', 'KGT-0066', '2024-02-24', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2024 di Aula Paroki Santa Maria Contoh dengan 34 peserta dari target 35 peserta.', 34, 2705000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0058', 'KGT-0067', '2024-03-31', 'Final', 'Pelatihan Fotografi dan Videografi Liturgi dilaksanakan pada 21 Maret 2024 di Aula Paroki Santa Maria Contoh dengan 16 peserta dari target 20 peserta.', 16, 2455000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Relawan berlatih mengambil gambar dengan sikap menghormati perayaan dan menyepakati aturan dokumentasi.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0059', 'KGT-0068', '2024-04-12', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 28 sampai 31 Maret 2024 di Gereja Santa Maria Contoh dengan 526 peserta dari target 550 peserta.', 526, 13510000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0060', 'KGT-0069', '2024-04-19', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2024 di Aula Paroki Santa Maria Contoh dengan 116 peserta dari target 135 peserta.', 116, 14270000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0061', 'KGT-0071', '2024-05-21', 'Final', 'Lokakarya Penulisan Warta Paroki dilaksanakan pada 9 Mei 2024 di Ruang Rapat Paroki dengan 13 peserta dari target 15 peserta.', 13, 1350000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Relawan menulis contoh warta dan menerima masukan penyuntingan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0062', 'KGT-0072', '2024-06-03', 'Final', 'Pelatihan Katekis Lingkungan dilaksanakan pada 23 Mei 2024 di Aula Paroki Santa Maria Contoh dengan 27 peserta dari target 25 peserta.', 27, 4285000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0063', 'KGT-0073', '2024-06-05', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2024 di Aula Paroki Santa Maria Contoh dengan 28 peserta dari target 30 peserta.', 28, 5725000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0064', 'KGT-0074', '2024-06-09', 'Final', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2024 di Aula Paroki Santa Maria Contoh dengan 57 peserta dari target 55 peserta.', 57, 4500000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0065', 'KGT-0075', '2024-06-20', 'Final', 'Pelatihan Pertolongan Pertama dilaksanakan pada 13 Juni 2024 di Aula Paroki Santa Maria Contoh dengan 26 peserta dari target 25 peserta.', 26, 2105000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0066', 'KGT-0076', '2024-07-01', 'Final', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2024 di Gereja Santa Maria Contoh dengan 28 peserta dari target 25 peserta.', 28, 980000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0067', 'KGT-0077', '2024-07-04', 'Final', 'Turnamen Futsal Antarlingkungan dilaksanakan pada 27 Juni 2024 di Lapangan Futsal Sewaan dengan 95 peserta dari target 110 peserta.', 95, 6505000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Turnamen berlangsung tertib dan sportif dengan keterlibatan banyak lingkungan.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0068', 'KGT-0080', '2024-07-21', 'Final', 'Pelatihan Operator Tata Suara dan Perangkat Baru dilaksanakan pada 18 Juli 2024 di Gereja Santa Maria Contoh dengan 8 peserta dari target 10 peserta.', 8, 12025000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0069', 'KGT-0081', '2024-08-06', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2024 di Ruang Rapat Paroki dengan 12 peserta dari target 15 peserta.', 12, 2365000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0070', 'KGT-0082', '2024-08-25', 'Final', 'Pelatihan Kepemimpinan Orang Muda dilaksanakan pada 22 Agustus 2024 di Aula Paroki Santa Maria Contoh dengan 30 peserta dari target 30 peserta.', 30, 4405000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0071', 'KGT-0083', '2024-09-15', 'Final', 'Seminar Pengasuhan Anak di Era Digital dilaksanakan pada 5 September 2024 di Aula Paroki Santa Maria Contoh dengan 72 peserta dari target 75 peserta.', 72, 5165000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0072', 'KGT-0085', '2024-09-27', 'Final', 'Bakti Sosial Orang Muda di Panti Asuhan dilaksanakan pada 19 September 2024 di Panti Asuhan Kasih Sejahtera dengan 26 peserta dari target 25 peserta.', 26, 2850000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Orang muda mengunjungi panti asuhan, bermain bersama anak-anak, dan menyerahkan bantuan perlengkapan sekolah.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0073', 'KGT-0086', '2024-10-17', 'Final', 'Misa Syukur Hari Ulang Tahun Paroki dilaksanakan pada 11 Oktober 2024 di Gereja Santa Maria Contoh dengan 354 peserta dari target 320 peserta.', 354, 11220000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0074', 'KGT-0088', '2024-11-02', 'Final', 'Misa Syukur Ulang Tahun Perkawinan dilaksanakan pada 24 Oktober 2024 di Gereja Santa Maria Contoh dengan 53 peserta dari target 65 peserta.', 53, 3440000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0075', 'KGT-0089', '2024-11-19', 'Final', 'Latihan Koor Gabungan Persiapan Natal dilaksanakan pada 7 November 2024 di Aula Paroki Santa Maria Contoh dengan 79 peserta dari target 75 peserta.', 79, 1985000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0076', 'KGT-0090', '2024-11-19', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2024 di Ruang Rapat Paroki dengan 36 peserta dari target 35 peserta.', 36, 1205000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0077', 'KGT-0091', '2024-11-25', 'Final', 'Temu Relawan Media Paroki dilaksanakan pada 21 November 2024 di Ruang Rapat Paroki dengan 24 peserta dari target 25 peserta.', 24, 770000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0078', 'KGT-0092', '2024-12-06', 'Final', 'Pendalaman Kitab Suci Masa Adven dilaksanakan pada 29 November 2024 di Aula Paroki Santa Maria Contoh dengan 81 peserta dari target 90 peserta.', 81, 2015000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0079', 'KGT-0093', '2024-12-18', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2024 di Lokasi Perkemahan Bukit Damai dengan 53 peserta dari target 55 peserta.', 53, 8700000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0080', 'KGT-0094', '2025-01-06', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2024 di Gereja Santa Maria Contoh dengan 799 peserta dari target 820 peserta.', 799, 20645000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0081', 'KGT-0095', '2025-01-21', 'Final', 'Rapat Kerja Pengurus Paroki dilaksanakan pada 17 sampai 18 Januari 2025 di Wisma Retret Damai Sejahtera dengan 36 peserta dari target 45 peserta.', 36, 7485000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Pengurus menyepakati prioritas pelayanan dan jadwal besar kegiatan tahun 2026.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0082', 'KGT-0096', '2025-03-17', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2025 sampai 14 Maret 2025 di Ruang Katekese Paroki dengan 27 peserta dari target 30 peserta.', 27, 4985000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0083', 'KGT-0098', '2025-02-24', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2025 di Aula Paroki Santa Maria Contoh dengan 37 peserta dari target 40 peserta.', 37, 3060000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0084', 'KGT-0099', '2025-03-20', 'Final', 'Kursus Persiapan Perkawinan Angkatan I dilaksanakan pada 14 sampai 15 Maret 2025 di Wisma Retret Damai Sejahtera dengan 19 peserta dari target 20 peserta.', 19, 3010000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Para calon pasangan menyelesaikan seluruh materi dan menyatakan lebih siap membangun keluarga.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0085', 'KGT-0100', '2025-03-31', 'Final', 'Pelatihan Fotografi dan Videografi Liturgi dilaksanakan pada 21 Maret 2025 di Aula Paroki Santa Maria Contoh dengan 18 peserta dari target 20 peserta.', 18, 2775000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Relawan berlatih mengambil gambar dengan sikap menghormati perayaan dan menyepakati aturan dokumentasi.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0086', 'KGT-0102', '2025-04-29', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 17 sampai 20 April 2025 di Gereja Santa Maria Contoh dengan 567 peserta dari target 580 peserta.', 567, 15640000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0087', 'KGT-0105', '2025-05-19', 'Final', 'Pemeriksaan Kesehatan Gratis untuk Lansia dilaksanakan pada 16 Mei 2025 di Aula Paroki Santa Maria Contoh dengan 75 peserta dari target 95 peserta.', 75, 6065000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Para lansia menerima pemeriksaan dasar dan konsultasi, sebagian dirujuk ke fasilitas kesehatan untuk pemeriksaan lanjutan.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0088', 'KGT-0107', '2025-06-07', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2025 di Aula Paroki Santa Maria Contoh dengan 30 peserta dari target 35 peserta.', 30, 6625000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0089', 'KGT-0108', '2025-06-13', 'Final', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2025 di Aula Paroki Santa Maria Contoh dengan 51 peserta dari target 60 peserta.', 51, 5325000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0090', 'KGT-0109', '2025-06-16', 'Final', 'Pelatihan Pertolongan Pertama dilaksanakan pada 13 Juni 2025 di Aula Paroki Santa Maria Contoh dengan 26 peserta dari target 30 peserta.', 26, 2410000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0091', 'KGT-0110', '2025-07-02', 'Final', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2025 di Gereja Santa Maria Contoh dengan 22 peserta dari target 25 peserta.', 22, 1050000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0092', 'KGT-0112', '2025-10-07', 'Final', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2025 sampai 26 September 2025 di Ruang Katekese Paroki dengan 44 peserta dari target 40 peserta.', 44, 3740000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0093', 'KGT-0113', '2025-07-20', 'Draf', 'Kunjungan dan Santunan Lansia dilaksanakan pada 11 Juli 2025 di Rumah Umat di Lingkungan dengan 47 peserta dari target 60 peserta.', 47, 4820000, NULL, NULL, 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0094', 'KGT-0114', '2025-07-22', 'Final', 'Penyaluran Bantuan Korban Hujan Abu Vulkanik dilaksanakan pada 12 Juli 2025 di Posko Bantuan Paroki dengan 119 peserta dari target 120 peserta.', 119, 8685000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Bantuan darurat berupa kebutuhan pokok dan masker tersalurkan kepada keluarga yang terdampak.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0095', 'KGT-0115', '2025-07-24', 'Final', 'Pelatihan Operator Tata Suara dan Perangkat Baru dilaksanakan pada 18 Juli 2025 di Gereja Santa Maria Contoh dengan 9 peserta dari target 10 peserta.', 9, 13540000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0096', 'KGT-0116', '2025-07-30', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2025 di Ruang Rapat Paroki dengan 14 peserta dari target 15 peserta.', 14, 3140000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0097', 'KGT-0117', '2025-08-26', 'Final', 'Pelatihan Siaran Langsung Misa dilaksanakan pada 15 Agustus 2025 di Gereja Santa Maria Contoh dengan 10 peserta dari target 10 peserta.', 10, 2220000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0098', 'KGT-0120', '2025-09-10', 'Final', 'Seminar Pengasuhan Anak di Era Digital dilaksanakan pada 5 September 2025 di Aula Paroki Santa Maria Contoh dengan 77 peserta dari target 75 peserta.', 77, 5540000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0099', 'KGT-0123', '2025-10-03', 'Final', 'Perayaan Bulan Kitab Suci Nasional dilaksanakan pada 26 September 2025 di Gereja Santa Maria Contoh dengan 179 peserta dari target 190 peserta.', 179, 4455000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Ibadat Sabda dan sarasehan berlangsung khidmat, umat membawa Kitab Suci masing-masing.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0100', 'KGT-0124', '2025-10-22', 'Draf', 'Misa Syukur Hari Ulang Tahun Paroki dilaksanakan pada 11 Oktober 2025 di Gereja Santa Maria Contoh dengan 293 peserta dari target 335 peserta.', 293, 10525000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', NULL, NULL),
-            ('LPK-0101', 'KGT-0125', '2025-10-28', 'Final', 'Penyuluhan Gizi Keluarga dilaksanakan pada 17 Oktober 2025 di Aula Paroki Santa Maria Contoh dengan 67 peserta dari target 60 peserta.', 67, 2810000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0102', 'KGT-0127', '2025-11-10', 'Final', 'Latihan Koor Gabungan Persiapan Natal dilaksanakan pada 7 November 2025 di Aula Paroki Santa Maria Contoh dengan 80 peserta dari target 75 peserta.', 80, 2410000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0103', 'KGT-0128', '2025-11-27', 'Final', 'Pekan Katekese Anak dilaksanakan pada 14 sampai 15 November 2025 di Aula Paroki Santa Maria Contoh dengan 87 peserta dari target 85 peserta.', 87, 4715000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0104', 'KGT-0129', '2025-11-26', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2025 di Ruang Rapat Paroki dengan 37 peserta dari target 40 peserta.', 37, 1470000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0105', 'KGT-0130', '2025-11-30', 'Final', 'Temu Relawan Media Paroki dilaksanakan pada 21 November 2025 di Ruang Rapat Paroki dengan 25 peserta dari target 25 peserta.', 25, 855000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0106', 'KGT-0131', '2025-12-05', 'Final', 'Pendalaman Kitab Suci Masa Adven dilaksanakan pada 29 November 2025 di Aula Paroki Santa Maria Contoh dengan 105 peserta dari target 95 peserta.', 105, 2070000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0107', 'KGT-0132', '2025-12-19', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2025 di Lokasi Perkemahan Bukit Damai dengan 47 peserta dari target 60 peserta.', 47, 9030000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0108', 'KGT-0133', '2026-01-03', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2025 di Gereja Santa Maria Contoh dengan 864 peserta dari target 870 peserta.', 864, 24660000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0109', 'KGT-0134', '2026-01-21', 'Final', 'Rapat Kerja Pengurus Paroki dilaksanakan pada 17 sampai 18 Januari 2026 di Wisma Retret Damai Sejahtera dengan 50 peserta dari target 45 peserta.', 50, 8110000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Pengurus menyepakati prioritas pelayanan dan jadwal besar kegiatan tahun 2026.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0110', 'KGT-0135', '2026-04-16', 'Final', 'Pendampingan Calon Baptis Dewasa dilaksanakan pada 24 Januari 2026 sampai 4 April 2026 di Ruang Katekese Paroki dengan 10 peserta dari target 12 peserta.', 10, 2690000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Para katekumen menyelesaikan seluruh pertemuan pendampingan dan dipersiapkan menerima sakramen pada Malam Paskah.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0111', 'KGT-0136', '2026-03-21', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2026 sampai 14 Maret 2026 di Ruang Katekese Paroki dengan 30 peserta dari target 30 peserta.', 30, 5375000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0112', 'KGT-0137', '2026-04-29', 'Final', 'Katekese Persiapan Komuni Pertama dilaksanakan pada 7 Februari 2026 sampai 25 April 2026 di Ruang Katekese Paroki dengan 37 peserta dari target 35 peserta.', 37, 6865000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Anak-anak mengikuti seluruh rangkaian pertemuan dan siap menerima Komuni Pertama, orang tua terlibat aktif dalam pendampingan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0113', 'KGT-0138', '2026-02-21', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2026 di Aula Paroki Santa Maria Contoh dengan 35 peserta dari target 40 peserta.', 35, 3105000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0114', 'KGT-0139', '2026-03-19', 'Final', 'Kursus Persiapan Perkawinan Angkatan I dilaksanakan pada 14 sampai 15 Maret 2026 di Wisma Retret Damai Sejahtera dengan 21 peserta dari target 20 peserta.', 21, 9350000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Para calon pasangan menyelesaikan seluruh materi dan menyatakan lebih siap membangun keluarga.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0115', 'KGT-0140', '2026-03-26', 'Final', 'Pelatihan Fotografi dan Videografi Liturgi dilaksanakan pada 21 Maret 2026 di Aula Paroki Santa Maria Contoh dengan 21 peserta dari target 20 peserta.', 21, 2310000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Relawan berlatih mengambil gambar dengan sikap menghormati perayaan dan menyepakati aturan dokumentasi.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.'),
-            ('LPK-0116', 'KGT-0141', '2026-04-09', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 2 sampai 5 April 2026 di Gereja Santa Maria Contoh dengan 626 peserta dari target 600 peserta.', 626, 17285000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0117', 'KGT-0142', '2026-04-15', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2026 di Aula Paroki Santa Maria Contoh dengan 166 peserta dari target 150 peserta.', 166, 14660000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0118', 'KGT-0143', '2026-05-01', 'Final', 'Retret Orang Muda Katolik dilaksanakan pada 25 sampai 26 April 2026 di Wisma Retret Damai Sejahtera dengan 41 peserta dari target 45 peserta.', 41, 13550000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti sesi refleksi, adorasi, dan berbagi kelompok dengan antusias.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0119', 'KGT-0144', '2026-05-14', 'Draf', 'Lokakarya Penulisan Warta Paroki dilaksanakan pada 9 Mei 2026 di Ruang Rapat Paroki dengan 17 peserta dari target 15 peserta.', 17, 1570000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Relawan menulis contoh warta dan menerima masukan penyuntingan.', NULL),
-            ('LPK-0120', 'KGT-0145', '2026-05-21', 'Final', 'Pemeriksaan Kesehatan Gratis untuk Lansia dilaksanakan pada 16 Mei 2026 di Aula Paroki Santa Maria Contoh dengan 107 peserta dari target 100 peserta.', 107, 7105000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Para lansia menerima pemeriksaan dasar dan konsultasi, sebagian dirujuk ke fasilitas kesehatan untuk pemeriksaan lanjutan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0121', 'KGT-0147', '2026-06-03', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2026 di Aula Paroki Santa Maria Contoh dengan 33 peserta dari target 35 peserta.', 33, 7720000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0122', 'KGT-0148', '2026-06-16', 'Draf', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2026 di Aula Paroki Santa Maria Contoh dengan 67 peserta dari target 60 peserta.', 67, NULL, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0123', 'KGT-0149', '2026-07-01', 'Draf', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2026 di Gereja Santa Maria Contoh dengan 22 peserta dari target 25 peserta.', 22, 1085000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', NULL),
-            ('LPK-0124', 'KGT-0150', '2026-06-30', 'Final', 'Turnamen Futsal Antarlingkungan dilaksanakan pada 27 Juni 2026 di Lapangan Futsal Sewaan dengan 132 peserta dari target 120 peserta.', 132, 8630000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Turnamen berlangsung tertib dan sportif dengan keterlibatan banyak lingkungan.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0125', 'KGT-0151', '2026-09-30', 'Draf', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2026 sampai 26 September 2026 di Ruang Katekese Paroki dengan 38 peserta dari target 40 peserta.', 38, 6480000, NULL, 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', NULL),
-            ('LPK-0126', 'KGT-0152', '2026-07-23', 'Draf', 'Kunjungan dan Santunan Lansia dilaksanakan pada 11 Juli 2026 di Rumah Umat di Lingkungan dengan 60 peserta dari target 60 peserta.', 60, 5505000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', NULL, NULL),
-            ('LPK-0127', 'KGT-0154', '2026-08-04', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2026 di Ruang Rapat Paroki dengan 16 peserta dari target 18 peserta.', 16, 3100000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0128', 'KGT-0155', '2026-08-07', 'Final', 'Penyaluran Bantuan Korban Banjir dilaksanakan pada 26 Juli 2026 di Posko Bantuan Paroki dengan 85 peserta dari target 90 peserta.', 85, 12740000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Bantuan darurat berupa kebutuhan pokok tersalurkan kepada keluarga yang terdampak.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.'),
-            ('LPK-0129', 'KGT-0159', '2026-09-02', 'Final', 'Aksi Donor Darah Paroki dilaksanakan pada 29 Agustus 2026 di Aula Paroki Santa Maria Contoh dengan 66 peserta dari target 70 peserta.', 66, 3600000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kantong darah terkumpul dan diserahkan kepada unit donor darah mitra.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0130', 'KGT-0162', '2026-09-26', 'Perlu Revisi', 'Bakti Sosial Orang Muda di Panti Asuhan dilaksanakan pada 19 September 2026 di Panti Asuhan Kasih Sejahtera dengan 30 peserta dari target 30 peserta.', 34, 3535000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Orang muda mengunjungi panti asuhan, bermain bersama anak-anak, dan menyerahkan bantuan perlengkapan sekolah.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.'),
-            ('LPK-0131', 'KGT-0164', '2026-09-30', 'Draf', 'Perayaan Bulan Kitab Suci Nasional dilaksanakan pada 26 September 2026 di Gereja Santa Maria Contoh dengan 202 peserta dari target 200 peserta.', 202, NULL, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Ibadat Sabda dan sarasehan berlangsung khidmat, umat membawa Kitab Suci masing-masing.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.'),
-            ('LPK-0132', 'KGT-0168', '2026-04-06', 'Final', 'Doa Bersama dan Penggalangan Bantuan Korban Longsor dilaksanakan pada 28 Maret 2026 di Gereja Santa Maria Contoh dengan 85 peserta dari target 60 peserta.', 85, 3200000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Doa bersama dan penggalangan bantuan berjalan lancar, bantuan diteruskan melalui jaringan pelayanan sosial.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.')
-    ) AS v (ID_LAPORAN, ID_KEGIATAN, TANGGAL_LAPORAN, STATUS_LAPORAN, RINGKASAN_PELAKSANAAN, JUMLAH_PESERTA, REALISASI_BIAYA, EVALUASI_LOGISTIK, HASIL_KEGIATAN, REKOMENDASI_TINDAK_LANJUT)
+            ('LPK-0001', 'KGT-0001', '2021-02-26', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2021 di Aula Paroki Santa Maria Contoh dengan 29 peserta dari target 30 peserta.', 29, 1740000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0001_Pelatihan_Lektor_dan_Pemazmur_2021-02-14.pdf'),
+            ('LPK-0002', 'KGT-0003', '2021-04-15', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 1 sampai 4 April 2021 di Gereja Santa Maria Contoh dengan 470 peserta dari target 450 peserta.', 470, 6945000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0002_Rangkaian_Perayaan_Pekan_Suci_dan_Paskah_2021-04-01.pdf'),
+            ('LPK-0003', 'KGT-0004', '2021-04-14', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2021 di Aula Paroki Santa Maria Contoh dengan 93 peserta dari target 115 peserta.', 93, 8490000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0003_Penyaluran_Bantuan_Aksi_Puasa_Pembangunan_2021-04-11.pdf'),
+            ('LPK-0004', 'KGT-0005', '2021-05-16', 'Final', 'Lokakarya Penulisan Warta Paroki dilaksanakan pada 9 Mei 2021 di Ruang Rapat Paroki dengan 9 peserta dari target 10 peserta.', 9, 930000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Relawan menulis contoh warta dan menerima masukan penyuntingan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0004_Lokakarya_Penulisan_Warta_Paroki_2021-05-09.pdf'),
+            ('LPK-0005', 'KGT-0006', '2021-06-08', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2021 di Aula Paroki Santa Maria Contoh dengan 20 peserta dari target 25 peserta.', 20, 3435000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0005_Pelatihan_Kewirausahaan_Usaha_Mikro_Umat_2021-05-30.pdf'),
+            ('LPK-0006', 'KGT-0007', '2021-06-12', 'Final', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2021 di Aula Paroki Santa Maria Contoh dengan 47 peserta dari target 45 peserta.', 47, 2385000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0006_Rekoleksi_Pasangan_Suami_Istri_2021-06-06.pdf'),
+            ('LPK-0007', 'KGT-0008', '2021-10-07', 'Final', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2021 sampai 26 September 2021 di Ruang Katekese Paroki dengan 29 peserta dari target 30 peserta.', 29, 3335000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0007_Katekese_Persiapan_Sakramen_Krisma_2021-07-04.pdf'),
+            ('LPK-0008', 'KGT-0009', '2021-08-02', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2021 di Ruang Rapat Paroki dengan 16 peserta dari target 15 peserta.', 16, 1360000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0008_Pelatihan_Pengelolaan_Data_Umat_dan_Pelindungan_Privasi_2021-07-25.pdf'),
+            ('LPK-0009', 'KGT-0010', '2021-09-23', 'Final', 'Bakti Sosial Orang Muda di Panti Asuhan dilaksanakan pada 19 September 2021 di Panti Asuhan Kasih Sejahtera dengan 24 peserta dari target 25 peserta.', 24, 1435000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Orang muda mengunjungi panti asuhan, bermain bersama anak-anak, dan menyerahkan bantuan perlengkapan sekolah.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0009_Bakti_Sosial_Orang_Muda_di_Panti_Asuhan_2021-09-19.pdf'),
+            ('LPK-0010', 'KGT-0011', '2021-10-16', 'Final', 'Misa Syukur Hari Ulang Tahun Paroki dilaksanakan pada 11 Oktober 2021 di Gereja Santa Maria Contoh dengan 210 peserta dari target 265 peserta.', 210, 5405000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0010_Misa_Syukur_Hari_Ulang_Tahun_Paroki_2021-10-11.pdf'),
+            ('LPK-0011', 'KGT-0012', '2021-11-17', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2021 di Ruang Rapat Paroki dengan 26 peserta dari target 30 peserta.', 26, 765000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0011_Rapat_Evaluasi_Semester_dan_Penyusunan_Anggaran_2027_2021-11-14.pdf'),
+            ('LPK-0012', 'KGT-0013', '2021-12-02', 'Final', 'Temu Relawan Media Paroki dilaksanakan pada 21 November 2021 di Ruang Rapat Paroki dengan 21 peserta dari target 20 peserta.', 21, 465000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0012_Temu_Relawan_Media_Paroki_2021-11-21.pdf'),
+            ('LPK-0013', 'KGT-0014', '2021-12-22', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2021 di Lokasi Perkemahan Bukit Damai dengan 48 peserta dari target 45 peserta.', 48, 4050000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0013_Perkemahan_Orang_Muda_Akhir_Tahun_2021-12-12.pdf'),
+            ('LPK-0014', 'KGT-0015', '2022-01-01', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2021 di Gereja Santa Maria Contoh dengan 671 peserta dari target 650 peserta.', 671, 9495000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0014_Rangkaian_Perayaan_Natal_2021-12-24.pdf'),
+            ('LPK-0015', 'KGT-0016', '2022-03-21', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2022 sampai 14 Maret 2022 di Ruang Katekese Paroki dengan 26 peserta dari target 25 peserta.', 26, 4305000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0015_Kursus_Dasar_Kitab_Suci_Angkatan_I_2022-01-31.pdf'),
+            ('LPK-0016', 'KGT-0017', '2022-02-22', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2022 di Aula Paroki Santa Maria Contoh dengan 28 peserta dari target 30 peserta.', 28, 2635000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0016_Pelatihan_Lektor_dan_Pemazmur_2022-02-14.pdf'),
+            ('LPK-0017', 'KGT-0018', '2022-03-24', 'Final', 'Kursus Persiapan Perkawinan Angkatan I dilaksanakan pada 14 sampai 15 Maret 2022 di Wisma Retret Damai Sejahtera dengan 15 peserta dari target 15 peserta.', 15, 7270000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Para calon pasangan menyelesaikan seluruh materi dan menyatakan lebih siap membangun keluarga.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0017_Kursus_Persiapan_Perkawinan_Angkatan_I_2022-03-14.pdf'),
+            ('LPK-0018', 'KGT-0020', '2022-04-15', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2022 di Aula Paroki Santa Maria Contoh dengan 100 peserta dari target 120 peserta.', 100, 13375000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0018_Penyaluran_Bantuan_Aksi_Puasa_Pembangunan_2022-04-11.pdf'),
+            ('LPK-0019', 'KGT-0021', '2022-04-21', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 14 sampai 17 April 2022 di Gereja Santa Maria Contoh dengan 503 peserta dari target 480 peserta.', 503, 9120000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0019_Rangkaian_Perayaan_Pekan_Suci_dan_Paskah_2022-04-14.pdf'),
+            ('LPK-0020', 'KGT-0023', '2022-06-08', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2022 di Aula Paroki Santa Maria Contoh dengan 31 peserta dari target 30 peserta.', 31, 6050000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0020_Pelatihan_Kewirausahaan_Usaha_Mikro_Umat_2022-05-30.pdf'),
+            ('LPK-0021', 'KGT-0025', '2022-06-23', 'Final', 'Pelatihan Pertolongan Pertama dilaksanakan pada 13 Juni 2022 di Aula Paroki Santa Maria Contoh dengan 23 peserta dari target 25 peserta.', 23, 2170000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0021_Pelatihan_Pertolongan_Pertama_2022-06-13.pdf'),
+            ('LPK-0022', 'KGT-0026', '2022-06-27', 'Final', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2022 di Gereja Santa Maria Contoh dengan 21 peserta dari target 20 peserta.', 21, 830000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0022_Pelatihan_Putra_Putri_Altar_Baru_2022-06-20.pdf'),
+            ('LPK-0023', 'KGT-0027', '2022-10-08', 'Final', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2022 sampai 26 September 2022 di Ruang Katekese Paroki dengan 33 peserta dari target 30 peserta.', 33, 5510000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0023_Katekese_Persiapan_Sakramen_Krisma_2022-07-04.pdf'),
+            ('LPK-0024', 'KGT-0028', '2022-07-17', 'Final', 'Kunjungan dan Santunan Lansia dilaksanakan pada 11 Juli 2022 di Rumah Umat di Lingkungan dengan 52 peserta dari target 50 peserta.', 52, 3985000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0024_Kunjungan_dan_Santunan_Lansia_2022-07-11.pdf'),
+            ('LPK-0025', 'KGT-0029', '2022-07-29', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2022 di Ruang Rapat Paroki dengan 15 peserta dari target 15 peserta.', 15, 2335000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0025_Pelatihan_Pengelolaan_Data_Umat_dan_Pelindungan_Privasi_2022-07-25.pdf'),
+            ('LPK-0026', 'KGT-0032', '2022-11-18', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2022 di Ruang Rapat Paroki dengan 28 peserta dari target 30 peserta.', 28, 1205000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0026_Rapat_Evaluasi_Semester_dan_Penyusunan_Anggaran_2027_2022-11-14.pdf'),
+            ('LPK-0027', 'KGT-0033', '2022-11-30', 'Final', 'Temu Relawan Media Paroki dilaksanakan pada 21 November 2022 di Ruang Rapat Paroki dengan 16 peserta dari target 20 peserta.', 16, 760000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0027_Temu_Relawan_Media_Paroki_2022-11-21.pdf'),
+            ('LPK-0028', 'KGT-0034', '2022-12-07', 'Final', 'Pendalaman Kitab Suci Masa Adven dilaksanakan pada 29 November 2022 di Aula Paroki Santa Maria Contoh dengan 85 peserta dari target 80 peserta.', 85, 1900000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0028_Pendalaman_Kitab_Suci_Masa_Adven_2022-11-29.pdf'),
+            ('LPK-0029', 'KGT-0035', '2022-12-16', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2022 di Lokasi Perkemahan Bukit Damai dengan 52 peserta dari target 50 peserta.', 52, 7925000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0029_Perkemahan_Orang_Muda_Akhir_Tahun_2022-12-12.pdf'),
+            ('LPK-0030', 'KGT-0036', '2022-12-30', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2022 di Gereja Santa Maria Contoh dengan 692 peserta dari target 700 peserta.', 692, 12555000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0030_Rangkaian_Perayaan_Natal_2022-12-24.pdf'),
+            ('LPK-0031', 'KGT-0037', '2023-03-20', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2023 sampai 14 Maret 2023 di Ruang Katekese Paroki dengan 24 peserta dari target 25 peserta.', 24, 4695000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0031_Kursus_Dasar_Kitab_Suci_Angkatan_I_2023-01-31.pdf'),
+            ('LPK-0032', 'KGT-0038', '2023-05-07', 'Final', 'Katekese Persiapan Komuni Pertama dilaksanakan pada 7 Februari 2023 sampai 25 April 2023 di Ruang Katekese Paroki dengan 24 peserta dari target 30 peserta.', 24, 4850000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Anak-anak mengikuti seluruh rangkaian pertemuan dan siap menerima Komuni Pertama, orang tua terlibat aktif dalam pendampingan.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0032_Katekese_Persiapan_Komuni_Pertama_2023-02-07.pdf'),
+            ('LPK-0033', 'KGT-0039', '2023-02-22', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2023 di Aula Paroki Santa Maria Contoh dengan 32 peserta dari target 35 peserta.', 32, 2570000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0033_Pelatihan_Lektor_dan_Pemazmur_2023-02-14.pdf'),
+            ('LPK-0034', 'KGT-0040', '2023-03-26', 'Final', 'Kursus Persiapan Perkawinan Angkatan I dilaksanakan pada 14 sampai 15 Maret 2023 di Wisma Retret Damai Sejahtera dengan 12 peserta dari target 15 peserta.', 12, 6905000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Para calon pasangan menyelesaikan seluruh materi dan menyatakan lebih siap membangun keluarga.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0034_Kursus_Persiapan_Perkawinan_Angkatan_I_2023-03-14.pdf'),
+            ('LPK-0035', 'KGT-0041', '2023-04-02', 'Final', 'Pelatihan Fotografi dan Videografi Liturgi dilaksanakan pada 21 Maret 2023 di Aula Paroki Santa Maria Contoh dengan 13 peserta dari target 15 peserta.', 13, 2255000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Relawan berlatih mengambil gambar dengan sikap menghormati perayaan dan menyepakati aturan dokumentasi.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0035_Pelatihan_Fotografi_dan_Videografi_Liturgi_2023-03-21.pdf'),
+            ('LPK-0036', 'KGT-0042', '2023-04-16', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 6 sampai 9 April 2023 di Gereja Santa Maria Contoh dengan 497 peserta dari target 520 peserta.', 497, 10995000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0036_Rangkaian_Perayaan_Pekan_Suci_dan_Paskah_2023-04-06.pdf'),
+            ('LPK-0037', 'KGT-0043', '2023-04-21', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2023 di Aula Paroki Santa Maria Contoh dengan 109 peserta dari target 130 peserta.', 109, 11905000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0037_Penyaluran_Bantuan_Aksi_Puasa_Pembangunan_2023-04-11.pdf'),
+            ('LPK-0038', 'KGT-0045', '2023-05-20', 'Final', 'Lokakarya Penulisan Warta Paroki dilaksanakan pada 9 Mei 2023 di Ruang Rapat Paroki dengan 16 peserta dari target 15 peserta.', 16, 1190000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Relawan menulis contoh warta dan menerima masukan penyuntingan.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0038_Lokakarya_Penulisan_Warta_Paroki_2023-05-09.pdf'),
+            ('LPK-0039', 'KGT-0046', '2023-06-09', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2023 di Aula Paroki Santa Maria Contoh dengan 33 peserta dari target 30 peserta.', 33, 5350000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0039_Pelatihan_Kewirausahaan_Usaha_Mikro_Umat_2023-05-30.pdf'),
+            ('LPK-0040', 'KGT-0047', '2023-06-17', 'Final', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2023 di Aula Paroki Santa Maria Contoh dengan 47 peserta dari target 50 peserta.', 47, 3765000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0040_Rekoleksi_Pasangan_Suami_Istri_2023-06-06.pdf'),
+            ('LPK-0041', 'KGT-0048', '2023-06-18', 'Final', 'Pelatihan Pertolongan Pertama dilaksanakan pada 13 Juni 2023 di Aula Paroki Santa Maria Contoh dengan 20 peserta dari target 25 peserta.', 20, 2175000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0041_Pelatihan_Pertolongan_Pertama_2023-06-13.pdf'),
+            ('LPK-0042', 'KGT-0049', '2023-06-24', 'Final', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2023 di Gereja Santa Maria Contoh dengan 16 peserta dari target 20 peserta.', 16, 795000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0042_Pelatihan_Putra_Putri_Altar_Baru_2023-06-20.pdf'),
+            ('LPK-0043', 'KGT-0050', '2023-10-01', 'Final', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2023 sampai 26 September 2023 di Ruang Katekese Paroki dengan 33 peserta dari target 35 peserta.', 33, 6180000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0043_Katekese_Persiapan_Sakramen_Krisma_2023-07-04.pdf'),
+            ('LPK-0044', 'KGT-0051', '2023-07-16', 'Final', 'Kunjungan dan Santunan Lansia dilaksanakan pada 11 Juli 2023 di Rumah Umat di Lingkungan dengan 45 peserta dari target 50 peserta.', 45, 4905000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0044_Kunjungan_dan_Santunan_Lansia_2023-07-11.pdf'),
+            ('LPK-0045', 'KGT-0052', '2023-07-25', 'Final', 'Pelatihan Operator Tata Suara dan Perangkat Baru dilaksanakan pada 18 Juli 2023 di Gereja Santa Maria Contoh dengan 9 peserta dari target 10 peserta.', 9, 10450000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0045_Pelatihan_Operator_Tata_Suara_dan_Perangkat_Baru_2023-07-18.pdf'),
+            ('LPK-0046', 'KGT-0053', '2023-08-06', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2023 di Ruang Rapat Paroki dengan 16 peserta dari target 15 peserta.', 16, 2170000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0046_Pelatihan_Pengelolaan_Data_Umat_dan_Pelindungan_Privasi_2023-07-25.pdf'),
+            ('LPK-0047', 'KGT-0054', '2023-09-10', 'Final', 'Seminar Pengasuhan Anak di Era Digital dilaksanakan pada 5 September 2023 di Aula Paroki Santa Maria Contoh dengan 72 peserta dari target 70 peserta.', 72, 4320000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0047_Seminar_Pengasuhan_Anak_di_Era_Digital_2023-09-05.pdf'),
+            ('LPK-0048', 'KGT-0055', '2023-09-25', 'Final', 'Bakti Sosial Orang Muda di Panti Asuhan dilaksanakan pada 19 September 2023 di Panti Asuhan Kasih Sejahtera dengan 28 peserta dari target 25 peserta.', 28, 2280000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Orang muda mengunjungi panti asuhan, bermain bersama anak-anak, dan menyerahkan bantuan perlengkapan sekolah.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0048_Bakti_Sosial_Orang_Muda_di_Panti_Asuhan_2023-09-19.pdf'),
+            ('LPK-0049', 'KGT-0056', '2023-10-14', 'Final', 'Misa Syukur Hari Ulang Tahun Paroki dilaksanakan pada 11 Oktober 2023 di Gereja Santa Maria Contoh dengan 267 peserta dari target 300 peserta.', 267, 8645000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0049_Misa_Syukur_Hari_Ulang_Tahun_Paroki_2023-10-11.pdf'),
+            ('LPK-0050', 'KGT-0057', '2023-11-02', 'Final', 'Misa Syukur Ulang Tahun Perkawinan dilaksanakan pada 24 Oktober 2023 di Gereja Santa Maria Contoh dengan 67 peserta dari target 60 peserta.', 67, 3215000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0050_Misa_Syukur_Ulang_Tahun_Perkawinan_2023-10-24.pdf'),
+            ('LPK-0051', 'KGT-0058', '2023-11-11', 'Final', 'Latihan Koor Gabungan Persiapan Natal dilaksanakan pada 7 November 2023 di Aula Paroki Santa Maria Contoh dengan 67 peserta dari target 70 peserta.', 67, 1620000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0051_Latihan_Koor_Gabungan_Persiapan_Natal_2023-11-07.pdf'),
+            ('LPK-0052', 'KGT-0059', '2023-11-17', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2023 di Ruang Rapat Paroki dengan 33 peserta dari target 35 peserta.', 33, 1070000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0052_Rapat_Evaluasi_Semester_dan_Penyusunan_Anggaran_2027_2023-11-14.pdf'),
+            ('LPK-0053', 'KGT-0061', '2023-12-07', 'Final', 'Pendalaman Kitab Suci Masa Adven dilaksanakan pada 29 November 2023 di Aula Paroki Santa Maria Contoh dengan 66 peserta dari target 85 peserta.', 66, 1595000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0053_Pendalaman_Kitab_Suci_Masa_Adven_2023-11-29.pdf'),
+            ('LPK-0054', 'KGT-0062', '2023-12-16', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2023 di Lokasi Perkemahan Bukit Damai dengan 47 peserta dari target 50 peserta.', 47, 5925000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0054_Perkemahan_Orang_Muda_Akhir_Tahun_2023-12-12.pdf'),
+            ('LPK-0055', 'KGT-0063', '2024-01-06', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2023 di Gereja Santa Maria Contoh dengan 778 peserta dari target 760 peserta.', 778, 16145000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0055_Rangkaian_Perayaan_Natal_2023-12-24.pdf'),
+            ('LPK-0056', 'KGT-0064', '2024-03-19', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2024 sampai 14 Maret 2024 di Ruang Katekese Paroki dengan 21 peserta dari target 25 peserta.', 21, 4725000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0056_Kursus_Dasar_Kitab_Suci_Angkatan_I_2024-01-31.pdf'),
+            ('LPK-0057', 'KGT-0066', '2024-02-24', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2024 di Aula Paroki Santa Maria Contoh dengan 34 peserta dari target 35 peserta.', 34, 2705000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0057_Pelatihan_Lektor_dan_Pemazmur_2024-02-14.pdf'),
+            ('LPK-0058', 'KGT-0067', '2024-03-31', 'Final', 'Pelatihan Fotografi dan Videografi Liturgi dilaksanakan pada 21 Maret 2024 di Aula Paroki Santa Maria Contoh dengan 16 peserta dari target 20 peserta.', 16, 2455000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Relawan berlatih mengambil gambar dengan sikap menghormati perayaan dan menyepakati aturan dokumentasi.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0058_Pelatihan_Fotografi_dan_Videografi_Liturgi_2024-03-21.pdf'),
+            ('LPK-0059', 'KGT-0068', '2024-04-12', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 28 sampai 31 Maret 2024 di Gereja Santa Maria Contoh dengan 526 peserta dari target 550 peserta.', 526, 13510000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0059_Rangkaian_Perayaan_Pekan_Suci_dan_Paskah_2024-03-28.pdf'),
+            ('LPK-0060', 'KGT-0069', '2024-04-19', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2024 di Aula Paroki Santa Maria Contoh dengan 116 peserta dari target 135 peserta.', 116, 14270000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0060_Penyaluran_Bantuan_Aksi_Puasa_Pembangunan_2024-04-11.pdf'),
+            ('LPK-0061', 'KGT-0071', '2024-05-21', 'Final', 'Lokakarya Penulisan Warta Paroki dilaksanakan pada 9 Mei 2024 di Ruang Rapat Paroki dengan 13 peserta dari target 15 peserta.', 13, 1350000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Relawan menulis contoh warta dan menerima masukan penyuntingan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0061_Lokakarya_Penulisan_Warta_Paroki_2024-05-09.pdf'),
+            ('LPK-0062', 'KGT-0072', '2024-06-03', 'Final', 'Pelatihan Katekis Lingkungan dilaksanakan pada 23 Mei 2024 di Aula Paroki Santa Maria Contoh dengan 27 peserta dari target 25 peserta.', 27, 4285000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0062_Pelatihan_Katekis_Lingkungan_2024-05-23.pdf'),
+            ('LPK-0063', 'KGT-0073', '2024-06-05', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2024 di Aula Paroki Santa Maria Contoh dengan 28 peserta dari target 30 peserta.', 28, 5725000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0063_Pelatihan_Kewirausahaan_Usaha_Mikro_Umat_2024-05-30.pdf'),
+            ('LPK-0064', 'KGT-0074', '2024-06-09', 'Final', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2024 di Aula Paroki Santa Maria Contoh dengan 57 peserta dari target 55 peserta.', 57, 4500000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0064_Rekoleksi_Pasangan_Suami_Istri_2024-06-06.pdf'),
+            ('LPK-0065', 'KGT-0075', '2024-06-20', 'Final', 'Pelatihan Pertolongan Pertama dilaksanakan pada 13 Juni 2024 di Aula Paroki Santa Maria Contoh dengan 26 peserta dari target 25 peserta.', 26, 2105000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0065_Pelatihan_Pertolongan_Pertama_2024-06-13.pdf'),
+            ('LPK-0066', 'KGT-0076', '2024-07-01', 'Final', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2024 di Gereja Santa Maria Contoh dengan 28 peserta dari target 25 peserta.', 28, 980000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0066_Pelatihan_Putra_Putri_Altar_Baru_2024-06-20.pdf'),
+            ('LPK-0067', 'KGT-0077', '2024-07-04', 'Final', 'Turnamen Futsal Antarlingkungan dilaksanakan pada 27 Juni 2024 di Lapangan Futsal Sewaan dengan 95 peserta dari target 110 peserta.', 95, 6505000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Turnamen berlangsung tertib dan sportif dengan keterlibatan banyak lingkungan.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0067_Turnamen_Futsal_Antarlingkungan_2024-06-27.pdf'),
+            ('LPK-0068', 'KGT-0080', '2024-07-21', 'Final', 'Pelatihan Operator Tata Suara dan Perangkat Baru dilaksanakan pada 18 Juli 2024 di Gereja Santa Maria Contoh dengan 8 peserta dari target 10 peserta.', 8, 12025000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0068_Pelatihan_Operator_Tata_Suara_dan_Perangkat_Baru_2024-07-18.pdf'),
+            ('LPK-0069', 'KGT-0081', '2024-08-06', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2024 di Ruang Rapat Paroki dengan 12 peserta dari target 15 peserta.', 12, 2365000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0069_Pelatihan_Pengelolaan_Data_Umat_dan_Pelindungan_Privasi_2024-07-25.pdf'),
+            ('LPK-0070', 'KGT-0082', '2024-08-25', 'Final', 'Pelatihan Kepemimpinan Orang Muda dilaksanakan pada 22 Agustus 2024 di Aula Paroki Santa Maria Contoh dengan 30 peserta dari target 30 peserta.', 30, 4405000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0070_Pelatihan_Kepemimpinan_Orang_Muda_2024-08-22.pdf'),
+            ('LPK-0071', 'KGT-0083', '2024-09-15', 'Final', 'Seminar Pengasuhan Anak di Era Digital dilaksanakan pada 5 September 2024 di Aula Paroki Santa Maria Contoh dengan 72 peserta dari target 75 peserta.', 72, 5165000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0071_Seminar_Pengasuhan_Anak_di_Era_Digital_2024-09-05.pdf'),
+            ('LPK-0072', 'KGT-0085', '2024-09-27', 'Final', 'Bakti Sosial Orang Muda di Panti Asuhan dilaksanakan pada 19 September 2024 di Panti Asuhan Kasih Sejahtera dengan 26 peserta dari target 25 peserta.', 26, 2850000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Orang muda mengunjungi panti asuhan, bermain bersama anak-anak, dan menyerahkan bantuan perlengkapan sekolah.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0072_Bakti_Sosial_Orang_Muda_di_Panti_Asuhan_2024-09-19.pdf'),
+            ('LPK-0073', 'KGT-0086', '2024-10-17', 'Final', 'Misa Syukur Hari Ulang Tahun Paroki dilaksanakan pada 11 Oktober 2024 di Gereja Santa Maria Contoh dengan 354 peserta dari target 320 peserta.', 354, 11220000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0073_Misa_Syukur_Hari_Ulang_Tahun_Paroki_2024-10-11.pdf'),
+            ('LPK-0074', 'KGT-0088', '2024-11-02', 'Final', 'Misa Syukur Ulang Tahun Perkawinan dilaksanakan pada 24 Oktober 2024 di Gereja Santa Maria Contoh dengan 53 peserta dari target 65 peserta.', 53, 3440000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0074_Misa_Syukur_Ulang_Tahun_Perkawinan_2024-10-24.pdf'),
+            ('LPK-0075', 'KGT-0089', '2024-11-19', 'Final', 'Latihan Koor Gabungan Persiapan Natal dilaksanakan pada 7 November 2024 di Aula Paroki Santa Maria Contoh dengan 79 peserta dari target 75 peserta.', 79, 1985000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0075_Latihan_Koor_Gabungan_Persiapan_Natal_2024-11-07.pdf'),
+            ('LPK-0076', 'KGT-0090', '2024-11-19', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2024 di Ruang Rapat Paroki dengan 36 peserta dari target 35 peserta.', 36, 1205000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0076_Rapat_Evaluasi_Semester_dan_Penyusunan_Anggaran_2027_2024-11-14.pdf'),
+            ('LPK-0077', 'KGT-0091', '2024-11-25', 'Final', 'Temu Relawan Media Paroki dilaksanakan pada 21 November 2024 di Ruang Rapat Paroki dengan 24 peserta dari target 25 peserta.', 24, 770000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0077_Temu_Relawan_Media_Paroki_2024-11-21.pdf'),
+            ('LPK-0078', 'KGT-0092', '2024-12-06', 'Final', 'Pendalaman Kitab Suci Masa Adven dilaksanakan pada 29 November 2024 di Aula Paroki Santa Maria Contoh dengan 81 peserta dari target 90 peserta.', 81, 2015000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0078_Pendalaman_Kitab_Suci_Masa_Adven_2024-11-29.pdf'),
+            ('LPK-0079', 'KGT-0093', '2024-12-18', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2024 di Lokasi Perkemahan Bukit Damai dengan 53 peserta dari target 55 peserta.', 53, 8700000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0079_Perkemahan_Orang_Muda_Akhir_Tahun_2024-12-12.pdf'),
+            ('LPK-0080', 'KGT-0094', '2025-01-06', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2024 di Gereja Santa Maria Contoh dengan 799 peserta dari target 820 peserta.', 799, 20645000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0080_Rangkaian_Perayaan_Natal_2024-12-24.pdf'),
+            ('LPK-0081', 'KGT-0095', '2025-01-21', 'Final', 'Rapat Kerja Pengurus Paroki dilaksanakan pada 17 sampai 18 Januari 2025 di Wisma Retret Damai Sejahtera dengan 36 peserta dari target 45 peserta.', 36, 7485000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Pengurus menyepakati prioritas pelayanan dan jadwal besar kegiatan tahun 2026.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0081_Rapat_Kerja_Pengurus_Paroki_2025-01-17.pdf'),
+            ('LPK-0082', 'KGT-0096', '2025-03-17', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2025 sampai 14 Maret 2025 di Ruang Katekese Paroki dengan 27 peserta dari target 30 peserta.', 27, 4985000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0082_Kursus_Dasar_Kitab_Suci_Angkatan_I_2025-01-31.pdf'),
+            ('LPK-0083', 'KGT-0098', '2025-02-24', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2025 di Aula Paroki Santa Maria Contoh dengan 37 peserta dari target 40 peserta.', 37, 3060000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0083_Pelatihan_Lektor_dan_Pemazmur_2025-02-14.pdf'),
+            ('LPK-0084', 'KGT-0099', '2025-03-20', 'Final', 'Kursus Persiapan Perkawinan Angkatan I dilaksanakan pada 14 sampai 15 Maret 2025 di Wisma Retret Damai Sejahtera dengan 19 peserta dari target 20 peserta.', 19, 3010000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Para calon pasangan menyelesaikan seluruh materi dan menyatakan lebih siap membangun keluarga.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0084_Kursus_Persiapan_Perkawinan_Angkatan_I_2025-03-14.pdf'),
+            ('LPK-0085', 'KGT-0100', '2025-03-31', 'Final', 'Pelatihan Fotografi dan Videografi Liturgi dilaksanakan pada 21 Maret 2025 di Aula Paroki Santa Maria Contoh dengan 18 peserta dari target 20 peserta.', 18, 2775000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Relawan berlatih mengambil gambar dengan sikap menghormati perayaan dan menyepakati aturan dokumentasi.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0085_Pelatihan_Fotografi_dan_Videografi_Liturgi_2025-03-21.pdf'),
+            ('LPK-0086', 'KGT-0102', '2025-04-29', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 17 sampai 20 April 2025 di Gereja Santa Maria Contoh dengan 567 peserta dari target 580 peserta.', 567, 15640000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0086_Rangkaian_Perayaan_Pekan_Suci_dan_Paskah_2025-04-17.pdf'),
+            ('LPK-0087', 'KGT-0105', '2025-05-19', 'Final', 'Pemeriksaan Kesehatan Gratis untuk Lansia dilaksanakan pada 16 Mei 2025 di Aula Paroki Santa Maria Contoh dengan 75 peserta dari target 95 peserta.', 75, 6065000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Para lansia menerima pemeriksaan dasar dan konsultasi, sebagian dirujuk ke fasilitas kesehatan untuk pemeriksaan lanjutan.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0087_Pemeriksaan_Kesehatan_Gratis_untuk_Lansia_2025-05-16.pdf'),
+            ('LPK-0088', 'KGT-0107', '2025-06-07', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2025 di Aula Paroki Santa Maria Contoh dengan 30 peserta dari target 35 peserta.', 30, 6625000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0088_Pelatihan_Kewirausahaan_Usaha_Mikro_Umat_2025-05-30.pdf'),
+            ('LPK-0089', 'KGT-0108', '2025-06-13', 'Final', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2025 di Aula Paroki Santa Maria Contoh dengan 51 peserta dari target 60 peserta.', 51, 5325000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0089_Rekoleksi_Pasangan_Suami_Istri_2025-06-06.pdf'),
+            ('LPK-0090', 'KGT-0109', '2025-06-16', 'Final', 'Pelatihan Pertolongan Pertama dilaksanakan pada 13 Juni 2025 di Aula Paroki Santa Maria Contoh dengan 26 peserta dari target 30 peserta.', 26, 2410000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0090_Pelatihan_Pertolongan_Pertama_2025-06-13.pdf'),
+            ('LPK-0091', 'KGT-0110', '2025-07-02', 'Final', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2025 di Gereja Santa Maria Contoh dengan 22 peserta dari target 25 peserta.', 22, 1050000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0091_Pelatihan_Putra_Putri_Altar_Baru_2025-06-20.pdf'),
+            ('LPK-0092', 'KGT-0112', '2025-10-07', 'Final', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2025 sampai 26 September 2025 di Ruang Katekese Paroki dengan 44 peserta dari target 40 peserta.', 44, 3740000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0092_Katekese_Persiapan_Sakramen_Krisma_2025-07-04.pdf'),
+            ('LPK-0093', 'KGT-0113', '2025-07-20', 'Draf', 'Kunjungan dan Santunan Lansia dilaksanakan pada 11 Juli 2025 di Rumah Umat di Lingkungan dengan 47 peserta dari target 60 peserta.', 47, 4820000, NULL, NULL, 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0093_Kunjungan_dan_Santunan_Lansia_2025-07-11.pdf'),
+            ('LPK-0094', 'KGT-0114', '2025-07-22', 'Final', 'Penyaluran Bantuan Korban Hujan Abu Vulkanik dilaksanakan pada 12 Juli 2025 di Posko Bantuan Paroki dengan 119 peserta dari target 120 peserta.', 119, 8685000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Bantuan darurat berupa kebutuhan pokok dan masker tersalurkan kepada keluarga yang terdampak.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0094_Penyaluran_Bantuan_Korban_Hujan_Abu_Vulkanik_2025-07-12.pdf'),
+            ('LPK-0095', 'KGT-0115', '2025-07-24', 'Final', 'Pelatihan Operator Tata Suara dan Perangkat Baru dilaksanakan pada 18 Juli 2025 di Gereja Santa Maria Contoh dengan 9 peserta dari target 10 peserta.', 9, 13540000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0095_Pelatihan_Operator_Tata_Suara_dan_Perangkat_Baru_2025-07-18.pdf'),
+            ('LPK-0096', 'KGT-0116', '2025-07-30', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2025 di Ruang Rapat Paroki dengan 14 peserta dari target 15 peserta.', 14, 3140000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0096_Pelatihan_Pengelolaan_Data_Umat_dan_Pelindungan_Privasi_2025-07-25.pdf'),
+            ('LPK-0097', 'KGT-0117', '2025-08-26', 'Final', 'Pelatihan Siaran Langsung Misa dilaksanakan pada 15 Agustus 2025 di Gereja Santa Maria Contoh dengan 10 peserta dari target 10 peserta.', 10, 2220000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0097_Pelatihan_Siaran_Langsung_Misa_2025-08-15.pdf'),
+            ('LPK-0098', 'KGT-0120', '2025-09-10', 'Final', 'Seminar Pengasuhan Anak di Era Digital dilaksanakan pada 5 September 2025 di Aula Paroki Santa Maria Contoh dengan 77 peserta dari target 75 peserta.', 77, 5540000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0098_Seminar_Pengasuhan_Anak_di_Era_Digital_2025-09-05.pdf'),
+            ('LPK-0099', 'KGT-0123', '2025-10-03', 'Final', 'Perayaan Bulan Kitab Suci Nasional dilaksanakan pada 26 September 2025 di Gereja Santa Maria Contoh dengan 179 peserta dari target 190 peserta.', 179, 4455000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Ibadat Sabda dan sarasehan berlangsung khidmat, umat membawa Kitab Suci masing-masing.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0099_Perayaan_Bulan_Kitab_Suci_Nasional_2025-09-26.pdf'),
+            ('LPK-0100', 'KGT-0124', '2025-10-22', 'Draf', 'Misa Syukur Hari Ulang Tahun Paroki dilaksanakan pada 11 Oktober 2025 di Gereja Santa Maria Contoh dengan 293 peserta dari target 335 peserta.', 293, 10525000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', NULL, NULL, 'LPK-0100_Misa_Syukur_Hari_Ulang_Tahun_Paroki_2025-10-11.pdf'),
+            ('LPK-0101', 'KGT-0125', '2025-10-28', 'Final', 'Penyuluhan Gizi Keluarga dilaksanakan pada 17 Oktober 2025 di Aula Paroki Santa Maria Contoh dengan 67 peserta dari target 60 peserta.', 67, 2810000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0101_Penyuluhan_Gizi_Keluarga_2025-10-17.pdf'),
+            ('LPK-0102', 'KGT-0127', '2025-11-10', 'Final', 'Latihan Koor Gabungan Persiapan Natal dilaksanakan pada 7 November 2025 di Aula Paroki Santa Maria Contoh dengan 80 peserta dari target 75 peserta.', 80, 2410000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0102_Latihan_Koor_Gabungan_Persiapan_Natal_2025-11-07.pdf'),
+            ('LPK-0103', 'KGT-0128', '2025-11-27', 'Final', 'Pekan Katekese Anak dilaksanakan pada 14 sampai 15 November 2025 di Aula Paroki Santa Maria Contoh dengan 87 peserta dari target 85 peserta.', 87, 4715000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0103_Pekan_Katekese_Anak_2025-11-14.pdf'),
+            ('LPK-0104', 'KGT-0129', '2025-11-26', 'Final', 'Rapat Evaluasi Semester dan Penyusunan Anggaran 2027 dilaksanakan pada 14 November 2025 di Ruang Rapat Paroki dengan 37 peserta dari target 40 peserta.', 37, 1470000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0104_Rapat_Evaluasi_Semester_dan_Penyusunan_Anggaran_2027_2025-11-14.pdf'),
+            ('LPK-0105', 'KGT-0130', '2025-11-30', 'Final', 'Temu Relawan Media Paroki dilaksanakan pada 21 November 2025 di Ruang Rapat Paroki dengan 25 peserta dari target 25 peserta.', 25, 855000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0105_Temu_Relawan_Media_Paroki_2025-11-21.pdf'),
+            ('LPK-0106', 'KGT-0131', '2025-12-05', 'Final', 'Pendalaman Kitab Suci Masa Adven dilaksanakan pada 29 November 2025 di Aula Paroki Santa Maria Contoh dengan 105 peserta dari target 95 peserta.', 105, 2070000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0106_Pendalaman_Kitab_Suci_Masa_Adven_2025-11-29.pdf'),
+            ('LPK-0107', 'KGT-0132', '2025-12-19', 'Final', 'Perkemahan Orang Muda Akhir Tahun dilaksanakan pada 12 sampai 13 Desember 2025 di Lokasi Perkemahan Bukit Damai dengan 47 peserta dari target 60 peserta.', 47, 9030000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0107_Perkemahan_Orang_Muda_Akhir_Tahun_2025-12-12.pdf'),
+            ('LPK-0108', 'KGT-0133', '2026-01-03', 'Final', 'Rangkaian Perayaan Natal dilaksanakan pada 24 sampai 25 Desember 2025 di Gereja Santa Maria Contoh dengan 864 peserta dari target 870 peserta.', 864, 24660000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0108_Rangkaian_Perayaan_Natal_2025-12-24.pdf'),
+            ('LPK-0109', 'KGT-0134', '2026-01-21', 'Final', 'Rapat Kerja Pengurus Paroki dilaksanakan pada 17 sampai 18 Januari 2026 di Wisma Retret Damai Sejahtera dengan 50 peserta dari target 45 peserta.', 50, 8110000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Pengurus menyepakati prioritas pelayanan dan jadwal besar kegiatan tahun 2026.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0109_Rapat_Kerja_Pengurus_Paroki_2026-01-17.pdf'),
+            ('LPK-0110', 'KGT-0135', '2026-04-16', 'Final', 'Pendampingan Calon Baptis Dewasa dilaksanakan pada 24 Januari 2026 sampai 4 April 2026 di Ruang Katekese Paroki dengan 10 peserta dari target 12 peserta.', 10, 2690000, 'Sebagian peserta yang mendaftar tidak hadir sehingga ada konsumsi yang tersisa.', 'Para katekumen menyelesaikan seluruh pertemuan pendampingan dan dipersiapkan menerima sakramen pada Malam Paskah.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0110_Pendampingan_Calon_Baptis_Dewasa_2026-01-24.pdf'),
+            ('LPK-0111', 'KGT-0136', '2026-03-21', 'Final', 'Kursus Dasar Kitab Suci Angkatan I dilaksanakan pada 31 Januari 2026 sampai 14 Maret 2026 di Ruang Katekese Paroki dengan 30 peserta dari target 30 peserta.', 30, 5375000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Peserta menyelesaikan kursus dan mampu menjelaskan struktur serta tema pokok Kitab Suci.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0111_Kursus_Dasar_Kitab_Suci_Angkatan_I_2026-01-31.pdf'),
+            ('LPK-0112', 'KGT-0137', '2026-04-29', 'Final', 'Katekese Persiapan Komuni Pertama dilaksanakan pada 7 Februari 2026 sampai 25 April 2026 di Ruang Katekese Paroki dengan 37 peserta dari target 35 peserta.', 37, 6865000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Anak-anak mengikuti seluruh rangkaian pertemuan dan siap menerima Komuni Pertama, orang tua terlibat aktif dalam pendampingan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0112_Katekese_Persiapan_Komuni_Pertama_2026-02-07.pdf'),
+            ('LPK-0113', 'KGT-0138', '2026-02-21', 'Final', 'Pelatihan Lektor dan Pemazmur dilaksanakan pada 14 Februari 2026 di Aula Paroki Santa Maria Contoh dengan 35 peserta dari target 40 peserta.', 35, 3105000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0113_Pelatihan_Lektor_dan_Pemazmur_2026-02-14.pdf'),
+            ('LPK-0114', 'KGT-0139', '2026-03-19', 'Final', 'Kursus Persiapan Perkawinan Angkatan I dilaksanakan pada 14 sampai 15 Maret 2026 di Wisma Retret Damai Sejahtera dengan 21 peserta dari target 20 peserta.', 21, 9350000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Para calon pasangan menyelesaikan seluruh materi dan menyatakan lebih siap membangun keluarga.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0114_Kursus_Persiapan_Perkawinan_Angkatan_I_2026-03-14.pdf'),
+            ('LPK-0115', 'KGT-0140', '2026-03-26', 'Final', 'Pelatihan Fotografi dan Videografi Liturgi dilaksanakan pada 21 Maret 2026 di Aula Paroki Santa Maria Contoh dengan 21 peserta dari target 20 peserta.', 21, 2310000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Relawan berlatih mengambil gambar dengan sikap menghormati perayaan dan menyepakati aturan dokumentasi.', 'Siapkan cadangan perlengkapan dan petugas untuk mengantisipasi kendala teknis.', 'LPK-0115_Pelatihan_Fotografi_dan_Videografi_Liturgi_2026-03-21.pdf'),
+            ('LPK-0116', 'KGT-0141', '2026-04-09', 'Final', 'Rangkaian Perayaan Pekan Suci dan Paskah dilaksanakan pada 2 sampai 5 April 2026 di Gereja Santa Maria Contoh dengan 626 peserta dari target 600 peserta.', 626, 17285000, 'Tata suara dan proyektor berfungsi baik, konsumsi cukup untuk seluruh peserta.', 'Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0116_Rangkaian_Perayaan_Pekan_Suci_dan_Paskah_2026-04-02.pdf'),
+            ('LPK-0117', 'KGT-0142', '2026-04-15', 'Final', 'Penyaluran Bantuan Aksi Puasa Pembangunan dilaksanakan pada 11 April 2026 di Aula Paroki Santa Maria Contoh dengan 166 peserta dari target 150 peserta.', 166, 14660000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Bantuan tersalurkan kepada keluarga penerima manfaat sesuai daftar yang telah diverifikasi.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0117_Penyaluran_Bantuan_Aksi_Puasa_Pembangunan_2026-04-11.pdf'),
+            ('LPK-0118', 'KGT-0143', '2026-05-01', 'Final', 'Retret Orang Muda Katolik dilaksanakan pada 25 sampai 26 April 2026 di Wisma Retret Damai Sejahtera dengan 41 peserta dari target 45 peserta.', 41, 13550000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mengikuti sesi refleksi, adorasi, dan berbagi kelompok dengan antusias.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0118_Retret_Orang_Muda_Katolik_2026-04-25.pdf'),
+            ('LPK-0119', 'KGT-0144', '2026-05-14', 'Draf', 'Lokakarya Penulisan Warta Paroki dilaksanakan pada 9 Mei 2026 di Ruang Rapat Paroki dengan 17 peserta dari target 15 peserta.', 17, 1570000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Relawan menulis contoh warta dan menerima masukan penyuntingan.', NULL, 'LPK-0119_Lokakarya_Penulisan_Warta_Paroki_2026-05-09.pdf'),
+            ('LPK-0120', 'KGT-0145', '2026-05-21', 'Final', 'Pemeriksaan Kesehatan Gratis untuk Lansia dilaksanakan pada 16 Mei 2026 di Aula Paroki Santa Maria Contoh dengan 107 peserta dari target 100 peserta.', 107, 7105000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Para lansia menerima pemeriksaan dasar dan konsultasi, sebagian dirujuk ke fasilitas kesehatan untuk pemeriksaan lanjutan.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0120_Pemeriksaan_Kesehatan_Gratis_untuk_Lansia_2026-05-16.pdf'),
+            ('LPK-0121', 'KGT-0147', '2026-06-03', 'Final', 'Pelatihan Kewirausahaan Usaha Mikro Umat dilaksanakan pada 30 sampai 31 Mei 2026 di Aula Paroki Santa Maria Contoh dengan 33 peserta dari target 35 peserta.', 33, 7720000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Peserta menyusun rencana usaha sederhana dan berlatih menghitung modal serta harga jual.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0121_Pelatihan_Kewirausahaan_Usaha_Mikro_Umat_2026-05-30.pdf'),
+            ('LPK-0122', 'KGT-0148', '2026-06-16', 'Draf', 'Rekoleksi Pasangan Suami Istri dilaksanakan pada 6 Juni 2026 di Aula Paroki Santa Maria Contoh dengan 67 peserta dari target 60 peserta.', 67, NULL, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Pasangan peserta berbagi pengalaman dan menyusun komitmen sederhana untuk keluarga masing-masing.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0122_Rekoleksi_Pasangan_Suami_Istri_2026-06-06.pdf'),
+            ('LPK-0123', 'KGT-0149', '2026-07-01', 'Draf', 'Pelatihan Putra-Putri Altar Baru dilaksanakan pada 20 Juni 2026 di Gereja Santa Maria Contoh dengan 22 peserta dari target 25 peserta.', 22, 1085000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Peserta mempelajari tugas dasar di altar dan berlatih dalam Misa percobaan.', NULL, 'LPK-0123_Pelatihan_Putra_Putri_Altar_Baru_2026-06-20.pdf'),
+            ('LPK-0124', 'KGT-0150', '2026-06-30', 'Final', 'Turnamen Futsal Antarlingkungan dilaksanakan pada 27 Juni 2026 di Lapangan Futsal Sewaan dengan 132 peserta dari target 120 peserta.', 132, 8630000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Turnamen berlangsung tertib dan sportif dengan keterlibatan banyak lingkungan.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0124_Turnamen_Futsal_Antarlingkungan_2026-06-27.pdf'),
+            ('LPK-0125', 'KGT-0151', '2026-09-30', 'Draf', 'Katekese Persiapan Sakramen Krisma dilaksanakan pada 4 Juli 2026 sampai 26 September 2026 di Ruang Katekese Paroki dengan 38 peserta dari target 40 peserta.', 38, 6480000, NULL, 'Peserta menyelesaikan materi pengajaran dan retret singkat sebagai persiapan menerima sakramen.', NULL, 'LPK-0125_Katekese_Persiapan_Sakramen_Krisma_2026-07-04.pdf'),
+            ('LPK-0126', 'KGT-0152', '2026-07-23', 'Draf', 'Kunjungan dan Santunan Lansia dilaksanakan pada 11 Juli 2026 di Rumah Umat di Lingkungan dengan 60 peserta dari target 60 peserta.', 60, 5505000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', NULL, NULL, 'LPK-0126_Kunjungan_dan_Santunan_Lansia_2026-07-11.pdf'),
+            ('LPK-0127', 'KGT-0154', '2026-08-04', 'Final', 'Pelatihan Pengelolaan Data Umat dan Pelindungan Privasi dilaksanakan pada 25 Juli 2026 di Ruang Rapat Paroki dengan 16 peserta dari target 18 peserta.', 16, 3100000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Petugas memahami klasifikasi data, batas akses, dan cara menjaga kerahasiaan data umat.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0127_Pelatihan_Pengelolaan_Data_Umat_dan_Pelindungan_Privasi_2026-07-25.pdf'),
+            ('LPK-0128', 'KGT-0155', '2026-08-07', 'Final', 'Penyaluran Bantuan Korban Banjir dilaksanakan pada 26 Juli 2026 di Posko Bantuan Paroki dengan 85 peserta dari target 90 peserta.', 85, 12740000, 'Tempat memadai, tetapi sirkulasi udara di ruangan kurang optimal.', 'Bantuan darurat berupa kebutuhan pokok tersalurkan kepada keluarga yang terdampak.', 'Pendaftaran perlu dibuka lebih awal agar persiapan konsumsi dan perlengkapan lebih akurat.', 'LPK-0128_Penyaluran_Bantuan_Korban_Banjir_2026-07-26.pdf'),
+            ('LPK-0129', 'KGT-0159', '2026-09-02', 'Final', 'Aksi Donor Darah Paroki dilaksanakan pada 29 Agustus 2026 di Aula Paroki Santa Maria Contoh dengan 66 peserta dari target 70 peserta.', 66, 3600000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Kantong darah terkumpul dan diserahkan kepada unit donor darah mitra.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0129_Aksi_Donor_Darah_Paroki_2026-08-29.pdf'),
+            ('LPK-0130', 'KGT-0162', '2026-09-26', 'Perlu Revisi', 'Bakti Sosial Orang Muda di Panti Asuhan dilaksanakan pada 19 September 2026 di Panti Asuhan Kasih Sejahtera dengan 30 peserta dari target 30 peserta.', 34, 3535000, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Orang muda mengunjungi panti asuhan, bermain bersama anak-anak, dan menyerahkan bantuan perlengkapan sekolah.', 'Publikasi perlu melibatkan lebih banyak lingkungan agar jangkauan peserta lebih luas.', 'LPK-0130_Bakti_Sosial_Orang_Muda_di_Panti_Asuhan_2026-09-19.pdf'),
+            ('LPK-0131', 'KGT-0164', '2026-09-30', 'Draf', 'Perayaan Bulan Kitab Suci Nasional dilaksanakan pada 26 September 2026 di Gereja Santa Maria Contoh dengan 202 peserta dari target 200 peserta.', 202, NULL, 'Perlengkapan, tempat, dan konsumsi tersedia dengan baik dan tepat waktu.', 'Ibadat Sabda dan sarasehan berlangsung khidmat, umat membawa Kitab Suci masing-masing.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0131_Perayaan_Bulan_Kitab_Suci_Nasional_2026-09-26.pdf'),
+            ('LPK-0132', 'KGT-0168', '2026-04-06', 'Final', 'Doa Bersama dan Penggalangan Bantuan Korban Longsor dilaksanakan pada 28 Maret 2026 di Gereja Santa Maria Contoh dengan 85 peserta dari target 60 peserta.', 85, 3200000, 'Jumlah peserta melebihi perkiraan sehingga ruangan terasa penuh dan konsumsi hampir tidak cukup.', 'Doa bersama dan penggalangan bantuan berjalan lancar, bantuan diteruskan melalui jaringan pelayanan sosial.', 'Kegiatan serupa layak dilanjutkan tahun depan dengan tambahan waktu praktik.', 'LPK-0132_Doa_Bersama_dan_Penggalangan_Bantuan_Korban_Longsor_2026-03-28.pdf')
+    ) AS v (ID_LAPORAN, ID_KEGIATAN, TANGGAL_LAPORAN, STATUS_LAPORAN, RINGKASAN_PELAKSANAAN, JUMLAH_PESERTA, REALISASI_BIAYA, EVALUASI_LOGISTIK, HASIL_KEGIATAN, REKOMENDASI_TINDAK_LANJUT, NAMA_BERKAS_SUMBER)
 ) AS s
 ON t.ID_LAPORAN = s.ID_LAPORAN
 WHEN MATCHED THEN UPDATE SET
@@ -13753,9 +13756,10 @@ WHEN MATCHED THEN UPDATE SET
     REALISASI_BIAYA = s.REALISASI_BIAYA,
     EVALUASI_LOGISTIK = s.EVALUASI_LOGISTIK,
     HASIL_KEGIATAN = s.HASIL_KEGIATAN,
-    REKOMENDASI_TINDAK_LANJUT = s.REKOMENDASI_TINDAK_LANJUT
-WHEN NOT MATCHED THEN INSERT (ID_LAPORAN, ID_KEGIATAN, TANGGAL_LAPORAN, STATUS_LAPORAN, RINGKASAN_PELAKSANAAN, JUMLAH_PESERTA, REALISASI_BIAYA, EVALUASI_LOGISTIK, HASIL_KEGIATAN, REKOMENDASI_TINDAK_LANJUT)
-    VALUES (s.ID_LAPORAN, s.ID_KEGIATAN, s.TANGGAL_LAPORAN, s.STATUS_LAPORAN, s.RINGKASAN_PELAKSANAAN, s.JUMLAH_PESERTA, s.REALISASI_BIAYA, s.EVALUASI_LOGISTIK, s.HASIL_KEGIATAN, s.REKOMENDASI_TINDAK_LANJUT);
+    REKOMENDASI_TINDAK_LANJUT = s.REKOMENDASI_TINDAK_LANJUT,
+    NAMA_BERKAS_SUMBER = s.NAMA_BERKAS_SUMBER
+WHEN NOT MATCHED THEN INSERT (ID_LAPORAN, ID_KEGIATAN, TANGGAL_LAPORAN, STATUS_LAPORAN, RINGKASAN_PELAKSANAAN, JUMLAH_PESERTA, REALISASI_BIAYA, EVALUASI_LOGISTIK, HASIL_KEGIATAN, REKOMENDASI_TINDAK_LANJUT, NAMA_BERKAS_SUMBER)
+    VALUES (s.ID_LAPORAN, s.ID_KEGIATAN, s.TANGGAL_LAPORAN, s.STATUS_LAPORAN, s.RINGKASAN_PELAKSANAAN, s.JUMLAH_PESERTA, s.REALISASI_BIAYA, s.EVALUASI_LOGISTIK, s.HASIL_KEGIATAN, s.REKOMENDASI_TINDAK_LANJUT, s.NAMA_BERKAS_SUMBER);
 
 -- =============================================================================
 -- >>> sql/04f_load_donations.sql
@@ -15989,6 +15993,7 @@ SELECT
          ELSE 'Isi belum lengkap'
     END AS KELENGKAPAN_ISI_LAPORAN,
     r.REALISASI_BIAYA AS BIAYA_MENURUT_LAPORAN,
+    r.NAMA_BERKAS_SUMBER AS NAMA_BERKAS_LAPORAN,
     'Data simulasi (fiktif)' AS SUMBER_DATA
 FROM DATA_OPERASIONAL.KEGIATAN e
 JOIN MASTER_DATA.MASTER_SEKSI s
@@ -17249,1387 +17254,1411 @@ WITH CHECKS AS (
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KEGIATAN).' AS NOTE
     UNION ALL
-    SELECT 930 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 930 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_LAPORAN_KEGIATAN_BERKAS' AS CHECK_NAME,
+           'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT NAMA_BERKAS_SUMBER FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE NAMA_BERKAS_SUMBER IS NOT NULL GROUP BY NAMA_BERKAS_SUMBER HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (NAMA_BERKAS_SUMBER).' AS NOTE
+    UNION ALL
+    SELECT 940 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KATEGORI_INFORMASI.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KATEGORI_INFORMASI c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 940 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 950 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KATEGORI_INFORMASI.ID_SEKSI_PENGELOLA -> MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KATEGORI_INFORMASI c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI_PENGELOLA = p.ID_SEKSI WHERE c.ID_SEKSI_PENGELOLA IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 950 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 960 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.KEBIJAKAN_AKSES_DATA.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.KEBIJAKAN_AKSES_DATA c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 960 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 970 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN.ID_WILAYAH -> MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN c LEFT JOIN MASTER_DATA.MASTER_WILAYAH p ON c.ID_WILAYAH = p.ID_WILAYAH WHERE c.ID_WILAYAH IS NOT NULL AND p.ID_WILAYAH IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 970 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 980 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN.ID_LINGKUNGAN -> MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN c LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN p ON c.ID_LINGKUNGAN = p.ID_LINGKUNGAN WHERE c.ID_LINGKUNGAN IS NOT NULL AND p.ID_LINGKUNGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 980 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 990 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN.ID_LINGKUNGAN -> MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN c LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN p ON c.ID_LINGKUNGAN = p.ID_LINGKUNGAN WHERE c.ID_LINGKUNGAN IS NOT NULL AND p.ID_LINGKUNGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 990 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1000 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.SURVEI.ID_SEKSI -> MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI = p.ID_SEKSI WHERE c.ID_SEKSI IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1000 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1010 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.SURVEI.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1010 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1020 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.PERTANYAAN_SURVEI.ID_SURVEI -> SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PERTANYAAN_SURVEI c LEFT JOIN MASTER_DATA.SURVEI p ON c.ID_SURVEI = p.ID_SURVEI WHERE c.ID_SURVEI IS NOT NULL AND p.ID_SURVEI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1020 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1030 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.OPSI_JAWABAN_SURVEI.ID_PERTANYAAN -> PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.OPSI_JAWABAN_SURVEI c LEFT JOIN MASTER_DATA.PERTANYAAN_SURVEI p ON c.ID_PERTANYAAN = p.ID_PERTANYAAN WHERE c.ID_PERTANYAAN IS NOT NULL AND p.ID_PERTANYAAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1030 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1040 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA.ID_JADWAL_MISA -> JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA c LEFT JOIN MASTER_DATA.JADWAL_MISA p ON c.ID_JADWAL_MISA = p.ID_JADWAL_MISA WHERE c.ID_JADWAL_MISA IS NOT NULL AND p.ID_JADWAL_MISA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1040 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1050 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA.ID_KEJADIAN_MISA -> KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA c LEFT JOIN DATA_OPERASIONAL.KEJADIAN_MISA p ON c.ID_KEJADIAN_MISA = p.ID_KEJADIAN_MISA WHERE c.ID_KEJADIAN_MISA IS NOT NULL AND p.ID_KEJADIAN_MISA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1050 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1060 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA.ID_PERISTIWA -> PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA c LEFT JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA p ON c.ID_PERISTIWA = p.ID_PERISTIWA WHERE c.ID_PERISTIWA IS NOT NULL AND p.ID_PERISTIWA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1060 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1070 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE.ID_KEJADIAN_MISA -> KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE c LEFT JOIN DATA_OPERASIONAL.KEJADIAN_MISA p ON c.ID_KEJADIAN_MISA = p.ID_KEJADIAN_MISA WHERE c.ID_KEJADIAN_MISA IS NOT NULL AND p.ID_KEJADIAN_MISA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1070 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1080 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE.ID_JENIS_KOLEKTE -> REFERENSI_JENIS_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE c LEFT JOIN MASTER_DATA.REFERENSI_JENIS_KOLEKTE p ON c.ID_JENIS_KOLEKTE = p.ID_JENIS_KOLEKTE WHERE c.ID_JENIS_KOLEKTE IS NOT NULL AND p.ID_JENIS_KOLEKTE IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1080 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1090 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1090 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1100 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1100 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1110 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA.ID_UMAT -> UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA c LEFT JOIN DATA_OPERASIONAL.UMAT p ON c.ID_UMAT = p.ID_UMAT WHERE c.ID_UMAT IS NOT NULL AND p.ID_UMAT IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1110 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1120 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA.ID_KELUARGA -> KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA c LEFT JOIN DATA_OPERASIONAL.KELUARGA p ON c.ID_KELUARGA = p.ID_KELUARGA WHERE c.ID_KELUARGA IS NOT NULL AND p.ID_KELUARGA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1120 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1130 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN.ID_KELUARGA -> KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN c LEFT JOIN DATA_OPERASIONAL.KELUARGA p ON c.ID_KELUARGA = p.ID_KELUARGA WHERE c.ID_KELUARGA IS NOT NULL AND p.ID_KELUARGA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1130 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1140 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN.ID_LINGKUNGAN -> MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN c LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN p ON c.ID_LINGKUNGAN = p.ID_LINGKUNGAN WHERE c.ID_LINGKUNGAN IS NOT NULL AND p.ID_LINGKUNGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1140 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1150 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI.ID_SURVEI -> SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI c LEFT JOIN MASTER_DATA.SURVEI p ON c.ID_SURVEI = p.ID_SURVEI WHERE c.ID_SURVEI IS NOT NULL AND p.ID_SURVEI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1150 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1160 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI.ID_WILAYAH -> MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI c LEFT JOIN MASTER_DATA.MASTER_WILAYAH p ON c.ID_WILAYAH = p.ID_WILAYAH WHERE c.ID_WILAYAH IS NOT NULL AND p.ID_WILAYAH IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1160 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1170 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI.ID_RESPONDEN -> RESPONDEN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI c LEFT JOIN DATA_OPERASIONAL.RESPONDEN_SURVEI p ON c.ID_RESPONDEN = p.ID_RESPONDEN WHERE c.ID_RESPONDEN IS NOT NULL AND p.ID_RESPONDEN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1170 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1180 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI.ID_PERTANYAAN -> PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI c LEFT JOIN MASTER_DATA.PERTANYAAN_SURVEI p ON c.ID_PERTANYAAN = p.ID_PERTANYAAN WHERE c.ID_PERTANYAAN IS NOT NULL AND p.ID_PERTANYAAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1180 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1190 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI.ID_OPSI -> OPSI_JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI c LEFT JOIN MASTER_DATA.OPSI_JAWABAN_SURVEI p ON c.ID_OPSI = p.ID_OPSI WHERE c.ID_OPSI IS NOT NULL AND p.ID_OPSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1190 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1200 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT.ID_SURVEI -> SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT c LEFT JOIN MASTER_DATA.SURVEI p ON c.ID_SURVEI = p.ID_SURVEI WHERE c.ID_SURVEI IS NOT NULL AND p.ID_SURVEI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1200 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1210 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT.ID_PERTANYAAN -> PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT c LEFT JOIN MASTER_DATA.PERTANYAAN_SURVEI p ON c.ID_PERTANYAAN = p.ID_PERTANYAAN WHERE c.ID_PERTANYAAN IS NOT NULL AND p.ID_PERTANYAAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1210 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1220 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT.ID_OPSI -> OPSI_JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT c LEFT JOIN MASTER_DATA.OPSI_JAWABAN_SURVEI p ON c.ID_OPSI = p.ID_OPSI WHERE c.ID_OPSI IS NOT NULL AND p.ID_OPSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1220 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1230 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN.ID_SEKSI -> MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI = p.ID_SEKSI WHERE c.ID_SEKSI IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1230 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1240 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN.ID_RENCANA_KERJA -> RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN c LEFT JOIN DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN p ON c.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE c.ID_RENCANA_KERJA IS NOT NULL AND p.ID_RENCANA_KERJA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1240 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1250 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN.ID_KESEMPATAN -> REFERENSI_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN c LEFT JOIN MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS p ON c.ID_KESEMPATAN = p.ID_KESEMPATAN WHERE c.ID_KESEMPATAN IS NOT NULL AND p.ID_KESEMPATAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1250 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1260 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN.ID_RENCANA_PENGGUNAAN -> RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN c LEFT JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON c.ID_RENCANA_PENGGUNAAN = p.ID_RENCANA WHERE c.ID_RENCANA_PENGGUNAAN IS NOT NULL AND p.ID_RENCANA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1260 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1270 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS.ID_KAMPANYE -> KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS c LEFT JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN p ON c.ID_KAMPANYE = p.ID_KAMPANYE WHERE c.ID_KAMPANYE IS NOT NULL AND p.ID_KAMPANYE IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1270 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1280 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS.ID_WILAYAH -> MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS c LEFT JOIN MASTER_DATA.MASTER_WILAYAH p ON c.ID_WILAYAH = p.ID_WILAYAH WHERE c.ID_WILAYAH IS NOT NULL AND p.ID_WILAYAH IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1280 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1290 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA.ID_KAMPANYE -> KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA c LEFT JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN p ON c.ID_KAMPANYE = p.ID_KAMPANYE WHERE c.ID_KAMPANYE IS NOT NULL AND p.ID_KAMPANYE IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1290 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1300 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA.ID_KELUARGA -> KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA c LEFT JOIN DATA_OPERASIONAL.KELUARGA p ON c.ID_KELUARGA = p.ID_KELUARGA WHERE c.ID_KELUARGA IS NOT NULL AND p.ID_KELUARGA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1300 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1310 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA.ID_LINGKUNGAN -> MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA c LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN p ON c.ID_LINGKUNGAN = p.ID_LINGKUNGAN WHERE c.ID_LINGKUNGAN IS NOT NULL AND p.ID_LINGKUNGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1310 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1320 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN.ID_RENCANA -> RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN c LEFT JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON c.ID_RENCANA = p.ID_RENCANA WHERE c.ID_RENCANA IS NOT NULL AND p.ID_RENCANA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1320 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1330 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN.ID_KATEGORI_BIAYA -> REFERENSI_KATEGORI_BIAYA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN c LEFT JOIN MASTER_DATA.REFERENSI_KATEGORI_BIAYA p ON c.ID_KATEGORI_BIAYA = p.ID_KATEGORI_BIAYA WHERE c.ID_KATEGORI_BIAYA IS NOT NULL AND p.ID_KATEGORI_BIAYA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1330 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1340 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN.ID_ALOKASI -> ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN c LEFT JOIN DATA_OPERASIONAL.ALOKASI_ANGGARAN p ON c.ID_ALOKASI = p.ID_ALOKASI WHERE c.ID_ALOKASI IS NOT NULL AND p.ID_ALOKASI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1340 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1350 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN.ID_RENCANA -> RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN c LEFT JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON c.ID_RENCANA = p.ID_RENCANA WHERE c.ID_RENCANA IS NOT NULL AND p.ID_RENCANA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1350 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1360 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN.ID_SEKSI -> MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI = p.ID_SEKSI WHERE c.ID_SEKSI IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1360 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1370 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN.ID_KEGIATAN -> KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN c LEFT JOIN DATA_OPERASIONAL.KEGIATAN p ON c.ID_KEGIATAN = p.ID_KEGIATAN WHERE c.ID_KEGIATAN IS NOT NULL AND p.ID_KEGIATAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1370 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list HARI' AS CHECK_NAME,
+    SELECT 1380 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list HARI' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA.HARI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'HARI' AND v.NILAI = x.HARI WHERE x.HARI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1380 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list BAHASA_MISA' AS CHECK_NAME,
+    SELECT 1390 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list BAHASA_MISA' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA.BAHASA_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'BAHASA_MISA' AND v.NILAI = x.BAHASA_MISA WHERE x.BAHASA_MISA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1390 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list MUSIM_LITURGI' AS CHECK_NAME,
+    SELECT 1400 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list MUSIM_LITURGI' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS.MUSIM_LITURGI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'MUSIM_LITURGI' AND v.NILAI = x.MUSIM_LITURGI WHERE x.MUSIM_LITURGI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1400 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KELOMPOK_PENGGUNA' AS CHECK_NAME,
+    SELECT 1410 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KELOMPOK_PENGGUNA' AS CHECK_NAME,
            'MASTER_DATA.KEBIJAKAN_AKSES_DATA.KELOMPOK_PENGGUNA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.KEBIJAKAN_AKSES_DATA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'KELOMPOK_PENGGUNA' AND v.NILAI = x.KELOMPOK_PENGGUNA WHERE x.KELOMPOK_PENGGUNA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1410 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list TINGKAT_AKSES' AS CHECK_NAME,
+    SELECT 1420 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list TINGKAT_AKSES' AS CHECK_NAME,
            'MASTER_DATA.KEBIJAKAN_AKSES_DATA.TINGKAT_AKSES' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.KEBIJAKAN_AKSES_DATA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'TINGKAT_AKSES' AND v.NILAI = x.TINGKAT_AKSES WHERE x.TINGKAT_AKSES IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1420 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_SURVEI' AS CHECK_NAME,
+    SELECT 1430 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_SURVEI' AS CHECK_NAME,
            'MASTER_DATA.SURVEI.STATUS_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_SURVEI' AND v.NILAI = x.STATUS_SURVEI WHERE x.STATUS_SURVEI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1430 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_JAWABAN' AS CHECK_NAME,
+    SELECT 1440 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_JAWABAN' AS CHECK_NAME,
            'MASTER_DATA.PERTANYAAN_SURVEI.JENIS_JAWABAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PERTANYAAN_SURVEI x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'JENIS_JAWABAN' AND v.NILAI = x.JENIS_JAWABAN WHERE x.JENIS_JAWABAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1440 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PELAKSANAAN_MISA' AS CHECK_NAME,
+    SELECT 1450 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PELAKSANAAN_MISA' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA.STATUS_PELAKSANAAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_PELAKSANAAN_MISA' AND v.NILAI = x.STATUS_PELAKSANAAN WHERE x.STATUS_PELAKSANAAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1450 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list METODE_PENGHITUNGAN' AS CHECK_NAME,
+    SELECT 1460 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list METODE_PENGHITUNGAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA.METODE_PENGHITUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'METODE_PENGHITUNGAN' AND v.NILAI = x.METODE_PENGHITUNGAN WHERE x.METODE_PENGHITUNGAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1460 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_VALIDASI' AS CHECK_NAME,
+    SELECT 1470 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_VALIDASI' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA.STATUS_VALIDASI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_VALIDASI' AND v.NILAI = x.STATUS_VALIDASI WHERE x.STATUS_VALIDASI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1470 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_REKONSILIASI' AS CHECK_NAME,
+    SELECT 1480 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_REKONSILIASI' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE.STATUS_REKONSILIASI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_REKONSILIASI' AND v.NILAI = x.STATUS_REKONSILIASI WHERE x.STATUS_REKONSILIASI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1480 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_VALIDASI' AS CHECK_NAME,
+    SELECT 1490 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_VALIDASI' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS.STATUS_VALIDASI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_VALIDASI' AND v.NILAI = x.STATUS_VALIDASI WHERE x.STATUS_VALIDASI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1490 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KELUARGA' AS CHECK_NAME,
+    SELECT 1500 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KELUARGA' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA.STATUS_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_KELUARGA' AND v.NILAI = x.STATUS_KELUARGA WHERE x.STATUS_KELUARGA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1500 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_KELAMIN' AS CHECK_NAME,
+    SELECT 1510 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_KELAMIN' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT.JENIS_KELAMIN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'JENIS_KELAMIN' AND v.NILAI = x.JENIS_KELAMIN WHERE x.JENIS_KELAMIN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1510 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KEANGGOTAAN' AS CHECK_NAME,
+    SELECT 1520 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KEANGGOTAAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT.STATUS_KEANGGOTAAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_KEANGGOTAAN' AND v.NILAI = x.STATUS_KEANGGOTAAN WHERE x.STATUS_KEANGGOTAAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1520 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list PERAN_DALAM_KELUARGA' AS CHECK_NAME,
+    SELECT 1530 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list PERAN_DALAM_KELUARGA' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA.PERAN_DALAM_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'PERAN_DALAM_KELUARGA' AND v.NILAI = x.PERAN_DALAM_KELUARGA WHERE x.PERAN_DALAM_KELUARGA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1530 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KELOMPOK_USIA' AS CHECK_NAME,
+    SELECT 1540 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KELOMPOK_USIA' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI.KELOMPOK_USIA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'KELOMPOK_USIA' AND v.NILAI = x.KELOMPOK_USIA WHERE x.KELOMPOK_USIA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1540 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PENGESAHAN' AS CHECK_NAME,
+    SELECT 1550 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PENGESAHAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN.STATUS_PENGESAHAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_PENGESAHAN' AND v.NILAI = x.STATUS_PENGESAHAN WHERE x.STATUS_PENGESAHAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1550 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PELAKSANAAN_RENCANA' AS CHECK_NAME,
+    SELECT 1560 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PELAKSANAAN_RENCANA' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN.STATUS_PELAKSANAAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_PELAKSANAAN_RENCANA' AND v.NILAI = x.STATUS_PELAKSANAAN WHERE x.STATUS_PELAKSANAAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1560 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KEGIATAN' AS CHECK_NAME,
+    SELECT 1570 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KEGIATAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN.STATUS_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_KEGIATAN' AND v.NILAI = x.STATUS_KEGIATAN WHERE x.STATUS_KEGIATAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1570 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_LAPORAN' AS CHECK_NAME,
+    SELECT 1580 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_LAPORAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN.STATUS_LAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_LAPORAN' AND v.NILAI = x.STATUS_LAPORAN WHERE x.STATUS_LAPORAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1580 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KAMPANYE' AS CHECK_NAME,
+    SELECT 1590 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KAMPANYE' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN.STATUS_KAMPANYE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_KAMPANYE' AND v.NILAI = x.STATUS_KAMPANYE WHERE x.STATUS_KAMPANYE IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1590 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_PERISTIWA' AS CHECK_NAME,
+    SELECT 1600 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_PERISTIWA' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA.JENIS_PERISTIWA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'JENIS_PERISTIWA' AND v.NILAI = x.JENIS_PERISTIWA WHERE x.JENIS_PERISTIWA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1600 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list TINGKAT_GANGGUAN' AS CHECK_NAME,
+    SELECT 1610 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list TINGKAT_GANGGUAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA.TINGKAT_GANGGUAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'TINGKAT_GANGGUAN' AND v.NILAI = x.TINGKAT_GANGGUAN WHERE x.TINGKAT_GANGGUAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1610 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KATEGORI_EKONOMI' AS CHECK_NAME,
+    SELECT 1620 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KATEGORI_EKONOMI' AS CHECK_NAME,
            'MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN.KATEGORI_EKONOMI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'KATEGORI_EKONOMI' AND v.NILAI = x.KATEGORI_EKONOMI WHERE x.KATEGORI_EKONOMI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1620 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1630 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.INFO_DATASET' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.INFO_DATASET WHERE TANGGAL_MULAI_RIWAYAT < DATE '2000-01-01' OR TANGGAL_MULAI_RIWAYAT > DATE '2030-12-31' OR TANGGAL_SNAPSHOT < DATE '2000-01-01' OR TANGGAL_SNAPSHOT > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_RIWAYAT, TANGGAL_SNAPSHOT.' AS NOTE
     UNION ALL
-    SELECT 1630 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1640 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KLASIFIKASI_DATA WHERE URUTAN_TINGKAT < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in URUTAN_TINGKAT.' AS NOTE
     UNION ALL
-    SELECT 1640 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1650 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_SEKSI WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1650 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1660 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'MASTER_DATA.MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_SEKSI WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1660 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
+    SELECT 1670 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
            'MASTER_DATA.MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_SEKSI WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'STATUS_AKTIF must be TRUE exactly when there is no end date.' AS NOTE
     UNION ALL
-    SELECT 1670 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1680 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_DAFTAR_NILAI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_DAFTAR_NILAI WHERE URUTAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in URUTAN.' AS NOTE
     UNION ALL
-    SELECT 1680 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1690 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_PERIODE_PELAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_PERIODE_PELAPORAN WHERE TAHUN < 0 OR BULAN < 0 OR KUARTAL < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TAHUN, BULAN, KUARTAL.' AS NOTE
     UNION ALL
-    SELECT 1690 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1700 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_PERIODE_PELAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_PERIODE_PELAPORAN WHERE TANGGAL_MULAI < DATE '2000-01-01' OR TANGGAL_MULAI > DATE '2030-12-31' OR TANGGAL_SELESAI < DATE '2000-01-01' OR TANGGAL_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI, TANGGAL_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 1700 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1710 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_WILAYAH WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1710 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1720 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'MASTER_DATA.MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_WILAYAH WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1720 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
+    SELECT 1730 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
            'MASTER_DATA.MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_WILAYAH WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'STATUS_AKTIF must be TRUE exactly when there is no end date.' AS NOTE
     UNION ALL
-    SELECT 1730 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1740 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1740 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1750 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1750 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
+    SELECT 1760 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'STATUS_AKTIF must be TRUE exactly when there is no end date.' AS NOTE
     UNION ALL
-    SELECT 1760 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1770 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN WHERE TAHUN_PENILAIAN < 0 OR INDEKS_KAPASITAS_EKONOMI < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TAHUN_PENILAIAN, INDEKS_KAPASITAS_EKONOMI.' AS NOTE
     UNION ALL
-    SELECT 1770 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1780 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1780 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1790 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1790 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
+    SELECT 1800 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'STATUS_AKTIF must be TRUE exactly when there is no end date.' AS NOTE
     UNION ALL
-    SELECT 1800 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1810 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI WHERE TANGGAL_MULAI < DATE '2000-01-01' OR TANGGAL_MULAI > DATE '2030-12-31' OR TANGGAL_SELESAI < DATE '2000-01-01' OR TANGGAL_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI, TANGGAL_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 1810 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1820 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PERTANYAAN_SURVEI WHERE NOMOR_URUT < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in NOMOR_URUT.' AS NOTE
     UNION ALL
-    SELECT 1820 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1830 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.OPSI_JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.OPSI_JAWABAN_SURVEI WHERE NOMOR_URUT < 0 OR NILAI_SKOR < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in NOMOR_URUT, NILAI_SKOR.' AS NOTE
     UNION ALL
-    SELECT 1830 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1840 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE TANGGAL_MISA < DATE '2000-01-01' OR TANGGAL_MISA > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MISA.' AS NOTE
     UNION ALL
-    SELECT 1840 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1850 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA WHERE TANGGAL_MULAI < DATE '2000-01-01' OR TANGGAL_MULAI > DATE '2030-12-31' OR TANGGAL_SELESAI < DATE '2000-01-01' OR TANGGAL_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI, TANGGAL_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 1850 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1860 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE JUMLAH_UMAT < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_UMAT.' AS NOTE
     UNION ALL
-    SELECT 1860 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1870 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE JUMLAH_PENERIMAAN < 0 OR JUMLAH_HASIL_PENGHITUNGAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_PENERIMAAN, JUMLAH_HASIL_PENGHITUNGAN.' AS NOTE
     UNION ALL
-    SELECT 1870 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1880 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE TANGGAL_PENCATATAN < DATE '2000-01-01' OR TANGGAL_PENCATATAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENCATATAN.' AS NOTE
     UNION ALL
-    SELECT 1880 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1890 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA WHERE TANGGAL_TERDAFTAR < DATE '2000-01-01' OR TANGGAL_TERDAFTAR > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_TERDAFTAR.' AS NOTE
     UNION ALL
-    SELECT 1890 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1900 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE TAHUN_LAHIR < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TAHUN_LAHIR.' AS NOTE
     UNION ALL
-    SELECT 1900 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1910 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE TANGGAL_TERDAFTAR < DATE '2000-01-01' OR TANGGAL_TERDAFTAR > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_TERDAFTAR.' AS NOTE
     UNION ALL
-    SELECT 1910 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1920 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1920 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1930 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1930 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1940 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1940 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1950 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1950 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1960 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI WHERE TANGGAL_PENGISIAN < DATE '2000-01-01' OR TANGGAL_PENGISIAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENGISIAN.' AS NOTE
     UNION ALL
-    SELECT 1960 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1970 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE JUMLAH_RESPONDEN < 0 OR TOTAL_RESPONDEN_PERTANYAAN < 0 OR PERSENTASE_JAWABAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_RESPONDEN, TOTAL_RESPONDEN_PERTANYAAN, PERSENTASE_JAWABAN.' AS NOTE
     UNION ALL
-    SELECT 1970 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1980 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE TANGGAL_AGREGASI < DATE '2000-01-01' OR TANGGAL_AGREGASI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_AGREGASI.' AS NOTE
     UNION ALL
-    SELECT 1980 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1990 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN WHERE TAHUN_RENCANA < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TAHUN_RENCANA.' AS NOTE
     UNION ALL
-    SELECT 1990 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2000 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN WHERE TANGGAL_PENGESAHAN < DATE '2000-01-01' OR TANGGAL_PENGESAHAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENGESAHAN.' AS NOTE
     UNION ALL
-    SELECT 2000 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2010 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN WHERE TANGGAL_RENCANA < DATE '2000-01-01' OR TANGGAL_RENCANA > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_RENCANA.' AS NOTE
     UNION ALL
-    SELECT 2010 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2020 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE TARGET_DANA < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TARGET_DANA.' AS NOTE
     UNION ALL
-    SELECT 2020 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2030 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE PERIODE_MULAI < DATE '2000-01-01' OR PERIODE_MULAI > DATE '2030-12-31' OR PERIODE_SELESAI < DATE '2000-01-01' OR PERIODE_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in PERIODE_MULAI, PERIODE_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 2030 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2040 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE JUMLAH_KELUARGA_PESERTA < 0 OR JUMLAH_SUMBANGAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_KELUARGA_PESERTA, JUMLAH_SUMBANGAN.' AS NOTE
     UNION ALL
-    SELECT 2040 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2050 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE TANGGAL_PENCATATAN < DATE '2000-01-01' OR TANGGAL_PENCATATAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENCATATAN.' AS NOTE
     UNION ALL
-    SELECT 2050 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2060 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA WHERE JUMLAH_SUMBANGAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_SUMBANGAN.' AS NOTE
     UNION ALL
-    SELECT 2060 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2070 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA WHERE TANGGAL_SUMBANGAN < DATE '2000-01-01' OR TANGGAL_SUMBANGAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_SUMBANGAN.' AS NOTE
     UNION ALL
-    SELECT 2070 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2080 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN WHERE JUMLAH_ANGGARAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_ANGGARAN.' AS NOTE
     UNION ALL
-    SELECT 2080 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2090 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN WHERE TANGGAL_PERSETUJUAN < DATE '2000-01-01' OR TANGGAL_PERSETUJUAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PERSETUJUAN.' AS NOTE
     UNION ALL
-    SELECT 2090 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2100 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN WHERE JUMLAH_PENGELUARAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_PENGELUARAN.' AS NOTE
     UNION ALL
-    SELECT 2100 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2110 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN WHERE TANGGAL_PENGELUARAN < DATE '2000-01-01' OR TANGGAL_PENGELUARAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENGELUARAN.' AS NOTE
     UNION ALL
-    SELECT 2110 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2120 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN WHERE TARGET_PESERTA < 0 OR JUMLAH_PESERTA_AKTUAL < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TARGET_PESERTA, JUMLAH_PESERTA_AKTUAL.' AS NOTE
     UNION ALL
-    SELECT 2120 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2130 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN WHERE TANGGAL_MULAI < DATE '2000-01-01' OR TANGGAL_MULAI > DATE '2030-12-31' OR TANGGAL_SELESAI < DATE '2000-01-01' OR TANGGAL_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI, TANGGAL_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 2130 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2140 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE JUMLAH_PESERTA < 0 OR REALISASI_BIAYA < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_PESERTA, REALISASI_BIAYA.' AS NOTE
     UNION ALL
-    SELECT 2140 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2150 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE TANGGAL_LAPORAN < DATE '2000-01-01' OR TANGGAL_LAPORAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_LAPORAN.' AS NOTE
     UNION ALL
-    SELECT 2150 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Attendance for a Mass that was not held' AS CHECK_NAME,
+    SELECT 2160 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Attendance for a Mass that was not held' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE k.STATUS_PELAKSANAAN <> 'Terlaksana') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Attendance may only exist for occurrences with status Terlaksana.' AS NOTE
     UNION ALL
-    SELECT 2160 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory for a Mass that was not held' AS CHECK_NAME,
+    SELECT 2170 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory for a Mass that was not held' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE k.STATUS_PELAKSANAAN <> 'Terlaksana') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Offertory may only exist for occurrences with status Terlaksana.' AS NOTE
     UNION ALL
-    SELECT 2170 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Held Mass without attendance' AS CHECK_NAME,
+    SELECT 2180 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Held Mass without attendance' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k WHERE k.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.KEHADIRAN_MISA x WHERE x.ID_KEJADIAN_MISA = k.ID_KEJADIAN_MISA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every held Mass needs one attendance record.' AS NOTE
     UNION ALL
-    SELECT 2180 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Held Mass without offertory' AS CHECK_NAME,
+    SELECT 2190 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Held Mass without offertory' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k WHERE k.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE x WHERE x.ID_KEJADIAN_MISA = k.ID_KEJADIAN_MISA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every held Mass needs at least one offertory record.' AS NOTE
     UNION ALL
-    SELECT 2190 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Actual times inconsistent with status' AS CHECK_NAME,
+    SELECT 2200 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Actual times inconsistent with status' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE (STATUS_PELAKSANAAN = 'Terlaksana' AND (WAKTU_MULAI_AKTUAL IS NULL OR WAKTU_SELESAI_AKTUAL IS NULL OR WAKTU_SELESAI_AKTUAL <= WAKTU_MULAI_AKTUAL)) OR (STATUS_PELAKSANAAN <> 'Terlaksana' AND (WAKTU_MULAI_AKTUAL IS NOT NULL OR WAKTU_SELESAI_AKTUAL IS NOT NULL))) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Actual times exist only for held Masses and the end must be after the start.' AS NOTE
     UNION ALL
-    SELECT 2200 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Occurrence weekday differs from schedule' AS CHECK_NAME,
+    SELECT 2210 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Occurrence weekday differs from schedule' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k JOIN MASTER_DATA.JADWAL_MISA j ON j.ID_JADWAL_MISA = k.ID_JADWAL_MISA WHERE MOD(DATEDIFF('day', DATE '1900-01-01', k.TANGGAL_MISA), 7) <> CASE j.HARI WHEN 'Senin' THEN 0 WHEN 'Selasa' THEN 1 WHEN 'Rabu' THEN 2 WHEN 'Kamis' THEN 3 WHEN 'Jumat' THEN 4 WHEN 'Sabtu' THEN 5 WHEN 'Minggu' THEN 6 END) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The date must fall on the weekday of its schedule rule (1900-01-01 was a Monday).' AS NOTE
     UNION ALL
-    SELECT 2210 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Occurrence outside schedule validity' AS CHECK_NAME,
+    SELECT 2220 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Occurrence outside schedule validity' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k JOIN MASTER_DATA.JADWAL_MISA j ON j.ID_JADWAL_MISA = k.ID_JADWAL_MISA WHERE k.TANGGAL_MISA < j.TANGGAL_MULAI_BERLAKU OR (j.TANGGAL_AKHIR_BERLAKU IS NOT NULL AND k.TANGGAL_MISA > j.TANGGAL_AKHIR_BERLAKU)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A Mass may only follow a schedule rule that was valid on that date.' AS NOTE
     UNION ALL
-    SELECT 2220 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Status inconsistent with the as-of date' AS CHECK_NAME,
+    SELECT 2230 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Status inconsistent with the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE (STATUS_PELAKSANAAN = 'Terjadwal' AND TANGGAL_MISA <= DATE '2026-09-30') OR (STATUS_PELAKSANAAN <> 'Terjadwal' AND TANGGAL_MISA > DATE '2026-09-30')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Terjadwal only after 2026-09-30 (the demo snapshot date), otherwise Terlaksana or Dibatalkan.' AS NOTE
     UNION ALL
-    SELECT 2230 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'No reporting period for a Mass date' AS CHECK_NAME,
+    SELECT 2240 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'No reporting period for a Mass date' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k WHERE NOT EXISTS (SELECT 1 FROM MASTER_DATA.REFERENSI_PERIODE_PELAPORAN p WHERE k.TANGGAL_MISA BETWEEN p.TANGGAL_MULAI AND p.TANGGAL_SELESAI)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The monthly views join Masses to the reporting calendar.' AS NOTE
     UNION ALL
-    SELECT 2240 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Counted amount inconsistent with reconciliation status' AS CHECK_NAME,
+    SELECT 2250 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Counted amount inconsistent with reconciliation status' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE (STATUS_REKONSILIASI = 'Belum Dihitung' AND JUMLAH_HASIL_PENGHITUNGAN IS NOT NULL) OR (STATUS_REKONSILIASI <> 'Belum Dihitung' AND JUMLAH_HASIL_PENGHITUNGAN IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The counted amount is empty exactly when the status is Belum Dihitung.' AS NOTE
     UNION ALL
-    SELECT 2250 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Sudah Cocok but recorded and counted differ' AS CHECK_NAME,
+    SELECT 2260 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Sudah Cocok but recorded and counted differ' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE STATUS_REKONSILIASI = 'Sudah Cocok' AND JUMLAH_PENERIMAAN <> JUMLAH_HASIL_PENGHITUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Matched records must have equal recorded and counted amounts.' AS NOTE
     UNION ALL
-    SELECT 2260 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Selisih status but amounts are equal' AS CHECK_NAME,
+    SELECT 2270 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Selisih status but amounts are equal' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE STATUS_REKONSILIASI IN ('Selisih Disetujui', 'Selisih Sedang Ditelusuri') AND JUMLAH_PENERIMAAN = JUMLAH_HASIL_PENGHITUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A discrepancy status needs an actual discrepancy.' AS NOTE
     UNION ALL
-    SELECT 2270 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory booked before the Mass date' AS CHECK_NAME,
+    SELECT 2280 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory booked before the Mass date' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE x.TANGGAL_PENCATATAN < k.TANGGAL_MISA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The booking date cannot precede the Mass.' AS NOTE
     UNION ALL
-    SELECT 2280 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory with open reconciliation' AS CHECK_NAME,
+    SELECT 2290 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory with open reconciliation' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE STATUS_REKONSILIASI IN ('Selisih Sedang Ditelusuri', 'Belum Dihitung')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: records still being counted or investigated.' AS NOTE
     UNION ALL
-    SELECT 2290 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Attendance waiting for validation or recheck' AS CHECK_NAME,
+    SELECT 2300 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Attendance waiting for validation or recheck' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE STATUS_VALIDASI <> 'Sudah Divalidasi') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: attendance not yet validated.' AS NOTE
     UNION ALL
-    SELECT 2300 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Cancelled Mass occurrences' AS CHECK_NAME,
+    SELECT 2310 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Cancelled Mass occurrences' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE STATUS_PELAKSANAAN = 'Dibatalkan') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario.' AS NOTE
     UNION ALL
-    SELECT 2310 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Expenditure after the as-of date' AS CHECK_NAME,
+    SELECT 2320 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Expenditure after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN WHERE TANGGAL_PENGELUARAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Spending cannot be dated after the snapshot date.' AS NOTE
     UNION ALL
-    SELECT 2320 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Offertory booked after the as-of date' AS CHECK_NAME,
+    SELECT 2330 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Offertory booked after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE TANGGAL_PENCATATAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Bookings cannot be in the future.' AS NOTE
     UNION ALL
-    SELECT 2330 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Attendance recorded after the as-of date' AS CHECK_NAME,
+    SELECT 2340 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Attendance recorded after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE CAST(WAKTU_PENCATATAN AS DATE) > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Records cannot be in the future.' AS NOTE
     UNION ALL
-    SELECT 2340 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Birth year implausible or registration before birth' AS CHECK_NAME,
+    SELECT 2350 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Birth year implausible or registration before birth' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE TAHUN_LAHIR < 1900 OR TAHUN_LAHIR > 2026 OR EXTRACT(YEAR FROM TANGGAL_TERDAFTAR) < TAHUN_LAHIR) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Birth years must be plausible.' AS NOTE
     UNION ALL
-    SELECT 2350 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Assignment dated after the as-of date' AS CHECK_NAME,
+    SELECT 2360 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Assignment dated after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA WHERE TANGGAL_MULAI_BERLAKU > DATE '2026-09-30' OR TANGGAL_AKHIR_BERLAKU > DATE '2026-09-30') + (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN WHERE TANGGAL_MULAI_BERLAKU > DATE '2026-09-30' OR TANGGAL_AKHIR_BERLAKU > DATE '2026-09-30')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Household and community assignments in the past only (both assignment tables).' AS NOTE
     UNION ALL
-    SELECT 2360 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Person without a household assignment' AS CHECK_NAME,
+    SELECT 2370 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Person without a household assignment' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT u WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA x WHERE x.ID_UMAT = u.ID_UMAT)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every person must belong to at least one household over time.' AS NOTE
     UNION ALL
-    SELECT 2370 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Household without a community assignment' AS CHECK_NAME,
+    SELECT 2380 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Household without a community assignment' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA f WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN x WHERE x.ID_KELUARGA = f.ID_KELUARGA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every household must belong to a community over time.' AS NOTE
     UNION ALL
-    SELECT 2380 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Overlapping household assignments of one person' AS CHECK_NAME,
+    SELECT 2390 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Overlapping household assignments of one person' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA a JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA b ON a.ID_UMAT = b.ID_UMAT AND a.ID_PENUGASAN_KELUARGA < b.ID_PENUGASAN_KELUARGA AND a.TANGGAL_MULAI_BERLAKU <= COALESCE(b.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31') AND b.TANGGAL_MULAI_BERLAKU <= COALESCE(a.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A person can be in only one household at a time.' AS NOTE
     UNION ALL
-    SELECT 2390 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Overlapping community assignments of one household' AS CHECK_NAME,
+    SELECT 2400 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Overlapping community assignments of one household' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN a JOIN DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN b ON a.ID_KELUARGA = b.ID_KELUARGA AND a.ID_PENUGASAN_LINGKUNGAN < b.ID_PENUGASAN_LINGKUNGAN AND a.TANGGAL_MULAI_BERLAKU <= COALESCE(b.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31') AND b.TANGGAL_MULAI_BERLAKU <= COALESCE(a.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A household can be in only one community at a time.' AS NOTE
     UNION ALL
-    SELECT 2400 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Active member without a current household' AS CHECK_NAME,
+    SELECT 2410 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Active member without a current household' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT u WHERE u.STATUS_KEANGGOTAAN = 'Aktif' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA x WHERE x.ID_UMAT = u.ID_UMAT AND x.TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Active members need an open household assignment.' AS NOTE
     UNION ALL
-    SELECT 2410 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Personal data not classified Terbatas or stricter' AS CHECK_NAME,
+    SELECT 2420 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Personal data not classified Terbatas or stricter' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT, DATA_OPERASIONAL.KELUARGA' AS OBJECT_NAME,
            (SELECT (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT x JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = x.ID_KLASIFIKASI_DATA WHERE k.URUTAN_TINGKAT < 3) + (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA x JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = x.ID_KLASIFIKASI_DATA WHERE k.URUTAN_TINGKAT < 3)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Identifiable personal data must be Terbatas or Sangat Terbatas.' AS NOTE
     UNION ALL
-    SELECT 2420 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Minors without the strictest classification' AS CHECK_NAME,
+    SELECT 2430 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Minors without the strictest classification' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE 2026 - TAHUN_LAHIR < 17 AND ID_KLASIFIKASI_DATA <> 'KLS-04') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Persons under 17 must be Sangat Terbatas (KLS-04).' AS NOTE
     UNION ALL
-    SELECT 2430 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Personal-data columns exposed in ANALISIS' AS CHECK_NAME,
+    SELECT 2440 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Personal-data columns exposed in ANALISIS' AS CHECK_NAME,
            'ANALISIS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE UPPER(TABLE_SCHEMA) = 'ANALISIS' AND UPPER(COLUMN_NAME) IN ('NAMA_FIKTIF', 'NAMA_KELUARGA_FIKTIF', 'ID_UMAT', 'ID_KELUARGA', 'TAHUN_LAHIR', 'ID_RESPONDEN', 'ID_PENUGASAN_KELUARGA', 'ID_SUMBANGAN_KELUARGA')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Summary views must never expose names or person and household identifiers.' AS NOTE
     UNION ALL
-    SELECT 2440 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Geometry not marked synthetic' AS CHECK_NAME,
+    SELECT 2450 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Geometry not marked synthetic' AS CHECK_NAME,
            'MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN WHERE BERSIFAT_SINTETIS = FALSE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'All demo geometry must be labelled synthetic.' AS NOTE
     UNION ALL
-    SELECT 2450 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active community without illustrative geometry' AS CHECK_NAME,
+    SELECT 2460 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active community without illustrative geometry' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN l WHERE l.STATUS_AKTIF = TRUE AND NOT EXISTS (SELECT 1 FROM MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN g WHERE g.ID_LINGKUNGAN = l.ID_LINGKUNGAN)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Needed only for map demos.' AS NOTE
     UNION ALL
-    SELECT 2460 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Households with a community history' AS CHECK_NAME,
+    SELECT 2470 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Households with a community history' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KELUARGA FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN GROUP BY ID_KELUARGA HAVING COUNT(*) > 1) h) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: merged or relocated communities.' AS NOTE
     UNION ALL
-    SELECT 2470 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Campaign dates or status inconsistent' AS CHECK_NAME,
+    SELECT 2480 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Campaign dates or status inconsistent' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE PERIODE_SELESAI < PERIODE_MULAI OR (STATUS_KAMPANYE = 'Selesai' AND PERIODE_SELESAI > DATE '2026-09-30') OR (STATUS_KAMPANYE = 'Direncanakan' AND PERIODE_MULAI <= DATE '2026-09-30') OR (STATUS_KAMPANYE = 'Berjalan' AND (PERIODE_MULAI > DATE '2026-09-30' OR PERIODE_SELESAI <= DATE '2026-09-30'))) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Status must follow the campaign dates and the snapshot date.' AS NOTE
     UNION ALL
-    SELECT 2480 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Campaign funds an activity that starts before it' AS CHECK_NAME,
+    SELECT 2490 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Campaign funds an activity that starts before it' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = k.ID_RENCANA_PENGGUNAAN WHERE p.TANGGAL_RENCANA < k.PERIODE_MULAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A campaign pays for an activity that happens after it opens.' AS NOTE
     UNION ALL
-    SELECT 2490 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Gift dated outside its campaign' AS CHECK_NAME,
+    SELECT 2500 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Gift dated outside its campaign' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA g JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k ON k.ID_KAMPANYE = g.ID_KAMPANYE WHERE g.TANGGAL_SUMBANGAN < k.PERIODE_MULAI OR g.TANGGAL_SUMBANGAN > k.PERIODE_SELESAI OR g.TANGGAL_SUMBANGAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A household gift is received during its campaign.' AS NOTE
     UNION ALL
-    SELECT 2500 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Gift community differs from the household assignment' AS CHECK_NAME,
+    SELECT 2510 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Gift community differs from the household assignment' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA g WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN p WHERE p.ID_KELUARGA = g.ID_KELUARGA AND p.ID_LINGKUNGAN = g.ID_LINGKUNGAN AND p.TANGGAL_MULAI_BERLAKU <= g.TANGGAL_SUMBANGAN AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= g.TANGGAL_SUMBANGAN))) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The community recorded on a gift must be the household community on that date.' AS NOTE
     UNION ALL
-    SELECT 2510 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Regional summary differs from the household gifts' AS CHECK_NAME,
+    SELECT 2520 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Regional summary differs from the household gifts' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s LEFT JOIN (SELECT g.ID_KAMPANYE, l.ID_WILAYAH, COUNT(*) AS JUMLAH_KELUARGA, SUM(g.JUMLAH_SUMBANGAN) AS TOTAL FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA g JOIN MASTER_DATA.MASTER_LINGKUNGAN l ON l.ID_LINGKUNGAN = g.ID_LINGKUNGAN GROUP BY g.ID_KAMPANYE, l.ID_WILAYAH) d ON d.ID_KAMPANYE = s.ID_KAMPANYE AND d.ID_WILAYAH = s.ID_WILAYAH WHERE COALESCE(d.JUMLAH_KELUARGA, 0) <> s.JUMLAH_KELUARGA_PESERTA OR COALESCE(d.TOTAL, 0) <> s.JUMLAH_SUMBANGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The summary of a region must equal the sum and count of its household gifts.' AS NOTE
     UNION ALL
-    SELECT 2520 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Household gifts without a regional summary' AS CHECK_NAME,
+    SELECT 2530 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Household gifts without a regional summary' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT g.ID_KAMPANYE, l.ID_WILAYAH, COUNT(*) AS JUMLAH_KELUARGA, SUM(g.JUMLAH_SUMBANGAN) AS TOTAL FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA g JOIN MASTER_DATA.MASTER_LINGKUNGAN l ON l.ID_LINGKUNGAN = g.ID_LINGKUNGAN GROUP BY g.ID_KAMPANYE, l.ID_WILAYAH) d LEFT JOIN DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s ON s.ID_KAMPANYE = d.ID_KAMPANYE AND s.ID_WILAYAH = d.ID_WILAYAH WHERE s.ID_SUMBANGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every region with gifts needs its summary row.' AS NOTE
     UNION ALL
-    SELECT 2530 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Summary recorded before the campaign ended' AS CHECK_NAME,
+    SELECT 2540 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Summary recorded before the campaign ended' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k ON k.ID_KAMPANYE = s.ID_KAMPANYE WHERE s.TANGGAL_PENCATATAN < k.PERIODE_SELESAI OR s.TANGGAL_PENCATATAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Regions report after the campaign closes and not after the snapshot date.' AS NOTE
     UNION ALL
-    SELECT 2540 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Participating households exceed households in the region' AS CHECK_NAME,
+    SELECT 2550 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Participating households exceed households in the region' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k ON k.ID_KAMPANYE = s.ID_KAMPANYE JOIN (SELECT s2.ID_SUMBANGAN, COUNT(p.ID_KELUARGA) AS JUMLAH_KELUARGA FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s2 JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k2 ON k2.ID_KAMPANYE = s2.ID_KAMPANYE LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN l ON l.ID_WILAYAH = s2.ID_WILAYAH LEFT JOIN DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN p ON p.ID_LINGKUNGAN = l.ID_LINGKUNGAN AND p.TANGGAL_MULAI_BERLAKU <= k2.PERIODE_SELESAI AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= k2.PERIODE_SELESAI) GROUP BY s2.ID_SUMBANGAN) h ON h.ID_SUMBANGAN = s.ID_SUMBANGAN WHERE s.JUMLAH_KELUARGA_PESERTA > h.JUMLAH_KELUARGA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Compares participants with households assigned to the region on the last day of the campaign.' AS NOTE
     UNION ALL
-    SELECT 2550 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Community without an economic profile' AS CHECK_NAME,
+    SELECT 2560 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Community without an economic profile' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN l WHERE NOT EXISTS (SELECT 1 FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN e WHERE e.ID_LINGKUNGAN = l.ID_LINGKUNGAN)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The donation analysis relates gifts to the economic profile of the community.' AS NOTE
     UNION ALL
-    SELECT 2560 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Planned campaigns' AS CHECK_NAME,
+    SELECT 2570 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Planned campaigns' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE STATUS_KAMPANYE = 'Direncanakan') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: Advent of the current year.' AS NOTE
     UNION ALL
-    SELECT 2570 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Donation summaries waiting for validation' AS CHECK_NAME,
+    SELECT 2580 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Donation summaries waiting for validation' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE STATUS_VALIDASI <> 'Sudah Divalidasi') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario.' AS NOTE
     UNION ALL
-    SELECT 2580 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Dataset information missing or duplicated' AS CHECK_NAME,
+    SELECT 2590 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Dataset information missing or duplicated' AS CHECK_NAME,
            'MASTER_DATA.INFO_DATASET' AS OBJECT_NAME,
            (SELECT CASE WHEN COUNT(*) = 1 THEN 0 ELSE 1 END FROM MASTER_DATA.INFO_DATASET) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Exactly one dataset information row is expected.' AS NOTE
     UNION ALL
-    SELECT 2590 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Snapshot date differs from this validation' AS CHECK_NAME,
+    SELECT 2600 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Snapshot date differs from this validation' AS CHECK_NAME,
            'MASTER_DATA.INFO_DATASET' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.INFO_DATASET WHERE TANGGAL_SNAPSHOT <> DATE '2026-09-30' OR BERSIFAT_SIMULASI <> TRUE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The date used by the checks must be the snapshot date of the data, and the data must be marked simulated.' AS NOTE
     UNION ALL
-    SELECT 2600 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Mass history shorter than five years' AS CHECK_NAME,
+    SELECT 2610 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Mass history shorter than five years' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.INFO_DATASET i WHERE (SELECT MIN(TANGGAL_MISA) FROM DATA_OPERASIONAL.KEJADIAN_MISA) > DATEADD('day', 7, i.TANGGAL_MULAI_RIWAYAT) OR DATEDIFF('day', i.TANGGAL_MULAI_RIWAYAT, i.TANGGAL_SNAPSHOT) < 1826) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'History must start within a week of the recorded start date and cover at least five years.' AS NOTE
     UNION ALL
-    SELECT 2610 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Plan history shorter than five years' AS CHECK_NAME,
+    SELECT 2620 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Plan history shorter than five years' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.INFO_DATASET i WHERE (SELECT MIN(TAHUN_RENCANA) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN) > EXTRACT(YEAR FROM i.TANGGAL_SNAPSHOT) - 5) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Annual plans must reach at least five years back.' AS NOTE
     UNION ALL
-    SELECT 2620 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Event ends before it starts' AS CHECK_NAME,
+    SELECT 2630 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Event ends before it starts' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA WHERE TANGGAL_SELESAI < TANGGAL_MULAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Event dates.' AS NOTE
     UNION ALL
-    SELECT 2630 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Event windows overlap' AS CHECK_NAME,
+    SELECT 2640 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Event windows overlap' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA a JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA b ON a.ID_PERISTIWA < b.ID_PERISTIWA AND a.TANGGAL_MULAI <= b.TANGGAL_SELESAI AND b.TANGGAL_MULAI <= a.TANGGAL_SELESAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Overlapping events would make the effect of each one impossible to separate.' AS NOTE
     UNION ALL
-    SELECT 2640 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance linked to an event that does not cover the Mass date' AS CHECK_NAME,
+    SELECT 2650 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance linked to an event that does not cover the Mass date' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA e ON e.ID_PERISTIWA = x.ID_PERISTIWA WHERE k.TANGGAL_MISA < e.TANGGAL_MULAI OR k.TANGGAL_MISA > e.TANGGAL_SELESAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A note about an event only applies to Masses inside its window.' AS NOTE
     UNION ALL
-    SELECT 2650 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance during an event without a link to it' AS CHECK_NAME,
+    SELECT 2660 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance during an event without a link to it' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA e ON k.TANGGAL_MISA BETWEEN e.TANGGAL_MULAI AND e.TANGGAL_SELESAI WHERE x.ID_PERISTIWA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Records inside an event window should name the event, otherwise the dip cannot be explained.' AS NOTE
     UNION ALL
-    SELECT 2660 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance records linked to an unforeseen event' AS CHECK_NAME,
+    SELECT 2670 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance records linked to an unforeseen event' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE ID_PERISTIWA IS NOT NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Masses whose attendance and offertory carry an explanation.' AS NOTE
     UNION ALL
-    SELECT 2670 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Masses cancelled' AS CHECK_NAME,
+    SELECT 2680 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Masses cancelled' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE STATUS_PELAKSANAAN = 'Dibatalkan' AND KETERANGAN IS NOT NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Cancellations, some caused by events.' AS NOTE
     UNION ALL
-    SELECT 2680 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event section differs from its plan' AS CHECK_NAME,
+    SELECT 2690 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event section differs from its plan' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN e JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = e.ID_RENCANA JOIN DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE h.ID_SEKSI <> e.ID_SEKSI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'ID_SEKSI is repeated on the event on purpose, so it must agree with the plan.' AS NOTE
     UNION ALL
-    SELECT 2690 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event status differs from its plan status' AS CHECK_NAME,
+    SELECT 2700 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event status differs from its plan status' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN e JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = e.ID_RENCANA WHERE p.STATUS_PELAKSANAAN <> e.STATUS_KEGIATAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Plan and event must tell the same story.' AS NOTE
     UNION ALL
-    SELECT 2700 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Completed plan without an event' AS CHECK_NAME,
+    SELECT 2710 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Completed plan without an event' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN p WHERE p.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.KEGIATAN e WHERE e.ID_RENCANA = p.ID_RENCANA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A plan marked Terlaksana needs the event that carried it out.' AS NOTE
     UNION ALL
-    SELECT 2710 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event dates or participants inconsistent' AS CHECK_NAME,
+    SELECT 2720 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event dates or participants inconsistent' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN WHERE TANGGAL_SELESAI < TANGGAL_MULAI OR (STATUS_KEGIATAN = 'Terlaksana' AND (JUMLAH_PESERTA_AKTUAL IS NULL OR TANGGAL_SELESAI > DATE '2026-09-30')) OR (STATUS_KEGIATAN <> 'Terlaksana' AND JUMLAH_PESERTA_AKTUAL IS NOT NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Actual participants exist exactly for events that were held, and held events are in the past.' AS NOTE
     UNION ALL
-    SELECT 2720 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Plan date outside the plan year' AS CHECK_NAME,
+    SELECT 2730 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Plan date outside the plan year' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN p JOIN DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM p.TANGGAL_RENCANA) <> h.TAHUN_RENCANA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Planned dates must fall in the year of the annual plan.' AS NOTE
     UNION ALL
-    SELECT 2730 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Open plan missing from the upcoming activities view' AS CHECK_NAME,
+    SELECT 2740 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Open plan missing from the upcoming activities view' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN p WHERE p.STATUS_PELAKSANAAN = 'Direncanakan' AND NOT EXISTS (SELECT 1 FROM ANALISIS.KEGIATAN_MENDATANG u WHERE u.ID_RENCANA = p.ID_RENCANA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every plan that has not been carried out yet must show up on the upcoming activities page.' AS NOTE
     UNION ALL
-    SELECT 2740 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Plan listed twice in the upcoming activities view' AS CHECK_NAME,
+    SELECT 2750 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Plan listed twice in the upcoming activities view' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_RENCANA FROM ANALISIS.KEGIATAN_MENDATANG GROUP BY ID_RENCANA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'One row per plan: a duplicate would double the budget shown for upcoming activities.' AS NOTE
     UNION ALL
-    SELECT 2750 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Upcoming activity dated before the snapshot date' AS CHECK_NAME,
+    SELECT 2760 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Upcoming activity dated before the snapshot date' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_MENDATANG WHERE TAHAP <> 'Ditunda, perlu jadwal baru' AND TANGGAL_MULAI < TANGGAL_DATA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'A plan still marked Direncanakan after its date is overdue and should be updated.' AS NOTE
     UNION ALL
-    SELECT 2760 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Upcoming activities' AS CHECK_NAME,
+    SELECT 2770 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Upcoming activities' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_MENDATANG) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: scheduled events, plan-only activities and postponed ones.' AS NOTE
     UNION ALL
-    SELECT 2770 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Expenditure outside the plan year' AS CHECK_NAME,
+    SELECT 2780 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Source file name does not start with the report number' AS CHECK_NAME,
+           'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE NAMA_BERKAS_SUMBER IS NOT NULL AND LEFT(NAMA_BERKAS_SUMBER, LENGTH(ID_LAPORAN) + 1) <> ID_LAPORAN || '_') AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'The report number at the start of the file name is how a document is matched to its row.' AS NOTE
+    UNION ALL
+    SELECT 2790 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Source file is not a PDF or names a folder' AS CHECK_NAME,
+           'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE NAMA_BERKAS_SUMBER IS NOT NULL AND (LOWER(NAMA_BERKAS_SUMBER) NOT LIKE '%.pdf' OR NAMA_BERKAS_SUMBER LIKE '%/%')) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Only the file name is stored, never a folder, because the folder differs between a repository and a stage.' AS NOTE
+    UNION ALL
+    SELECT 2800 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Reports without a source document' AS CHECK_NAME,
+           'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE NAMA_BERKAS_SUMBER IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
+           'Every report in the demo was extracted from a PDF, so a report entered by hand would show here.' AS NOTE
+    UNION ALL
+    SELECT 2810 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Expenditure outside the plan year' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN x JOIN DATA_OPERASIONAL.ALOKASI_ANGGARAN a ON a.ID_ALOKASI = x.ID_ALOKASI JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = a.ID_RENCANA JOIN DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM x.TANGGAL_PENGELUARAN) <> h.TAHUN_RENCANA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Spending must be dated in the plan year.' AS NOTE
     UNION ALL
-    SELECT 2780 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Expenditure on a plan that is Direncanakan or Dibatalkan' AS CHECK_NAME,
+    SELECT 2820 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Expenditure on a plan that is Direncanakan or Dibatalkan' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN x JOIN DATA_OPERASIONAL.ALOKASI_ANGGARAN a ON a.ID_ALOKASI = x.ID_ALOKASI JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = a.ID_RENCANA WHERE p.STATUS_PELAKSANAAN IN ('Direncanakan', 'Dibatalkan')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Possible but unusual: spending before a plan starts or after it was cancelled.' AS NOTE
     UNION ALL
-    SELECT 2790 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations without any expenditure' AS CHECK_NAME,
+    SELECT 2830 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations without any expenditure' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN a WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN x WHERE x.ID_ALOKASI = a.ID_ALOKASI)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: budget not yet used.' AS NOTE
     UNION ALL
-    SELECT 2800 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations partly used' AS CHECK_NAME,
+    SELECT 2840 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations partly used' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT a.ID_ALOKASI, a.JUMLAH_ANGGARAN, COALESCE(SUM(x.JUMLAH_PENGELUARAN), 0) AS TERPAKAI FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN a LEFT JOIN DATA_OPERASIONAL.REALISASI_PENGELUARAN x ON x.ID_ALOKASI = a.ID_ALOKASI GROUP BY a.ID_ALOKASI, a.JUMLAH_ANGGARAN) t WHERE t.TERPAKAI BETWEEN 1 AND t.JUMLAH_ANGGARAN - 1) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: spending below budget.' AS NOTE
     UNION ALL
-    SELECT 2810 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations spent above budget' AS CHECK_NAME,
+    SELECT 2850 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations spent above budget' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT a.ID_ALOKASI, a.JUMLAH_ANGGARAN, COALESCE(SUM(x.JUMLAH_PENGELUARAN), 0) AS TERPAKAI FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN a LEFT JOIN DATA_OPERASIONAL.REALISASI_PENGELUARAN x ON x.ID_ALOKASI = a.ID_ALOKASI GROUP BY a.ID_ALOKASI, a.JUMLAH_ANGGARAN) t WHERE t.TERPAKAI > t.JUMLAH_ANGGARAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: overspending to be explained.' AS NOTE
     UNION ALL
-    SELECT 2820 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report for an event that was not held' AS CHECK_NAME,
+    SELECT 2860 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report for an event that was not held' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r JOIN DATA_OPERASIONAL.KEGIATAN e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE e.STATUS_KEGIATAN <> 'Terlaksana') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Only events that took place can be reported.' AS NOTE
     UNION ALL
-    SELECT 2830 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report date before the event ended or after the as-of date' AS CHECK_NAME,
+    SELECT 2870 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report date before the event ended or after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r JOIN DATA_OPERASIONAL.KEGIATAN e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE r.TANGGAL_LAPORAN < e.TANGGAL_SELESAI OR r.TANGGAL_LAPORAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A report follows the event.' AS NOTE
     UNION ALL
-    SELECT 2840 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Final report with empty required fields' AS CHECK_NAME,
+    SELECT 2880 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Final report with empty required fields' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE STATUS_LAPORAN = 'Final' AND (RINGKASAN_PELAKSANAAN IS NULL OR JUMLAH_PESERTA IS NULL OR REALISASI_BIAYA IS NULL OR EVALUASI_LOGISTIK IS NULL OR HASIL_KEGIATAN IS NULL OR REKOMENDASI_TINDAK_LANJUT IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A final report must be complete.' AS NOTE
     UNION ALL
-    SELECT 2850 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report participants differ from the event' AS CHECK_NAME,
+    SELECT 2890 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report participants differ from the event' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r JOIN DATA_OPERASIONAL.KEGIATAN e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE r.JUMLAH_PESERTA IS NOT NULL AND r.JUMLAH_PESERTA <> e.JUMLAH_PESERTA_AKTUAL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Expected: 1 (the report with status Perlu Revisi is deliberately inconsistent).' AS NOTE
     UNION ALL
-    SELECT 2860 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report cost differs from recorded expenditure' AS CHECK_NAME,
+    SELECT 2900 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report cost differs from recorded expenditure' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r JOIN DATA_OPERASIONAL.KEGIATAN e ON e.ID_KEGIATAN = r.ID_KEGIATAN LEFT JOIN (SELECT a.ID_RENCANA, SUM(x.JUMLAH_PENGELUARAN) AS TOTAL_PENGELUARAN FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN x JOIN DATA_OPERASIONAL.ALOKASI_ANGGARAN a ON a.ID_ALOKASI = x.ID_ALOKASI GROUP BY a.ID_RENCANA) s ON s.ID_RENCANA = e.ID_RENCANA WHERE r.REALISASI_BIAYA IS NOT NULL AND e.ID_RENCANA IS NOT NULL AND r.REALISASI_BIAYA <> COALESCE(s.TOTAL_PENGELUARAN, 0)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Compares the cost in the report with the sum of expenditure lines of the planned activity.' AS NOTE
     UNION ALL
-    SELECT 2870 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Completed events without a report' AS CHECK_NAME,
+    SELECT 2910 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Completed events without a report' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN e WHERE e.STATUS_KEGIATAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r WHERE r.ID_KEGIATAN = e.ID_KEGIATAN)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: reports not yet submitted.' AS NOTE
     UNION ALL
-    SELECT 2880 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Draft or revision reports' AS CHECK_NAME,
+    SELECT 2920 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Draft or revision reports' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE STATUS_LAPORAN <> 'Final') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: incomplete reports.' AS NOTE
     UNION ALL
-    SELECT 2890 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Postponed or cancelled plans' AS CHECK_NAME,
+    SELECT 2930 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Postponed or cancelled plans' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN WHERE STATUS_PELAKSANAAN IN ('Ditunda', 'Dibatalkan')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario.' AS NOTE
     UNION ALL
-    SELECT 2900 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Answer option does not belong to the question' AS CHECK_NAME,
+    SELECT 2940 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Answer option does not belong to the question' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI j JOIN MASTER_DATA.OPSI_JAWABAN_SURVEI o ON o.ID_OPSI = j.ID_OPSI WHERE o.ID_PERTANYAAN <> j.ID_PERTANYAAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The chosen option must be one of the question options.' AS NOTE
     UNION ALL
-    SELECT 2910 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Question and respondent belong to different surveys' AS CHECK_NAME,
+    SELECT 2950 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Question and respondent belong to different surveys' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI j JOIN MASTER_DATA.PERTANYAAN_SURVEI q ON q.ID_PERTANYAAN = j.ID_PERTANYAAN JOIN DATA_OPERASIONAL.RESPONDEN_SURVEI r ON r.ID_RESPONDEN = j.ID_RESPONDEN WHERE q.ID_SURVEI <> r.ID_SURVEI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A respondent only answers questions of the survey they filled in.' AS NOTE
     UNION ALL
-    SELECT 2920 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Aggregate count differs from the answers' AS CHECK_NAME,
+    SELECT 2960 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Aggregate count differs from the answers' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT h LEFT JOIN (SELECT ID_OPSI, COUNT(*) AS N FROM DATA_OPERASIONAL.JAWABAN_SURVEI GROUP BY ID_OPSI) c ON c.ID_OPSI = h.ID_OPSI WHERE h.JUMLAH_RESPONDEN <> COALESCE(c.N, 0)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Recomputes every option count from the raw answers.' AS NOTE
     UNION ALL
-    SELECT 2930 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Aggregate total differs from the answers' AS CHECK_NAME,
+    SELECT 2970 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Aggregate total differs from the answers' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT h LEFT JOIN (SELECT ID_PERTANYAAN, COUNT(*) AS N FROM DATA_OPERASIONAL.JAWABAN_SURVEI GROUP BY ID_PERTANYAAN) c ON c.ID_PERTANYAAN = h.ID_PERTANYAAN WHERE h.TOTAL_RESPONDEN_PERTANYAAN <> COALESCE(c.N, 0)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Recomputes the number of respondents per question.' AS NOTE
     UNION ALL
-    SELECT 2940 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Percentage differs from count divided by total' AS CHECK_NAME,
+    SELECT 2980 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Percentage differs from count divided by total' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE (TOTAL_RESPONDEN_PERTANYAAN = 0 AND PERSENTASE_JAWABAN <> 0) OR (TOTAL_RESPONDEN_PERTANYAAN > 0 AND ABS(PERSENTASE_JAWABAN - 100.0 * JUMLAH_RESPONDEN / TOTAL_RESPONDEN_PERTANYAAN) > 0.01)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Tolerance 0.01 percentage point for rounding.' AS NOTE
     UNION ALL
-    SELECT 2950 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Option counts do not add up to the question total' AS CHECK_NAME,
+    SELECT 2990 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Option counts do not add up to the question total' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PERTANYAAN FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT GROUP BY ID_PERTANYAAN HAVING SUM(JUMLAH_RESPONDEN) <> MAX(TOTAL_RESPONDEN_PERTANYAAN)) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Single answers: option counts must sum to the number of respondents.' AS NOTE
     UNION ALL
-    SELECT 2960 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Percentages do not add up to 100' AS CHECK_NAME,
+    SELECT 3000 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Percentages do not add up to 100' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PERTANYAAN FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT GROUP BY ID_PERTANYAAN HAVING MAX(TOTAL_RESPONDEN_PERTANYAAN) > 0 AND ABS(SUM(PERSENTASE_JAWABAN) - 100) > 0.1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Tolerance 0.1 percentage point for rounding.' AS NOTE
     UNION ALL
-    SELECT 2970 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Answered question without aggregate rows' AS CHECK_NAME,
+    SELECT 3010 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Answered question without aggregate rows' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(DISTINCT j.ID_PERTANYAAN) FROM DATA_OPERASIONAL.JAWABAN_SURVEI j WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT h WHERE h.ID_PERTANYAAN = j.ID_PERTANYAAN)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every answered question must be summarised.' AS NOTE
     UNION ALL
-    SELECT 2980 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Respondent filled outside the survey window' AS CHECK_NAME,
+    SELECT 3020 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Respondent filled outside the survey window' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI r JOIN MASTER_DATA.SURVEI s ON s.ID_SURVEI = r.ID_SURVEI WHERE r.TANGGAL_PENGISIAN < s.TANGGAL_MULAI OR r.TANGGAL_PENGISIAN > s.TANGGAL_SELESAI OR r.TANGGAL_PENGISIAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Responses fall inside the survey dates.' AS NOTE
     UNION ALL
-    SELECT 2990 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Survey ends before it starts' AS CHECK_NAME,
+    SELECT 3030 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Survey ends before it starts' AS CHECK_NAME,
            'MASTER_DATA.SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI WHERE TANGGAL_SELESAI < TANGGAL_MULAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Survey dates.' AS NOTE
     UNION ALL
-    SELECT 3000 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Surveys without responses' AS CHECK_NAME,
+    SELECT 3040 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Surveys without responses' AS CHECK_NAME,
            'MASTER_DATA.SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI s WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.RESPONDEN_SURVEI r WHERE r.ID_SURVEI = s.ID_SURVEI)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: a planned survey has no responses and no aggregates.' AS NOTE
     UNION ALL
-    SELECT 3010 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3050 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.STRUKTUR_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.STRUKTUR_WILAYAH) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3020 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3060 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PELAKSANAAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PELAKSANAAN_MISA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3030 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3070 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEHADIRAN_MISA_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEHADIRAN_MISA_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3040 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3080 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KOLEKTE_MISA_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MISA_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3050 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3090 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.TREN_KEHADIRAN_PERIODE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.TREN_KEHADIRAN_PERIODE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3060 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3100 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.SUMBANGAN_KHUSUS_PER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.SUMBANGAN_KHUSUS_PER_WILAYAH) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3070 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3110 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3080 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3120 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.ANGGARAN_VS_REALISASI_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.ANGGARAN_VS_REALISASI_SEKSI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3090 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3130 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_DAN_LAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_DAN_LAPORAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3100 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3140 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KELENGKAPAN_LAPORAN_PER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KELENGKAPAN_LAPORAN_PER_SEKSI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3110 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3150 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.HASIL_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.HASIL_SURVEI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3120 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3160 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.RINGKASAN_SKOR_LIKERT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_SKOR_LIKERT) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3130 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3170 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.RINGKASAN_UMAT_PER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_UMAT_PER_LINGKUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3140 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3180 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3150 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3190 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3160 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3200 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3170 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3210 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KORELASI_KOLEKTE_KEHADIRAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KORELASI_KOLEKTE_KEHADIRAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3180 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3220 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3190 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3230 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3200 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3240 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3210 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3250 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3220 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3260 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.TITIK_IMPAS_KAMPANYE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.TITIK_IMPAS_KAMPANYE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3230 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3270 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_MENDATANG) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,

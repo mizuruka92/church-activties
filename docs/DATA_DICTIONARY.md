@@ -854,6 +854,7 @@ Laporan pascakegiatan. Tidak semua kegiatan memiliki laporan, dan sebagian lapor
 - **Domain:** Kegiatan dan laporan pascakegiatan.
 - **Kunci utama (PK):** `ID_LAPORAN`.
 - **Kunci unik (UQ):** `ID_KEGIATAN`.
+- **Kunci unik (UQ):** `NAMA_BERKAS_SUMBER`.
 - **Relasi (FK):** `ID_KEGIATAN` merujuk ke `DATA_OPERASIONAL.KEGIATAN` (`ID_KEGIATAN`).
 
 | Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
@@ -868,6 +869,7 @@ Laporan pascakegiatan. Tidak semua kegiatan memiliki laporan, dan sebagian lapor
 | `EVALUASI_LOGISTIK` | `VARCHAR(2000)` | Tidak | Evaluasi perlengkapan, tempat, dan konsumsi |  |
 | `HASIL_KEGIATAN` | `VARCHAR(2000)` | Tidak | Hasil atau capaian kegiatan |  |
 | `REKOMENDASI_TINDAK_LANJUT` | `VARCHAR(2000)` | Tidak | Rekomendasi tindak lanjut, kosong jika belum diisi |  |
+| `NAMA_BERKAS_SUMBER` | `VARCHAR(200)` | Tidak | Nama berkas PDF dokumen sumber laporan, tanpa folder dan diawali nomor laporan, kosong jika laporan tidak berasal dari dokumen |  |
 
 ## Daftar nilai terkendali
 

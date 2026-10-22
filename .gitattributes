@@ -1,0 +1,3 @@
+# The mock report PDFs are binary files with byte offsets inside them. Never let Git convert their line endings
+# (on Windows, core.autocrlf would otherwise corrupt them).
+*.pdf binary
