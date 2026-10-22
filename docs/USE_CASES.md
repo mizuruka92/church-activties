@@ -1,0 +1,336 @@
+# Use cases: income versus outcome, unforeseen events, community donations, Easter and Christmas
+
+This guide describes four analysis stories that the simulated data was shaped to support, the views
+that answer them, and what to look at. It exists so that the next phase (the Streamlit dashboard) can
+be built on questions that already have answers.
+
+> **Everything here is simulated.** The parish, the amounts and the events are fictional. The numbers
+> in this guide were produced by running the committed SQL on a **local DuckDB stand-in**, not in
+> Snowflake (nothing has been executed in Snowflake yet; see the README). They are deterministic, so
+> Snowflake should return the same values, but that has not been verified. The stories are
+> deliberately clean so that they are easy to present. Real data will be messier.
+
+| # | Question | Main views |
+|---|---|---|
+| 1 | Is the offertory still larger than what the parish spends, and for how long? | `PEMASUKAN_PENGELUARAN_BULANAN`, `PEMASUKAN_PENGELUARAN_TAHUNAN`, `PROYEKSI_PEMASUKAN_PENGELUARAN` |
+| 2 | What moves the offertory from week to week? | `POLA_KOLEKTE_HARI_DALAM_BULAN`, `KORELASI_KOLEKTE_KEHADIRAN`, `KEHADIRAN_MISA_BULANAN`, `KOLEKTE_MISA_BULANAN` |
+| 3 | What did an unforeseen event (rain, haze, ash) do, and how does it bias a forecast? | `KOLEKTE_MINGGUAN_DAN_PERISTIWA`, `DAMPAK_PERISTIWA_LUAR_BIASA` |
+| 4 | How do Lent and Advent gifts differ between communities, and do they cover the Easter and Christmas celebrations? | `SUMBANGAN_KELUARGA_PER_LINGKUNGAN`, `TITIK_IMPAS_KAMPANYE` |
+
+All views carry the column `SUMBER_DATA = 'Data simulasi (fiktif)'`. The queries below use fully
+qualified names, so they work in any worksheet once the setup has run.
+
+## How the data was shaped
+
+The generator builds the story from a few explicit assumptions and then adds noise. These are the
+knobs, in case you want a different story. After changing one, run
+`python scripts/generate_mock_data.py` and `python -m unittest discover -s tests`, then reload.
+
+| Assumption | Where | Value in the bundled data |
+|---|---|---|
+| History | `config.py` | 1 January 2021 to the snapshot 30 September 2026; plans for 2021 to 2026 |
+| Attendance level per year (1.0 = 2026) | `liturgy.ATTENDANCE_KNOTS` | 0.90, 0.94, 0.97, 0.99, 1.00, 1.00 for 2021 to 2026: growth that flattens |
+| Offertory per attendee | `liturgy.PER_ATTENDEE_MEAN`, `PER_ATTENDEE_KNOTS` | Mean per collection type, same flattening curve |
+| Payday effect | `liturgy.payday_factor` | 1.20 on the 1st of the month, falling in a straight line to 0.80 on the 31st |
+| Noise | `liturgy.py` | Attendance about 11 %, amount per attendee about 3 % |
+| Unforeseen events | `peristiwa.EVENTS`, `ATTENDANCE_FACTOR` | 10 events, attendance factor 0.90 / 0.78 / 0.60 for light / medium / severe |
+| Number of programmes per year | `planning.ACTIVITY_COUNT` | 14, 19, 25, 31, 36 for 2021 to 2025, then the hand-written 2026 plan |
+| Programme spending per year | `planning.SPEND_TARGET` | Rp 55 M, 90 M, 125 M, 165 M, 210 M for 2021 to 2025 |
+| Easter and Christmas budgets | `planning.BIG_BUDGET` | Easter Rp 7 M rising to 17.5 M, Christmas Rp 9.5 M rising to 29 M |
+| Lent and Advent collected | `donations.LENT_TOTAL`, `ADVENT_TOTAL` | Lent Rp 12.5 M rising to 18.5 M, Advent Rp 11 M rising to 16 M |
+| Economic capacity per community | `reference.EKONOMI` | 18 communities, index 0.50 to 1.70, four categories |
+| Communities with a regular large donor | `donations.REGULAR_DONOR_COMMUNITIES` | six communities, mostly the lower-capacity ones |
+
+## 1. Income versus outcome
+
+**Income** here is the offertory (`PEMASUKAN_KOLEKTE`) and, shown separately, the special donations
+(`PEMASUKAN_SUMBANGAN_KHUSUS`). **Outcome** is the programme spending recorded against annual plans
+(`PENGELUARAN_PROGRAM`). Running costs outside the plans are not modelled.
+
+```sql
+SELECT TAHUN, STATUS_TAHUN, PEMASUKAN_KOLEKTE, PENGELUARAN_PROGRAM,
+       SELISIH_KOLEKTE_VS_PENGELUARAN, PERSEN_PENGELUARAN_TERHADAP_KOLEKTE,
+       PERTUMBUHAN_KOLEKTE_PERSEN, PERTUMBUHAN_PENGELUARAN_PERSEN,
+       PERTUMBUHAN_KOLEKTE_PER_MISA_TANPA_PERISTIWA_PERSEN
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN
+ORDER BY TAHUN;
+```
+
+| Year | Offertory (Rp M) | Programme spending (Rp M) | Spending as % of offertory | Offertory growth | Spending growth | Per-Mass growth without events |
+|---|---:|---:|---:|---:|---:|---:|
+| 2021 | 247.9 | 55.1 | 22 % | | | |
+| 2022 | 262.4 | 90.8 | 35 % | +5.9 % | +64.9 % | +7.3 % |
+| 2023 | 272.8 | 126.0 | 46 % | +3.9 % | +38.7 % | +4.3 % |
+| 2024 | 296.6 | 163.4 | 55 % | +8.7 % | +29.7 % | +2.7 % |
+| 2025 | 283.3 | 196.5 | 69 % | -4.5 % | +20.3 % | +1.1 % |
+| 2026 (9 months) | 217.7 | 167.6 | 77 % | not comparable | not comparable | about 0 % |
+
+How to read it:
+
+* The offertory is **still larger than spending in every year**, as intended. The gap shrinks from
+  Rp 193 M (2021) to Rp 87 M (2025) and Rp 50 M over the first nine months of 2026.
+* The raw offertory growth jumps around (+8.7 % then -4.5 %) because the 2025 ash event removed
+  several weeks of offertory. The last column removes the effect of the events and shows the
+  underlying trend: growth per Mass slows steadily towards zero. Showing both columns side by side
+  is the point of the use case.
+* Spending growth is positive every year while the growth rate itself falls, because a larger
+  programme base is added to each year. Spending still grows by Rp 33 to 37 M every year in absolute terms.
+* `STATUS_TAHUN` and `TAHUN_LENGKAP` mark 2026 as a partial year. Do not compare it with full years.
+
+### The forecast
+
+`PROYEKSI_PEMASUKAN_PENGELUARAN` fits a straight line through the complete years 2021 to 2025 for
+each series and projects five years ahead.
+
+```sql
+SELECT TAHUN, JENIS_DATA, KOLEKTE_TREN, PENGELUARAN_TREN,
+       SELISIH_TREN_KOLEKTE_VS_PENGELUARAN, TREN_PENGELUARAN_MELEBIHI_KOLEKTE,
+       TAHUN_PERTAMA_PENGELUARAN_MELEBIHI_KOLEKTE, CATATAN_METODE
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN
+ORDER BY TAHUN;
+```
+
+| Year | Offertory trend (Rp M) | Spending trend (Rp M) | Difference (Rp M) |
+|---|---:|---:|---:|
+| 2026 | 304.1 | 233.0 | 71.1 |
+| 2027 | 314.6 | 268.5 | 46.0 |
+| 2028 | 325.1 | 304.1 | 21.0 |
+| **2029** | **335.6** | **339.6** | **-4.1** |
+| 2030 | 346.0 | 375.1 | -29.1 |
+
+The offertory trend grows by about Rp 10.5 M a year and the spending trend by about Rp 35.5 M a year,
+so the lines cross in **2029**, three years after the snapshot. This is the requested "forecast three
+years ahead" picture.
+
+Two caveats are built into the view and should be said out loud in a presentation:
+
+* The method is a straight line through five points. It ignores events and ignores that spending
+  growth is itself slowing, so it is a demonstration of the idea, not a forecasting model.
+* When the special donations are included, the total income stays above spending throughout the
+  horizon (`TAHUN_PERTAMA_PENGELUARAN_MELEBIHI_TOTAL_PEMASUKAN` is empty). The comparison with the
+  offertory alone is the one the use case asks for; the donations are earmarked for specific
+  celebrations (use case 4).
+
+## 2. What drives the offertory
+
+Offertory is generated as *attendance x amount per attendee x payday factor x noise*, so it is
+linearly related to attendance and shifts with the day of the month by construction. The views let
+you see both effects in the data.
+
+**Day of the month.** Offertory per attendee is highest right after salary day and falls through the month:
+
+```sql
+SELECT TAHUN, KELOMPOK_TANGGAL, SUM(TOTAL_KOLEKTE) / SUM(TOTAL_UMAT) AS KOLEKTE_PER_UMAT
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN
+GROUP BY TAHUN, KELOMPOK_TANGGAL
+ORDER BY TAHUN, KELOMPOK_TANGGAL;
+```
+
+In 2025 the offertory per attendee was Rp 21,485 on the 1st to 7th, 19,107 on the 8th to 14th,
+18,458 on the 15th to 21st and 15,469 from the 22nd. The first week is about **1.3 to 1.4 times** the last
+one, in every year.
+
+**Attendance.** Within one Mass session and year, offertory follows attendance:
+
+```sql
+SELECT TAHUN, NAMA_MISA, JUMLAH_MISA, KORELASI_KOLEKTE_DENGAN_UMAT, R_KUADRAT_KOLEKTE_DARI_UMAT,
+       TAMBAHAN_KOLEKTE_PER_UMAT, KORELASI_TANGGAL_DENGAN_KOLEKTE_PER_UMAT
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.KORELASI_KOLEKTE_KEHADIRAN
+ORDER BY TAHUN, NAMA_MISA;
+```
+
+For sessions with at least 20 Masses in the year, the correlation between attendance and offertory
+runs from 0.58 to 0.91 (average 0.78), and the correlation between the day of the month and the
+offertory per attendee from -0.99 to -0.75. `TAMBAHAN_KOLEKTE_PER_UMAT` is the regression slope:
+the extra rupiah that one more attendee goes with. The relationship is a statistical pattern for
+planning and forecasting. It says nothing about the faith of the people who attend.
+
+## 3. Unforeseen events and forecast bias
+
+`PERISTIWA_LUAR_BIASA` is a short log of ten events from 2021 to 2026: heavy rain and flooding, haze,
+volcanic ash and a power cut. Each has a type, a period, a severity (light, medium, severe) and a
+description. The matching attendance records carry the event id and a note, so the event shows as a
+labelled dip on a weekly line chart:
+
+```sql
+SELECT AWAL_PEKAN, TOTAL_UMAT, TOTAL_KOLEKTE,
+       RATA_RATA_UMAT_8_PEKAN_SEBELUMNYA, RATA_RATA_KOLEKTE_8_PEKAN_SEBELUMNYA,
+       PERSEN_UMAT_TERHADAP_8_PEKAN_SEBELUMNYA, NAMA_PERISTIWA, TINGKAT_GANGGUAN
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA
+ORDER BY AWAL_PEKAN;
+```
+
+Weeks start on Monday. `NAMA_PERISTIWA` is empty for normal weeks, so a chart can draw the line
+and mark the weeks where the column is filled.
+
+To explain what an event cost, and therefore why a forecast was off, use the impact view. It
+compares each event with the average of the eight weeks before, for the same Mass sessions:
+
+```sql
+SELECT NAMA_PERISTIWA, TINGKAT_GANGGUAN, JUMLAH_MISA_DIBATALKAN,
+       PERSEN_KEHADIRAN_TERHADAP_HARAPAN, PERSEN_KOLEKTE_TERHADAP_HARAPAN,
+       PERKIRAAN_KOLEKTE_YANG_TIDAK_DITERIMA
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA
+ORDER BY TANGGAL_MULAI;
+```
+
+| Event | Severity | Attendance vs expectation | Offertory vs expectation | Estimated offertory not received (Rp M) |
+|---|---|---:|---:|---:|
+| Heavy flood, Feb 2021 | severe | 55 % | 53 % | 4.4 |
+| Haze, Sep 2021 | medium | 82 % | 84 % | 3.1 |
+| Heavy rain, Jan 2022 | light | 88 % | 83 % | 1.7 |
+| Light ash fall, Nov 2022 | medium | 77 % | 72 % | 4.5 |
+| Power cut, Mar 2023 | light | 91 % | 106 % | -0.3 |
+| Very thick haze, Sep-Oct 2023 | severe | 48 % | 51 % | 18.7 |
+| Flood, Feb 2024 | medium | 82 % | 86 % | 1.5 |
+| Thick volcanic ash, Jun 2025 | severe | 39 % | 37 % | 21.7 |
+| Heavy rain in Advent, Dec 2025 | medium | 77 % | 73 % | 3.0 |
+| Flood, Jul 2026 | medium | 64 % | 69 % | 3.4 |
+
+The severity orders the relative size of the dip: the three severe events came in at 37 to 55 % of the
+expectation, the medium ones at 64 to 86 %, and the light ones at 83 % or more.
+
+**An example of why such a baseline is rough.** The March 2023 power cut lowered attendance to 91 %
+of the expectation, but the offertory came out at 106 %. The event fell on the first weekend of the
+month, when the payday effect lifts the offertory per attendee by up to a third, and that hid the
+dip. The impact view says so in its `CATATAN_METODE` column: *rough estimate, without correction for
+payday and season*. This is exactly the kind of result a forecast bias discussion needs. A forecast
+fitted without the event log would read the weeks of the severe events (autumn 2023 and mid 2025,
+Rp 18.7 M and Rp 21.7 M not received) as real changes in the trend, and the log is what lets you
+say otherwise.
+
+The effect size is not stored anywhere in the data. The generator applies it, and the views have
+to rediscover it from the numbers, as an analyst would have to with real data.
+
+## 4. Special donations: communities, then Easter and Christmas
+
+### 4a. The economic mapping of communities
+
+`PROFIL_EKONOMI_LINGKUNGAN` gives each of the 18 communities an economic category (*Rendah*,
+*Menengah Bawah*, *Menengah Atas*, *Tinggi*) and a capacity index from 0.50 to 1.70. A household's
+gift scales with the index of its community. In six of the lower-capacity communities one household
+is a **regular large donor**: it gives several times the usual gift in every campaign. Nothing in the
+data marks these households.
+
+```sql
+SELECT NAMA_LINGKUNGAN, KATEGORI_EKONOMI, INDEKS_KAPASITAS_EKONOMI, JUMLAH_KELUARGA_PENYUMBANG,
+       TOTAL_SUMBANGAN, RATA_RATA_PER_KELUARGA_PENYUMBANG, MEDIAN_PER_KELUARGA_PENYUMBANG,
+       SELISIH_RATA_RATA_DARI_MEDIAN_PERSEN, PERSEN_TOTAL_DARI_SUMBANGAN_TERBESAR,
+       SUMBANGAN_PER_KELUARGA_TERDAFTAR, SUMBANGAN_PER_UMAT_TERDAFTAR
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN
+WHERE NAMA_KAMPANYE = 'Aksi Puasa Pembangunan 2025'
+ORDER BY INDEKS_KAPASITAS_EKONOMI;
+```
+
+Lent 2025, selected communities (amounts in rupiah):
+
+| Community | Category | Donors | Total | Mean per donor | Median per donor | Mean above median | Largest gift as % of total |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Santo Gregorius | Rendah | 8 | 705,000 | 88,125 | 47,500 | +86 % | 52 % |
+| Santo Dominikus | Rendah | 7 | 955,000 | 136,429 | 75,000 | +82 % | 58 % |
+| Santo Benediktus | Menengah Bawah | 4 | 1,085,000 | 271,250 | 122,500 | +121 % | 71 % |
+| Santa Veronika | Menengah Bawah | 9 | 760,000 | 84,444 | 90,000 | -6 % | 15 % |
+| Santo Nikolas | Menengah Atas | 7 | 915,000 | 130,714 | 130,000 | +0.5 % | 21 % |
+| Santa Agnes | Tinggi | 8 | 1,405,000 | 175,625 | 175,000 | 0 % | 18 % |
+
+What it shows:
+
+* **Mean versus median.** In the six communities with a regular large donor, the largest single gift
+  is 49 to 71 % of the community's total. The mean is lifted, the median stays at the level of the
+  typical household, and `SELISIH_RATA_RATA_DARI_MEDIAN_PERSEN` makes the gap visible (+42 % to
+  +121 % in Lent 2025). In the other communities the largest gift is 12 to 37 % of the total, and mean and
+  median stay within -6 % to +20 % of each other. Santo Dominikus, a *Rendah* community, has a mean of Rp 136,429, which looks
+  better than that of most communities, while its median of Rp 75,000 is among the lowest of all
+  18. Only the median describes the typical household. Over all 13 campaigns that collected gifts, the
+  average gap between mean and median is +99 % in the six communities with a regular large donor
+  and +1 % elsewhere.
+* **Total versus per head.** The total depends on how many people a community has. Santa Agnes has
+  the second-highest total (Rp 1,405,000) but 46 registered people, which gives Rp 30,543 per person;
+  Santa Katarina collects less (Rp 1,240,000) from 28 people, which gives Rp 44,286 per person.
+  Santo Dominikus has only 20 registered people, so a total near that of the *Menengah Atas*
+  community Santa Klara (Rp 955,000 against 960,000) comes to Rp 47,750 per person against
+  Rp 32,000. `SUMBANGAN_PER_KELUARGA_TERDAFTAR` and `SUMBANGAN_PER_UMAT_TERDAFTAR` divide by all
+  registered households and people, not only by the donors, so they also show participation.
+* The communities with few donors (4 to 9) give noisy figures. A real deployment should merge or
+  suppress very small groups before showing them.
+
+The view has **no rank column** and its `CATATAN_PENGGUNAAN` column says that the numbers describe
+economic capacity and the shape of the gifts, not faith or generosity, and must not be used to
+rank communities. Please keep it that way in any chart: sort alphabetically or by region, not by
+amount.
+
+### 4b. Do the donations cover Easter and Christmas?
+
+Each Lent campaign points at the Easter celebration of its year and each Advent campaign at the
+Christmas celebration (`KAMPANYE_SUMBANGAN.ID_RENCANA_PENGGUNAAN`). The break-even view joins the
+amount collected with the actual cost of that celebration:
+
+```sql
+SELECT TAHUN, NAMA_KESEMPATAN, TOTAL_SUMBANGAN, BIAYA_AKTUAL,
+       SELISIH_SUMBANGAN_VS_BIAYA_AKTUAL, PERSEN_BIAYA_TERTUTUP_SUMBANGAN,
+       PEMASUKAN_BERSIH_UNTUK_GEREJA, DANA_TAMBAHAN_DARI_GEREJA, STATUS_TITIK_IMPAS
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.TITIK_IMPAS_KAMPANYE
+ORDER BY TAHUN, NAMA_KESEMPATAN;
+```
+
+| Year | Campaign | Collected (Rp M) | Actual cost (Rp M) | Difference (Rp M) | Covered | Result |
+|---|---|---:|---:|---:|---:|---|
+| 2021 | Lent for Easter | 12.6 | 6.9 | +5.7 | 182 % | surplus |
+| 2021 | Advent for Christmas | 11.1 | 9.5 | +1.6 | 117 % | surplus |
+| 2022 | Lent | 14.0 | 9.1 | +4.9 | 154 % | surplus |
+| 2022 | Advent | 12.7 | 12.6 | +0.1 | 101 % | about break-even |
+| 2023 | Lent | 15.8 | 11.0 | +4.8 | 143 % | surplus |
+| 2023 | Advent | 13.8 | 16.1 | -2.4 | 85 % | **deficit** |
+| 2024 | Lent | 16.9 | 13.5 | +3.4 | 125 % | surplus |
+| 2024 | Advent | 14.8 | 20.6 | -5.8 | 72 % | **deficit** |
+| 2025 | Lent | 17.3 | 15.6 | +1.7 | 111 % | surplus |
+| 2025 | Advent | 16.3 | 24.7 | -8.4 | 66 % | **deficit** |
+| 2026 | Lent | 18.7 | 17.3 | +1.5 | 108 % | surplus |
+| 2026 | Advent (planned) | target 18.0 | budget 29.1 | -11.1 | | projected deficit |
+
+How it reads:
+
+* **Surplus** (`PEMASUKAN_BERSIH_UNTUK_GEREJA`): the part of the donations that the celebration did
+  not use becomes church income. Easter stays in surplus every year, but the cushion shrinks from
+  182 % to 108 % coverage, because the Easter budget grows faster than the Lent gifts.
+* **Deficit** (`DANA_TAMBAHAN_DARI_GEREJA`): the church has to add its own money. Christmas drops
+  below break-even from 2023 and the shortfall widens every year, from Rp 2.4 M to Rp 8.4 M.
+* For a campaign that is still planned, the actual cost does not exist yet, so the status says the
+  comparison cannot be made, and `PROYEKSI_SELISIH_JIKA_TARGET_TERCAPAI` compares the target with the
+  planned budget instead. For Advent 2026 even reaching the target would leave Rp 11.1 M uncovered.
+* The two relief campaigns (ash 2025, flood 2026) appear in the same view. The 2025 one roughly
+  covered its cost; the 2026 one covered 58 %.
+
+Regional summaries (`SUMBANGAN_KHUSUS_PER_WILAYAH`) are derived from the household gifts, so the
+totals match. The demo includes some regions whose summary is still waiting for validation, or marked
+for re-checking.
+
+## Judgement calls
+
+These are choices made while implementing the request. Please say if you want any of them changed.
+
+1. **No real place names.** The request mentions haze and ash affecting Jakarta. The data uses generic
+   wording ("kabut asap", "hujan abu vulkanik") and names no city or volcano, because the demo parish
+   must not look like a real one. The event log supports a place column later if you want it.
+2. **Economics per community, not per household.** The request asked for a household mapping, ideally
+   per community. Only the community level is stored. A household-level wealth attribute would be the
+   most sensitive field in the model, and the analysis does not need it: the shape of the gifts
+   already shows the effect. A household attribute can be added later with an explicit
+   classification and access rule.
+3. **Household gifts are restricted data.** `SUMBANGAN_KELUARGA` is classified *Sangat Terbatas* and
+   is never exposed by an analysis view, even in aggregate form that would identify a single gift.
+4. **The effect of events is not stored.** Only the event log and a flag on the attendance records
+   are stored. The impact is an estimate computed in a view, as it would be with real data.
+5. **A simple forecast.** A straight line through five complete years. It is transparent and
+   explainable, which suits the story; it is not a forecasting method.
+6. **"Outcome" is programme spending.** Salaries, utilities and maintenance are not in the dataset.
+7. **No ranking.** No view orders or ranks communities, regions or Mass sessions by amount.
+8. **The curves are designed.** The crossing in 2029 and the Christmas deficit are set by the
+   assumptions in the table at the top. The tests check the shape of the story, not exact figures.
+
+## Changing the data model of an existing Snowflake demo
+
+These use cases added tables and columns (a new donation structure, an event log, an economic
+profile, `KEHADIRAN_MISA.ID_PERISTIWA`). Setup step 2 uses `CREATE TABLE IF NOT EXISTS`, which
+never alters an existing table. If you ran an earlier version of this repository in Snowflake, reset
+the demo first (see `sql/99_reset_demo.sql`, option B or C), then run the setup again.

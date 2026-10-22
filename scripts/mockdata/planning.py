@@ -1,15 +1,20 @@
 """Domains 4.7 and 4.8: annual plans, planned activities, budget allocations,
 actual expenditure, events and post-event reports.
 
-The activity table below is written by hand so that the demo tells a believable
-story: finished programs, postponed and cancelled ones, future plans, partial or
-missing spending, unplanned events, and reports that are final, draft, under
-revision or missing. Everything else is derived from that table.
+The 2026 activity table is written by hand so that the current year tells a
+believable story: finished programs, postponed and cancelled ones, future plans,
+partial or missing spending, unplanned events, and reports that are final, draft,
+under revision or missing.
+
+The five years before (2021-2025) are derived from the same activity templates.
+Programs accumulate: every year adds activities (growing count) and each costs
+more (rising price index). Easter and Christmas, the two big celebrations funded
+by the Lent and Advent donation campaigns, exist in every year.
 """
 
 from datetime import date, timedelta
 
-from . import config, util
+from . import config, liturgy, util
 from .config import AS_OF, CHURCH_NAME, HALL_NAME, PLAN_YEAR
 from .reference import SEKSI
 from .rng import Rng
@@ -25,15 +30,15 @@ RETREAT = "Wisma Retret Damai Sejahtera"
 T, R, D, B = "Terlaksana", "Direncanakan", "Ditunda", "Dibatalkan"
 
 ANNUAL_GOALS = {
-    "SEK-01": "Meningkatkan mutu perayaan liturgi dan keterlibatan petugas liturgi pada tahun 2026.",
-    "SEK-02": "Memperkuat pembinaan iman anak, remaja, dan dewasa sepanjang tahun 2026.",
-    "SEK-03": "Mendampingi calon pasangan dan keluarga agar semakin kuat dalam iman pada tahun 2026.",
-    "SEK-04": "Mengembangkan iman, kepemimpinan, dan kepedulian orang muda pada tahun 2026.",
-    "SEK-05": "Memperluas pelayanan sosial dan pemberdayaan ekonomi umat pada tahun 2026.",
-    "SEK-06": "Memperbaiki komunikasi dan dokumentasi paroki melalui relawan yang terlatih pada tahun 2026.",
-    "SEK-07": "Menumbuhkan kebiasaan membaca dan mendalami Kitab Suci pada tahun 2026.",
-    "SEK-08": "Meningkatkan kesehatan umat dan masyarakat sekitar melalui penyuluhan dan layanan pada tahun 2026.",
-    "SEK-09": "Menjaga tata kelola administrasi, data, dan keuangan paroki yang tertib pada tahun 2026.",
+    "SEK-01": "Meningkatkan mutu perayaan liturgi dan keterlibatan petugas liturgi pada tahun {year}.",
+    "SEK-02": "Memperkuat pembinaan iman anak, remaja, dan dewasa sepanjang tahun {year}.",
+    "SEK-03": "Mendampingi calon pasangan dan keluarga agar semakin kuat dalam iman pada tahun {year}.",
+    "SEK-04": "Mengembangkan iman, kepemimpinan, dan kepedulian orang muda pada tahun {year}.",
+    "SEK-05": "Memperluas pelayanan sosial dan pemberdayaan ekonomi umat pada tahun {year}.",
+    "SEK-06": "Memperbaiki komunikasi dan dokumentasi paroki melalui relawan yang terlatih pada tahun {year}.",
+    "SEK-07": "Menumbuhkan kebiasaan membaca dan mendalami Kitab Suci pada tahun {year}.",
+    "SEK-08": "Meningkatkan kesehatan umat dan masyarakat sekitar melalui penyuluhan dan layanan pada tahun {year}.",
+    "SEK-09": "Menjaga tata kelola administrasi, data, dan keuangan paroki yang tertib pada tahun {year}.",
 }
 
 
@@ -51,17 +56,18 @@ def act(section, name, purpose, start, status, target, place, budget, end=None, 
     }
 
 
-ACTIVITIES = [
+EASTER_NAME = "Rangkaian Perayaan Pekan Suci dan Paskah"
+CHRISTMAS_NAME = "Rangkaian Perayaan Natal"
+ASH_RELIEF_NAME = "Penyaluran Bantuan Korban Hujan Abu Vulkanik"
+FLOOD_RELIEF_NAME = "Penyaluran Bantuan Korban Banjir"
+
+
+ACTIVITIES_2026 = [
     # --- SEK-01 Liturgi -----------------------------------------------------------
     act("SEK-01", "Pelatihan Lektor dan Pemazmur",
         "Meningkatkan kemampuan membaca Kitab Suci dan melagukan mazmur dalam Misa.",
         (2, 14), T, 40, HALL, [("KBY-01", 800), ("KBY-04", 1500), ("KBY-02", 500)], report="Final",
         result="Peserta mengikuti latihan teknik membaca, pernapasan, dan melagukan mazmur, lalu menyelesaikan sesi praktik di depan kelompok."),
-    act("SEK-01", "Rangkaian Perayaan Pekan Suci dan Paskah",
-        "Menyiapkan dan melaksanakan perayaan Kamis Putih sampai Minggu Paskah dengan khidmat.",
-        (4, 2), T, 600, CHURCH, [("KBY-02", 6000), ("KBY-01", 2000), ("KBY-05", 500), ("KBY-06", 1500)],
-        end=(4, 5), report="Final", attendance=1.05,
-        result="Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat."),
     act("SEK-01", "Pelatihan Putra-Putri Altar Baru",
         "Membekali anak-anak calon putra-putri altar dengan pengetahuan dan keterampilan melayani di altar.",
         (6, 20), T, 25, CHURCH, [("KBY-01", 500), ("KBY-02", 400)], report="Draf", missing=("REKOMENDASI_TINDAK_LANJUT",),
@@ -148,7 +154,7 @@ ACTIVITIES = [
         "Mengunjungi dan menyantuni umat lanjut usia yang hidup sendiri atau kurang mampu.",
         (7, 11), T, 60, "Rumah Umat di Lingkungan", [("KBY-07", 4000), ("KBY-03", 800), ("KBY-01", 700)], report="Draf",
         missing=("HASIL_KEGIATAN", "REKOMENDASI_TINDAK_LANJUT")),
-    act("SEK-05", "Penyaluran Bantuan Korban Banjir",
+    act("SEK-05", FLOOD_RELIEF_NAME,
         "Menyalurkan dana solidaritas dan bantuan darurat kepada korban banjir.",
         (7, 26), T, 90, "Posko Bantuan Paroki", [("KBY-07", 10000), ("KBY-03", 1500), ("KBY-01", 1000)], report="Final",
         result="Bantuan darurat berupa kebutuhan pokok tersalurkan kepada keluarga yang terdampak."),
@@ -260,6 +266,41 @@ EXPENSE_TEXT = {
 EVENT_REGISTRATION_HORIZON = 35
 
 
+HISTORY_YEARS = range(config.FIRST_PLAN_YEAR, PLAN_YEAR)
+
+# Regular (non-celebration) activities per year. The count grows every year.
+ACTIVITY_COUNT = {2021: 14, 2022: 19, 2023: 25, 2024: 31, 2025: 36}
+PARTICIPANT_INDEX = {2021: 0.75, 2022: 0.80, 2023: 0.86, 2024: 0.91, 2025: 0.96}
+
+# Intended total spending per year in rupiah. The budget scale of each year is
+# derived from it, so spending grows steadily while the number of activities AND
+# the cost per activity both rise (this is what makes the outcome trendline steep).
+SPEND_TARGET = {2021: 55_000_000, 2022: 90_000_000, 2023: 125_000_000, 2024: 165_000_000, 2025: 210_000_000}
+NORMAL_REALISATION = 0.93  # share of the budget a normal activity ends up spending
+# The 2026 hand-written budgets are scaled up to the same price level.
+BUDGET_SCALE_2026 = 1.25
+
+# The two big celebrations: total budget in thousands of rupiah, and target attendance.
+BIG_BUDGET = {
+    "Paskah": {2021: 7000, 2022: 9000, 2023: 11000, 2024: 13500, 2025: 15500, 2026: 17500},
+    "Natal": {2021: 9500, 2022: 12500, 2023: 16000, 2024: 20500, 2025: 25000, 2026: 29000},
+}
+BIG_TARGET = {
+    "Paskah": {2021: 450, 2022: 480, 2023: 520, 2024: 550, 2025: 580, 2026: 600},
+    "Natal": {2021: 650, 2022: 700, 2023: 760, 2024: 820, 2025: 870, 2026: 900},
+}
+BIG_SHARES = [("KBY-02", 0.38), ("KBY-01", 0.22), ("KBY-05", 0.06), ("KBY-06", 0.22), ("KBY-04", 0.12)]
+
+CANCEL_NOTES = [
+    "Dibatalkan karena jumlah pendaftar terlalu sedikit.",
+    "Dibatalkan karena narasumber tidak dapat hadir.",
+    "Dibatalkan karena bentrok dengan kegiatan keuskupan.",
+    "Dibatalkan karena tempat kegiatan tidak tersedia.",
+]
+RESULT_FALLBACK = "Kegiatan berlangsung sesuai rencana dan peserta mengikuti seluruh rangkaian acara."
+REPORT_FIELDS = ("REALISASI_BIAYA", "EVALUASI_LOGISTIK", "HASIL_KEGIATAN", "REKOMENDASI_TINDAK_LANJUT")
+
+
 def _period_text(start, end):
     if end is None or end == start:
         return util.date_id(start)
@@ -268,18 +309,102 @@ def _period_text(start, end):
     return f"{util.date_id(start)} sampai {util.date_id(end)}"
 
 
+def _celebration(year, kind):
+    """The Easter or Christmas celebration of a year. Budgets track closely
+    (spend mode 'tight') because these are planned to the last detail."""
+    budget = [(category, util.round_to(BIG_BUDGET[kind][year] * share, 50)) for category, share in BIG_SHARES]
+    if kind == "Paskah":
+        sunday = liturgy.easter(year)
+        name, start, end = EASTER_NAME, sunday - timedelta(days=3), sunday
+        purpose = "Menyiapkan dan melaksanakan perayaan Kamis Putih sampai Minggu Paskah dengan khidmat."
+        result = "Seluruh liturgi Pekan Suci berjalan lancar, dekorasi dan petugas liturgi dinilai baik oleh umat."
+    else:
+        name, start, end = CHRISTMAS_NAME, date(year, 12, 24), date(year, 12, 25)
+        purpose = "Menyiapkan dan melaksanakan perayaan Malam Natal dan Hari Raya Natal bagi seluruh umat."
+        result = "Perayaan Natal berlangsung khidmat, tata ibadat, paduan suara, dan dekorasi mendapat sambutan baik dari umat."
+    held = start <= AS_OF
+    return {
+        "section": "SEK-01", "name": name, "purpose": purpose, "start": start, "end": end,
+        "status": T if held else R, "target": BIG_TARGET[kind][year], "place": CHURCH, "budget": budget,
+        "spend": "tight" if held else "none", "report": "Final" if held else None, "missing": (),
+        "result": result if held else None, "note": None, "attendance": None, "event": None, "big": True,
+    }
+
+
+def _history(rng):
+    """Activities of 2021-2025, derived from the 2026 templates."""
+    pool = [a for a in ACTIVITIES_2026 if a["name"] != FLOOD_RELIEF_NAME]
+    order = rng.shuffled(list(range(len(pool))))  # a fixed order: later years only add programs
+    activities = []
+    for year in HISTORY_YEARS:
+        chosen = [(pool[index], rng.chance(0.09)) for index in order[:ACTIVITY_COUNT[year]]]
+        # Scale the budgets so that the year's spending lands near its target.
+        celebrations = BIG_BUDGET["Paskah"][year] + BIG_BUDGET["Natal"][year]
+        relief = 10_000 * NORMAL_REALISATION if year == 2025 else 0
+        base = sum(sum(thousands for _, thousands in template["budget"]) for template, cancelled in chosen if not cancelled)
+        scale = max(0.2, (SPEND_TARGET[year] / 1000 - celebrations - relief) / (NORMAL_REALISATION * base))
+        for template, cancelled in chosen:
+            budget = [(category, max(100, util.round_to(thousands * scale * (0.92 + 0.16 * rng.random()), 50)))
+                      for category, thousands in template["budget"]]
+            activity = {
+                "section": template["section"], "name": template["name"], "purpose": template["purpose"],
+                "start": template["start"].replace(year=year),
+                "end": template["end"].replace(year=year) if template["end"] else None,
+                "status": B if cancelled else T,
+                "target": max(8, util.round_to(template["target"] * PARTICIPANT_INDEX[year], 5)),
+                "place": template["place"], "budget": budget, "attendance": None,
+                "spend": "none" if cancelled else ("over" if rng.chance(0.06) else "normal"),
+                "report": None, "missing": (), "result": template["result"] or RESULT_FALLBACK,
+                "note": rng.choice(CANCEL_NOTES) if cancelled else None,
+                "event": rng.chance(0.7) if cancelled else None,
+            }
+            if not cancelled:
+                roll = rng.random()
+                if year < 2025:
+                    activity["report"] = "Final" if roll < 0.85 else None
+                else:
+                    activity["report"] = "Final" if roll < 0.75 else "Draf" if roll < 0.85 else None
+                if activity["report"] == "Draf":
+                    activity["missing"] = tuple(rng.sample(list(REPORT_FIELDS), rng.randint(1, 2)))
+            activities.append(activity)
+        activities.append(_celebration(year, "Paskah"))
+        activities.append(_celebration(year, "Natal"))
+    activities.append({
+        "section": "SEK-05", "name": ASH_RELIEF_NAME, "start": date(2025, 7, 12), "end": None, "status": T,
+        "purpose": "Menyalurkan dana solidaritas dan bantuan darurat kepada korban hujan abu vulkanik.",
+        "target": 120, "place": "Posko Bantuan Paroki", "budget": [("KBY-07", 8000), ("KBY-03", 1200), ("KBY-01", 800)],
+        "spend": "normal", "report": "Final", "missing": (), "attendance": None, "event": None, "note": None,
+        "result": "Bantuan darurat berupa kebutuhan pokok dan masker tersalurkan kepada keluarga yang terdampak.",
+    })
+    return activities
+
+
+def funding_plans(data):
+    """(kind, year) -> ID_RENCANA of the activity that a donation campaign pays for.
+    kind is 'Paskah', 'Natal', 'Abu' (volcanic ash relief) or 'Banjir' (flood relief)."""
+    names = {EASTER_NAME: "Paskah", CHRISTMAS_NAME: "Natal", ASH_RELIEF_NAME: "Abu", FLOOD_RELIEF_NAME: "Banjir"}
+    result = {}
+    for plan in data[f"{SCHEMA}.RENCANA_KEGIATAN"]:
+        kind = names.get(plan["NAMA_PROGRAM"])
+        if kind:
+            result[(kind, plan["TANGGAL_RENCANA"].year)] = plan["ID_RENCANA"]
+    return result
+
+
 def _expenditure_for(rng, activity, allocations, counter):
     """Return expenditure rows for one activity (may be empty)."""
     mode, status = activity["spend"], activity["status"]
     start, end = activity["start"], activity["end"] or activity["start"]
+    floor = date(start.year, 1, 2)
+    ceiling = min(AS_OF, date(start.year, 12, 31))
     rows = []
 
     def add(allocation, when, amount, text):
         rows.append(
             {
-                "ID_PENGELUARAN": f"PGL-{util.pad(counter + len(rows) + 1, 4)}",
+                "ID_PENGELUARAN": f"PGL-{util.pad(counter + len(rows) + 1, 5)}",
                 "ID_ALOKASI": allocation["ID_ALOKASI"],
-                "TANGGAL_PENGELUARAN": when,
+                "TANGGAL_PENGELUARAN": min(ceiling, max(floor, when)),
                 "JUMLAH_PENGELUARAN": amount,
                 "KETERANGAN": text,
             }
@@ -290,7 +415,7 @@ def _expenditure_for(rng, activity, allocations, counter):
     if mode == "deposit":
         allocation = allocations[0]
         advance = util.round_to(allocation["JUMLAH_ANGGARAN"] * 0.25, 5000)
-        add(allocation, min(AS_OF, start - timedelta(days=10)), advance,
+        add(allocation, start - timedelta(days=10), advance,
             f"Uang muka {EXPENSE_TEXT[allocation['ID_KATEGORI_BIAYA']]} yang sudah dibayarkan sebelum kegiatan ditunda.")
         return rows
 
@@ -299,6 +424,8 @@ def _expenditure_for(rng, activity, allocations, counter):
         budget = allocation["JUMLAH_ANGGARAN"]
         if mode == "over":
             ratio = 1.03 + rng.random() * 0.09  # every category slightly above budget
+        elif mode == "tight":
+            ratio = 0.97 + rng.random() * 0.06  # planned to the last detail
         elif len(allocations) > 2 and allocation is not largest and rng.chance(0.08):
             continue  # this category was not used
         else:
@@ -307,38 +434,46 @@ def _expenditure_for(rng, activity, allocations, counter):
         label = EXPENSE_TEXT[allocation["ID_KATEGORI_BIAYA"]]
         if total >= 1000000:
             advance = util.round_to(total * 0.6, 5000)
-            add(allocation, max(date(PLAN_YEAR, 1, 2), start - timedelta(days=rng.randint(2, 14))), advance,
-                f"Uang muka {label}.")
-            add(allocation, min(AS_OF, end + timedelta(days=rng.randint(1, 6))), total - advance,
-                f"Pelunasan {label}.")
+            add(allocation, start - timedelta(days=rng.randint(2, 14)), advance, f"Uang muka {label}.")
+            add(allocation, end + timedelta(days=rng.randint(1, 6)), total - advance, f"Pelunasan {label}.")
         else:
-            add(allocation, max(date(PLAN_YEAR, 1, 2), start - timedelta(days=rng.randint(0, 7))), total,
-                f"Pembayaran {label}.")
+            add(allocation, start - timedelta(days=rng.randint(0, 7)), total, f"Pembayaran {label}.")
     return rows
 
 
 def build():
     rng = Rng(config.SEED, "planning")
+
+    activities = [dict(a) for a in _history(rng)]
+    for template in ACTIVITIES_2026:
+        activity = dict(template)
+        activity["budget"] = [(category, util.round_to(thousands * BUDGET_SCALE_2026, 50))
+                              for category, thousands in template["budget"]]
+        activities.append(activity)
+    activities += [_celebration(PLAN_YEAR, "Paskah"), _celebration(PLAN_YEAR, "Natal")]
+    activities.sort(key=lambda a: (a["start"], a["section"], a["name"]))
+
     headers, plans, allocations, expenditures, events, reports = [], [], [], [], [], []
-    for index, (section_id, _, _) in enumerate(SEKSI, start=1):
-        revising = section_id == "SEK-04"
-        headers.append(
-            {
-                "ID_RENCANA_KERJA": f"RKT-{PLAN_YEAR}-{util.pad(index, 2)}",
+    header_of = {}
+    for year in range(config.FIRST_PLAN_YEAR, PLAN_YEAR + 1):
+        for index, (section_id, _, _) in enumerate(SEKSI, start=1):
+            revising = year == PLAN_YEAR and section_id == "SEK-04"
+            header = {
+                "ID_RENCANA_KERJA": f"RKT-{year}-{util.pad(index, 2)}",
                 "ID_SEKSI": section_id,
-                "TAHUN_RENCANA": PLAN_YEAR,
-                "TUJUAN_UMUM": ANNUAL_GOALS[section_id],
+                "TAHUN_RENCANA": year,
+                "TUJUAN_UMUM": ANNUAL_GOALS[section_id].format(year=year),
                 "STATUS_PENGESAHAN": "Dalam Revisi" if revising else "Disahkan",
-                "TANGGAL_PENGESAHAN": date(2025, 12, 8) + timedelta(days=index),
+                "TANGGAL_PENGESAHAN": date(year - 1, 12, 8) + timedelta(days=index),
                 "KETERANGAN": "Direvisi karena penundaan pelatihan kepemimpinan dan perubahan jadwal semester."
                 if revising else None,
             }
-        )
-    header_of = {h["ID_SEKSI"]: h for h in headers}
+            headers.append(header)
+            header_of[(year, section_id)] = header
 
-    for number, activity in enumerate(ACTIVITIES, start=1):
-        header = header_of[activity["section"]]
-        plan_id = f"RNC-{util.pad(number, 3)}"
+    for number, activity in enumerate(activities, start=1):
+        header = header_of[(activity["start"].year, activity["section"])]
+        plan_id = f"RNC-{util.pad(number, 4)}"
         plans.append(
             {
                 "ID_RENCANA": plan_id,
@@ -353,7 +488,7 @@ def build():
         own_allocations = []
         for category, thousands in activity["budget"]:
             allocation = {
-                "ID_ALOKASI": f"ALK-{util.pad(len(allocations) + 1, 3)}",
+                "ID_ALOKASI": f"ALK-{util.pad(len(allocations) + 1, 4)}",
                 "ID_RENCANA": plan_id,
                 "ID_KATEGORI_BIAYA": category,
                 "JUMLAH_ANGGARAN": thousands * 1000,
@@ -368,8 +503,7 @@ def build():
         activity["_spent"] = sum(row["JUMLAH_PENGELUARAN"] for row in spent)
 
     # --- events and reports --------------------------------------------------------
-    def make_report(event, spec, planned_cost):
-        """spec: dict with report, result, missing."""
+    def make_report(event, spec, cost):
         status = spec["report"]
         end = event["TANGGAL_SELESAI"]
         actual = event["JUMLAH_PESERTA_AKTUAL"]
@@ -381,7 +515,7 @@ def build():
         else:
             logistics = rng.choice(LOGISTICS_NEUTRAL)
         report = {
-            "ID_LAPORAN": f"LPK-{util.pad(len(reports) + 1, 3)}",
+            "ID_LAPORAN": f"LPK-{util.pad(len(reports) + 1, 4)}",
             "ID_KEGIATAN": event["ID_KEGIATAN"],
             "TANGGAL_LAPORAN": min(AS_OF, end + timedelta(days=rng.randint(3, 12))),
             "STATUS_LAPORAN": status,
@@ -390,7 +524,7 @@ def build():
                 f"di {event['LOKASI']} dengan {actual} peserta dari target {target} peserta."
             ),
             "JUMLAH_PESERTA": actual + 4 if status == "Perlu Revisi" else actual,
-            "REALISASI_BIAYA": planned_cost,
+            "REALISASI_BIAYA": cost,
             "EVALUASI_LOGISTIK": logistics,
             "HASIL_KEGIATAN": spec["result"],
             "REKOMENDASI_TINDAK_LANJUT": rng.choice(RECOMMENDATIONS),
@@ -399,7 +533,7 @@ def build():
             report[column] = None
         reports.append(report)
 
-    for activity in ACTIVITIES:
+    for activity in activities:
         status = activity["status"]
         start = activity["start"]
         if activity["event"] is not None:
@@ -412,9 +546,9 @@ def build():
             continue
         end = activity["end"] or start
         held = status == T
-        ratio = activity["attendance"] or (0.78 + rng.random() * 0.34)
+        ratio = activity["attendance"] or (0.95 + rng.random() * 0.1 if activity.get("big") else 0.78 + rng.random() * 0.34)
         event = {
-            "ID_KEGIATAN": f"KGT-{util.pad(len(events) + 1, 3)}",
+            "ID_KEGIATAN": f"KGT-{util.pad(len(events) + 1, 4)}",
             "ID_RENCANA": activity["_plan_id"],
             "NAMA_KEGIATAN": activity["name"],
             "ID_SEKSI": activity["section"],
@@ -433,7 +567,7 @@ def build():
 
     for item in UNPLANNED:
         event = {
-            "ID_KEGIATAN": f"KGT-{util.pad(len(events) + 1, 3)}",
+            "ID_KEGIATAN": f"KGT-{util.pad(len(events) + 1, 4)}",
             "ID_RENCANA": None,
             "NAMA_KEGIATAN": item["name"],
             "ID_SEKSI": item["section"],
@@ -448,10 +582,6 @@ def build():
         events.append(event)
         if item["report"]:
             make_report(event, {"report": item["report"], "result": item["result"], "missing": ()}, item["cost"])
-
-    for activity in ACTIVITIES:  # drop helper keys so the module can be re-run safely
-        activity.pop("_plan_id", None)
-        activity.pop("_spent", None)
 
     return {
         f"{SCHEMA}.RENCANA_KERJA_TAHUNAN": headers,

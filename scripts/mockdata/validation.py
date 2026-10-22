@@ -22,7 +22,7 @@ from . import config
 from .vocab import NILAI_TERKENDALI
 
 AS_OF = f"DATE '{config.AS_OF.isoformat()}'"
-PLAUSIBLE_FROM, PLAUSIBLE_TO = "DATE '2000-01-01'", "DATE '2027-12-31'"
+PLAUSIBLE_FROM, PLAUSIBLE_TO = "DATE '2000-01-01'", "DATE '2030-12-31'"
 DB = "PUSAT_INFORMASI_PAROKI"
 
 _DAY_CASE = ("CASE {col} WHEN 'Senin' THEN 0 WHEN 'Selasa' THEN 1 WHEN 'Rabu' THEN 2 WHEN 'Kamis' THEN 3 "
@@ -80,7 +80,7 @@ def _generic_arms(tables, data):
         dates = [c.name for c in t.columns if c.base_type == "DATE"]
         if dates:
             cond = " OR ".join(f"{c} < {PLAUSIBLE_FROM} OR {c} > {PLAUSIBLE_TO}" for c in dates)
-            arms.append(Arm("DATES", "Date outside 2000-2027", t.qualified,
+            arms.append(Arm("DATES", "Date outside 2000-2030", t.qualified,
                             f"SELECT COUNT(*) FROM {t.qualified} WHERE {cond}", "ZERO_FAIL",
                             f"Implausible dates in {', '.join(dates)}."))
         names = t.column_names
@@ -210,7 +210,7 @@ def _business_arms(views):
         "ZERO_FAIL", "Persons under 17 must be Sangat Terbatas (KLS-04).")
     add("GOVERNANCE", "Personal-data columns exposed in ANALISIS", A,
         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE UPPER(TABLE_SCHEMA) = 'ANALISIS' AND UPPER(COLUMN_NAME) IN "
-        "('NAMA_FIKTIF', 'NAMA_KELUARGA_FIKTIF', 'ID_UMAT', 'ID_KELUARGA', 'TAHUN_LAHIR', 'ID_RESPONDEN', 'ID_PENUGASAN_KELUARGA')",
+        "('NAMA_FIKTIF', 'NAMA_KELUARGA_FIKTIF', 'ID_UMAT', 'ID_KELUARGA', 'TAHUN_LAHIR', 'ID_RESPONDEN', 'ID_PENUGASAN_KELUARGA', 'ID_SUMBANGAN_KELUARGA')",
         "ZERO_FAIL", "Summary views must never expose names or person and household identifiers.")
     add("GOVERNANCE", "Geometry not marked synthetic", f"{M}.GEOMETRI_ILUSTRATIF_LINGKUNGAN",
         f"SELECT COUNT(*) FROM {M}.GEOMETRI_ILUSTRATIF_LINGKUNGAN WHERE BERSIFAT_SINTETIS = FALSE", "ZERO_FAIL",
@@ -223,20 +223,93 @@ def _business_arms(views):
         f"SELECT COUNT(*) FROM (SELECT ID_KELUARGA FROM {pl} GROUP BY ID_KELUARGA HAVING COUNT(*) > 1) h", "INFO",
         "Deliberate demo scenario: merged or relocated communities.")
 
-    # --- donations -------------------------------------------------------------------------------
-    s = f"{O}.SUMBANGAN_KESEMPATAN_KHUSUS"
-    add("DONATIONS", "Period or booking date inconsistent", s,
-        f"SELECT COUNT(*) FROM {s} WHERE PERIODE_SELESAI < PERIODE_MULAI OR TANGGAL_PENCATATAN < PERIODE_SELESAI OR TANGGAL_PENCATATAN > {AS_OF}",
-        "ZERO_FAIL", "Booking happens after the period ends and not after the snapshot date.")
-    add("DONATIONS", "Participating households exceed households in the region", s,
-        f"SELECT COUNT(*) FROM {s} s JOIN (SELECT s2.ID_SUMBANGAN, COUNT(p.ID_KELUARGA) AS JUMLAH_KELUARGA FROM {s} s2 "
+    # --- donations ---------------------------------------------------------------------------------
+    camp, summ, gift = f"{O}.KAMPANYE_SUMBANGAN", f"{O}.SUMBANGAN_KESEMPATAN_KHUSUS", f"{O}.SUMBANGAN_KELUARGA"
+    per_region = (f"SELECT g.ID_KAMPANYE, l.ID_WILAYAH, COUNT(*) AS JUMLAH_KELUARGA, SUM(g.JUMLAH_SUMBANGAN) AS TOTAL "
+                  f"FROM {gift} g JOIN {M}.MASTER_LINGKUNGAN l ON l.ID_LINGKUNGAN = g.ID_LINGKUNGAN GROUP BY g.ID_KAMPANYE, l.ID_WILAYAH")
+    add("DONATIONS", "Campaign dates or status inconsistent", camp,
+        f"SELECT COUNT(*) FROM {camp} WHERE PERIODE_SELESAI < PERIODE_MULAI "
+        f"OR (STATUS_KAMPANYE = 'Selesai' AND PERIODE_SELESAI > {AS_OF}) "
+        f"OR (STATUS_KAMPANYE = 'Direncanakan' AND PERIODE_MULAI <= {AS_OF}) "
+        f"OR (STATUS_KAMPANYE = 'Berjalan' AND (PERIODE_MULAI > {AS_OF} OR PERIODE_SELESAI <= {AS_OF}))",
+        "ZERO_FAIL", "Status must follow the campaign dates and the snapshot date.")
+    add("DONATIONS", "Campaign funds an activity that starts before it", camp,
+        f"SELECT COUNT(*) FROM {camp} k JOIN {O}.RENCANA_KEGIATAN p ON p.ID_RENCANA = k.ID_RENCANA_PENGGUNAAN "
+        f"WHERE p.TANGGAL_RENCANA < k.PERIODE_MULAI", "ZERO_FAIL", "A campaign pays for an activity that happens after it opens.")
+    add("DONATIONS", "Gift dated outside its campaign", gift,
+        f"SELECT COUNT(*) FROM {gift} g JOIN {camp} k ON k.ID_KAMPANYE = g.ID_KAMPANYE "
+        f"WHERE g.TANGGAL_SUMBANGAN < k.PERIODE_MULAI OR g.TANGGAL_SUMBANGAN > k.PERIODE_SELESAI OR g.TANGGAL_SUMBANGAN > {AS_OF}",
+        "ZERO_FAIL", "A household gift is received during its campaign.")
+    add("DONATIONS", "Gift community differs from the household assignment", gift,
+        f"SELECT COUNT(*) FROM {gift} g WHERE NOT EXISTS (SELECT 1 FROM {pl} p WHERE p.ID_KELUARGA = g.ID_KELUARGA "
+        f"AND p.ID_LINGKUNGAN = g.ID_LINGKUNGAN AND p.TANGGAL_MULAI_BERLAKU <= g.TANGGAL_SUMBANGAN "
+        f"AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= g.TANGGAL_SUMBANGAN))",
+        "ZERO_FAIL", "The community recorded on a gift must be the household community on that date.")
+    add("DONATIONS", "Regional summary differs from the household gifts", summ,
+        f"SELECT COUNT(*) FROM {summ} s LEFT JOIN ({per_region}) d ON d.ID_KAMPANYE = s.ID_KAMPANYE AND d.ID_WILAYAH = s.ID_WILAYAH "
+        f"WHERE COALESCE(d.JUMLAH_KELUARGA, 0) <> s.JUMLAH_KELUARGA_PESERTA OR COALESCE(d.TOTAL, 0) <> s.JUMLAH_SUMBANGAN",
+        "ZERO_FAIL", "The summary of a region must equal the sum and count of its household gifts.")
+    add("DONATIONS", "Household gifts without a regional summary", gift,
+        f"SELECT COUNT(*) FROM ({per_region}) d LEFT JOIN {summ} s ON s.ID_KAMPANYE = d.ID_KAMPANYE AND s.ID_WILAYAH = d.ID_WILAYAH "
+        f"WHERE s.ID_SUMBANGAN IS NULL", "ZERO_FAIL", "Every region with gifts needs its summary row.")
+    add("DONATIONS", "Summary recorded before the campaign ended", summ,
+        f"SELECT COUNT(*) FROM {summ} s JOIN {camp} k ON k.ID_KAMPANYE = s.ID_KAMPANYE "
+        f"WHERE s.TANGGAL_PENCATATAN < k.PERIODE_SELESAI OR s.TANGGAL_PENCATATAN > {AS_OF}", "ZERO_FAIL",
+        "Regions report after the campaign closes and not after the snapshot date.")
+    add("DONATIONS", "Participating households exceed households in the region", summ,
+        f"SELECT COUNT(*) FROM {summ} s JOIN {camp} k ON k.ID_KAMPANYE = s.ID_KAMPANYE "
+        f"JOIN (SELECT s2.ID_SUMBANGAN, COUNT(p.ID_KELUARGA) AS JUMLAH_KELUARGA FROM {summ} s2 "
+        f"JOIN {camp} k2 ON k2.ID_KAMPANYE = s2.ID_KAMPANYE "
         f"LEFT JOIN {M}.MASTER_LINGKUNGAN l ON l.ID_WILAYAH = s2.ID_WILAYAH "
-        f"LEFT JOIN {pl} p ON p.ID_LINGKUNGAN = l.ID_LINGKUNGAN AND p.TANGGAL_MULAI_BERLAKU <= s2.PERIODE_SELESAI "
-        f"AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= s2.PERIODE_SELESAI) "
+        f"LEFT JOIN {pl} p ON p.ID_LINGKUNGAN = l.ID_LINGKUNGAN AND p.TANGGAL_MULAI_BERLAKU <= k2.PERIODE_SELESAI "
+        f"AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= k2.PERIODE_SELESAI) "
         f"GROUP BY s2.ID_SUMBANGAN) h ON h.ID_SUMBANGAN = s.ID_SUMBANGAN WHERE s.JUMLAH_KELUARGA_PESERTA > h.JUMLAH_KELUARGA",
-        "ZERO_WARN", "Compares participants with households assigned to the region on the last day of the period.")
-    add("DONATIONS", "Donation records waiting for validation", s,
-        f"SELECT COUNT(*) FROM {s} WHERE STATUS_VALIDASI <> 'Sudah Divalidasi'", "INFO", "Deliberate demo scenario.")
+        "ZERO_WARN", "Compares participants with households assigned to the region on the last day of the campaign.")
+    add("DONATIONS", "Community without an economic profile", f"{M}.MASTER_LINGKUNGAN",
+        f"SELECT COUNT(*) FROM {M}.MASTER_LINGKUNGAN l WHERE NOT EXISTS "
+        f"(SELECT 1 FROM {M}.PROFIL_EKONOMI_LINGKUNGAN e WHERE e.ID_LINGKUNGAN = l.ID_LINGKUNGAN)",
+        "ZERO_FAIL", "The donation analysis relates gifts to the economic profile of the community.")
+    add("DONATIONS", "Planned campaigns", camp,
+        f"SELECT COUNT(*) FROM {camp} WHERE STATUS_KAMPANYE = 'Direncanakan'", "INFO", "Deliberate demo scenario: Advent of the current year.")
+    add("DONATIONS", "Donation summaries waiting for validation", summ,
+        f"SELECT COUNT(*) FROM {summ} WHERE STATUS_VALIDASI <> 'Sudah Divalidasi'", "INFO", "Deliberate demo scenario.")
+
+    # --- dataset information and history ---------------------------------------------------------------
+    info = f"{M}.INFO_DATASET"
+    add("DATASET", "Dataset information missing or duplicated", info,
+        f"SELECT CASE WHEN COUNT(*) = 1 THEN 0 ELSE 1 END FROM {info}", "ZERO_FAIL", "Exactly one dataset information row is expected.")
+    add("DATASET", "Snapshot date differs from this validation", info,
+        f"SELECT COUNT(*) FROM {info} WHERE TANGGAL_SNAPSHOT <> {AS_OF} OR BERSIFAT_SIMULASI <> TRUE", "ZERO_FAIL",
+        "The date used by the checks must be the snapshot date of the data, and the data must be marked simulated.")
+    add("DATASET", "Mass history shorter than five years", k,
+        f"SELECT COUNT(*) FROM {info} i WHERE (SELECT MIN(TANGGAL_MISA) FROM {k}) > DATEADD('day', 7, i.TANGGAL_MULAI_RIWAYAT) "
+        f"OR DATEDIFF('day', i.TANGGAL_MULAI_RIWAYAT, i.TANGGAL_SNAPSHOT) < 1826", "ZERO_FAIL",
+        "History must start within a week of the recorded start date and cover at least five years.")
+    add("DATASET", "Plan history shorter than five years", f"{O}.RENCANA_KERJA_TAHUNAN",
+        f"SELECT COUNT(*) FROM {info} i WHERE (SELECT MIN(TAHUN_RENCANA) FROM {O}.RENCANA_KERJA_TAHUNAN) > EXTRACT(YEAR FROM i.TANGGAL_SNAPSHOT) - 5",
+        "ZERO_FAIL", "Annual plans must reach at least five years back.")
+
+    # --- unforeseen events ---------------------------------------------------------------------------------
+    ev = f"{O}.PERISTIWA_LUAR_BIASA"
+    add("EVENTS", "Event ends before it starts", ev,
+        f"SELECT COUNT(*) FROM {ev} WHERE TANGGAL_SELESAI < TANGGAL_MULAI", "ZERO_FAIL", "Event dates.")
+    add("EVENTS", "Event windows overlap", ev,
+        f"SELECT COUNT(*) FROM {ev} a JOIN {ev} b ON a.ID_PERISTIWA < b.ID_PERISTIWA "
+        f"AND a.TANGGAL_MULAI <= b.TANGGAL_SELESAI AND b.TANGGAL_MULAI <= a.TANGGAL_SELESAI", "ZERO_FAIL",
+        "Overlapping events would make the effect of each one impossible to separate.")
+    add("EVENTS", "Attendance linked to an event that does not cover the Mass date", a,
+        f"SELECT COUNT(*) FROM {a} x JOIN {k} k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA JOIN {ev} e ON e.ID_PERISTIWA = x.ID_PERISTIWA "
+        f"WHERE k.TANGGAL_MISA < e.TANGGAL_MULAI OR k.TANGGAL_MISA > e.TANGGAL_SELESAI", "ZERO_FAIL",
+        "A note about an event only applies to Masses inside its window.")
+    add("EVENTS", "Attendance during an event without a link to it", a,
+        f"SELECT COUNT(*) FROM {a} x JOIN {k} k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA JOIN {ev} e "
+        f"ON k.TANGGAL_MISA BETWEEN e.TANGGAL_MULAI AND e.TANGGAL_SELESAI WHERE x.ID_PERISTIWA IS NULL", "ZERO_WARN",
+        "Records inside an event window should name the event, otherwise the dip cannot be explained.")
+    add("EVENTS", "Attendance records linked to an unforeseen event", a,
+        f"SELECT COUNT(*) FROM {a} WHERE ID_PERISTIWA IS NOT NULL", "INFO", "Masses whose attendance and offertory carry an explanation.")
+    add("EVENTS", "Masses cancelled", k,
+        f"SELECT COUNT(*) FROM {k} WHERE STATUS_PELAKSANAAN = 'Dibatalkan' AND KETERANGAN IS NOT NULL", "INFO",
+        "Cancellations, some caused by events.")
 
     # --- planning, events, reports -------------------------------------------------------------------
     e, r, plan, hdr = f"{O}.KEGIATAN", f"{O}.LAPORAN_KEGIATAN", f"{O}.RENCANA_KEGIATAN", f"{O}.RENCANA_KERJA_TAHUNAN"

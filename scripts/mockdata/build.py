@@ -11,12 +11,12 @@ def load_tables(ddl_path):
 
 def build_all():
     """Generate all rows. Order matters only for derived values: donations use
-    the parishioner assignments."""
+    the parishioner assignments and the planned celebrations."""
     data = {}
     data.update(reference.build())
     data.update(liturgy.build())
     data.update(parish.build())
-    data.update(donations.build(data))
-    data.update(surveys.build())
     data.update(planning.build())
+    data.update(donations.build(data))  # needs households (parish) and the funded plans (planning)
+    data.update(surveys.build())
     return data

@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Step 2: Create all tables (DDL)
 --
--- Creates : 16 tables in MASTER_DATA and 17 tables in DATA_OPERASIONAL.
+-- Creates : every table of the schemas MASTER_DATA and DATA_OPERASIONAL.
 -- Requires: step 1 (database and schemas).
 -- Safe to re-run: yes (CREATE TABLE IF NOT EXISTS). Existing tables are NOT
 --           altered: a changed definition needs a manual ALTER or a reset.
@@ -24,6 +24,16 @@ USE DATABASE PUSAT_INFORMASI_PAROKI;
 -- =============================================================================
 -- MASTER_DATA : reference and master data
 -- =============================================================================
+
+CREATE TABLE IF NOT EXISTS MASTER_DATA.INFO_DATASET (
+    ID_DATASET VARCHAR(30) NOT NULL COMMENT 'Pengenal dataset (contoh: DS-01)',
+    NAMA_DATASET VARCHAR(150) NOT NULL COMMENT 'Nama dataset demo',
+    DESKRIPSI VARCHAR(500) NOT NULL COMMENT 'Penjelasan singkat isi dataset',
+    BERSIFAT_SIMULASI BOOLEAN NOT NULL COMMENT 'TRUE jika seluruh data adalah data simulasi (fiktif)',
+    TANGGAL_MULAI_RIWAYAT DATE NOT NULL COMMENT 'Tanggal pertama yang dicakup oleh data riwayat',
+    TANGGAL_SNAPSHOT DATE NOT NULL COMMENT 'Tanggal acuan data: catatan setelah tanggal ini adalah jadwal atau rencana, bukan kejadian',
+    CONSTRAINT PK_INFO_DATASET PRIMARY KEY (ID_DATASET)
+) COMMENT = 'Keterangan dataset demo, termasuk tanggal acuan yang dipakai view untuk membedakan tahun lengkap dari tahun berjalan | Granularitas: satu baris untuk seluruh dataset | Klasifikasi: Publik';
 
 CREATE TABLE IF NOT EXISTS MASTER_DATA.REFERENSI_KLASIFIKASI_DATA (
     ID_KLASIFIKASI_DATA VARCHAR(30) NOT NULL COMMENT 'Pengenal tingkat klasifikasi data (contoh: KLS-01)',
@@ -127,6 +137,18 @@ CREATE TABLE IF NOT EXISTS MASTER_DATA.MASTER_LINGKUNGAN (
     CONSTRAINT FK_MASTER_LINGKUNGAN_WILAYAH FOREIGN KEY (ID_WILAYAH) REFERENCES MASTER_DATA.MASTER_WILAYAH (ID_WILAYAH)
 ) COMMENT = 'Daftar lingkungan (fiktif) beserta wilayah induknya | Granularitas: satu baris per lingkungan | Klasifikasi: Publik';
 
+CREATE TABLE IF NOT EXISTS MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN (
+    ID_PROFIL VARCHAR(30) NOT NULL COMMENT 'Pengenal profil ekonomi (contoh: PEK-01)',
+    ID_LINGKUNGAN VARCHAR(30) NOT NULL COMMENT 'Lingkungan yang dinilai',
+    TAHUN_PENILAIAN NUMBER(4,0) NOT NULL COMMENT 'Tahun penilaian profil',
+    KATEGORI_EKONOMI VARCHAR(50) NOT NULL COMMENT 'Kapasitas ekonomi umum lingkungan: Rendah, Menengah Bawah, Menengah Atas, atau Tinggi',
+    INDEKS_KAPASITAS_EKONOMI NUMBER(4,2) NOT NULL COMMENT 'Indeks kapasitas ekonomi relatif terhadap rata-rata paroki, 1.00 berarti rata-rata',
+    KETERANGAN VARCHAR(500) COMMENT 'Catatan penilaian',
+    CONSTRAINT PK_PROFIL_EKONOMI_LINGKUNGAN PRIMARY KEY (ID_PROFIL),
+    CONSTRAINT UQ_PROFIL_EKONOMI_LINGKUNGAN UNIQUE (ID_LINGKUNGAN),
+    CONSTRAINT FK_PROFIL_EKONOMI_LINGKUNGAN FOREIGN KEY (ID_LINGKUNGAN) REFERENCES MASTER_DATA.MASTER_LINGKUNGAN (ID_LINGKUNGAN)
+) COMMENT = 'Gambaran kapasitas ekonomi umum setiap lingkungan (simulasi, hanya tingkat lingkungan, tidak ada data ekonomi rumah tangga). Menjelaskan konteks, bukan menilai kemurahan hati atau iman | Granularitas: satu baris per lingkungan | Klasifikasi: Internal';
+
 CREATE TABLE IF NOT EXISTS MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN (
     ID_GEOMETRI VARCHAR(30) NOT NULL COMMENT 'Pengenal geometri (contoh: GEO-01)',
     ID_LINGKUNGAN VARCHAR(30) NOT NULL COMMENT 'Lingkungan yang digambarkan',
@@ -207,6 +229,17 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KEJADIAN_MISA (
     CONSTRAINT FK_KEJADIAN_MISA_JADWAL FOREIGN KEY (ID_JADWAL_MISA) REFERENCES MASTER_DATA.JADWAL_MISA (ID_JADWAL_MISA)
 ) COMMENT = 'Kejadian Misa yang sebenarnya, hasil penerapan aturan jadwal pada tanggal tertentu | Granularitas: satu baris per Misa pada satu tanggal | Klasifikasi: Internal';
 
+CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA (
+    ID_PERISTIWA VARCHAR(30) NOT NULL COMMENT 'Pengenal peristiwa (contoh: PRS-01)',
+    JENIS_PERISTIWA VARCHAR(100) NOT NULL COMMENT 'Jenis peristiwa, misalnya Hujan Deras dan Banjir, Kabut Asap, atau Abu Vulkanik',
+    NAMA_PERISTIWA VARCHAR(200) NOT NULL COMMENT 'Nama peristiwa untuk tampilan pada grafik riwayat',
+    TANGGAL_MULAI DATE NOT NULL COMMENT 'Tanggal peristiwa mulai memengaruhi paroki',
+    TANGGAL_SELESAI DATE NOT NULL COMMENT 'Tanggal peristiwa berakhir',
+    TINGKAT_GANGGUAN VARCHAR(50) NOT NULL COMMENT 'Penilaian petugas atas gangguan: Ringan, Sedang, atau Berat',
+    DESKRIPSI VARCHAR(500) NOT NULL COMMENT 'Penjelasan singkat peristiwa dan akibatnya bagi kegiatan paroki',
+    CONSTRAINT PK_PERISTIWA_LUAR_BIASA PRIMARY KEY (ID_PERISTIWA)
+) COMMENT = 'Catatan peristiwa luar biasa seperti hujan deras, kabut asap, atau abu vulkanik yang dapat menurunkan kehadiran dan kolekte. Besar dampak sengaja tidak disimpan agar dapat dianalisis dari data | Granularitas: satu baris per peristiwa | Klasifikasi: Internal';
+
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KEHADIRAN_MISA (
     ID_KEHADIRAN VARCHAR(30) NOT NULL COMMENT 'Pengenal catatan kehadiran (contoh: KHD-000001)',
     ID_KEJADIAN_MISA VARCHAR(30) NOT NULL COMMENT 'Kejadian Misa yang dihitung kehadirannya',
@@ -215,9 +248,11 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KEHADIRAN_MISA (
     STATUS_VALIDASI VARCHAR(50) NOT NULL COMMENT 'Status validasi: Sudah Divalidasi, Menunggu Validasi, atau Perlu Dicek Ulang',
     WAKTU_PENCATATAN TIMESTAMP_NTZ NOT NULL COMMENT 'Waktu lokal pencatatan jumlah umat',
     KETERANGAN VARCHAR(500) COMMENT 'Catatan, misalnya kondisi cuaca atau alasan pengecekan ulang',
+    ID_PERISTIWA VARCHAR(30) COMMENT 'Peristiwa luar biasa yang dicatat petugas sebagai penyebab kehadiran berbeda, kosong jika tidak ada',
     CONSTRAINT PK_KEHADIRAN_MISA PRIMARY KEY (ID_KEHADIRAN),
     CONSTRAINT UQ_KEHADIRAN_MISA_KEJADIAN UNIQUE (ID_KEJADIAN_MISA),
-    CONSTRAINT FK_KEHADIRAN_MISA_KEJADIAN FOREIGN KEY (ID_KEJADIAN_MISA) REFERENCES DATA_OPERASIONAL.KEJADIAN_MISA (ID_KEJADIAN_MISA)
+    CONSTRAINT FK_KEHADIRAN_MISA_KEJADIAN FOREIGN KEY (ID_KEJADIAN_MISA) REFERENCES DATA_OPERASIONAL.KEJADIAN_MISA (ID_KEJADIAN_MISA),
+    CONSTRAINT FK_KEHADIRAN_MISA_PERISTIWA FOREIGN KEY (ID_PERISTIWA) REFERENCES DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA (ID_PERISTIWA)
 ) COMMENT = 'Total kehadiran umat pada setiap Misa yang terlaksana | Granularitas: satu baris per kejadian Misa | Klasifikasi: Internal';
 
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.PENERIMAAN_KOLEKTE (
@@ -234,23 +269,6 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.PENERIMAAN_KOLEKTE (
     CONSTRAINT FK_PENERIMAAN_KOLEKTE_KEJADIAN FOREIGN KEY (ID_KEJADIAN_MISA) REFERENCES DATA_OPERASIONAL.KEJADIAN_MISA (ID_KEJADIAN_MISA),
     CONSTRAINT FK_PENERIMAAN_KOLEKTE_JENIS FOREIGN KEY (ID_JENIS_KOLEKTE) REFERENCES MASTER_DATA.REFERENSI_JENIS_KOLEKTE (ID_JENIS_KOLEKTE)
 ) COMMENT = 'Ringkasan kolekte per Misa dan jenis kolekte, membedakan jumlah tercatat, hasil penghitungan, dan status rekonsiliasi. Bukan ukuran iman atau komitmen rohani | Granularitas: satu baris per kejadian Misa dan jenis kolekte | Klasifikasi: Internal';
-
-CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS (
-    ID_SUMBANGAN VARCHAR(30) NOT NULL COMMENT 'Pengenal catatan sumbangan (contoh: SMB-001)',
-    ID_WILAYAH VARCHAR(30) NOT NULL COMMENT 'Wilayah pelapor sumbangan',
-    ID_KESEMPATAN VARCHAR(30) NOT NULL COMMENT 'Kesempatan khusus, misalnya Prapaskah atau Adven',
-    PERIODE_MULAI DATE NOT NULL COMMENT 'Tanggal awal periode pengumpulan',
-    PERIODE_SELESAI DATE NOT NULL COMMENT 'Tanggal akhir periode pengumpulan',
-    JUMLAH_KELUARGA_PESERTA NUMBER(6,0) NOT NULL COMMENT 'Jumlah keluarga di wilayah yang ikut menyumbang',
-    JUMLAH_SUMBANGAN NUMBER(18,0) NOT NULL COMMENT 'Total sumbangan wilayah pada periode tersebut, dalam rupiah',
-    TANGGAL_PENCATATAN DATE NOT NULL COMMENT 'Tanggal laporan wilayah dicatat',
-    STATUS_VALIDASI VARCHAR(50) NOT NULL COMMENT 'Status validasi: Sudah Divalidasi, Menunggu Validasi, atau Perlu Dicek Ulang',
-    KETERANGAN VARCHAR(500) COMMENT 'Catatan tambahan',
-    CONSTRAINT PK_SUMBANGAN_KESEMPATAN_KHUSUS PRIMARY KEY (ID_SUMBANGAN),
-    CONSTRAINT UQ_SUMBANGAN_WILAYAH_KESEMPATAN_PERIODE UNIQUE (ID_WILAYAH, ID_KESEMPATAN, PERIODE_MULAI),
-    CONSTRAINT FK_SUMBANGAN_WILAYAH FOREIGN KEY (ID_WILAYAH) REFERENCES MASTER_DATA.MASTER_WILAYAH (ID_WILAYAH),
-    CONSTRAINT FK_SUMBANGAN_KESEMPATAN FOREIGN KEY (ID_KESEMPATAN) REFERENCES MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS (ID_KESEMPATAN)
-) COMMENT = 'Ringkasan sumbangan kesempatan khusus per wilayah. Tidak dipakai untuk memeringkat wilayah | Granularitas: satu baris per wilayah, kesempatan khusus, dan periode | Klasifikasi: Internal';
 
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KELUARGA (
     ID_KELUARGA VARCHAR(30) NOT NULL COMMENT 'Pengenal keluarga fiktif (contoh: KEL-0001)',
@@ -350,7 +368,7 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN (
 ) COMMENT = 'Rencana kerja tahunan setiap seksi | Granularitas: satu baris per seksi per tahun | Klasifikasi: Internal';
 
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.RENCANA_KEGIATAN (
-    ID_RENCANA VARCHAR(30) NOT NULL COMMENT 'Pengenal rencana kegiatan (contoh: RNC-001)',
+    ID_RENCANA VARCHAR(30) NOT NULL COMMENT 'Pengenal rencana kegiatan (contoh: RNC-0001)',
     ID_RENCANA_KERJA VARCHAR(30) NOT NULL COMMENT 'Rencana kerja tahunan induk, dari sini diperoleh seksi dan tahun',
     NAMA_PROGRAM VARCHAR(200) NOT NULL COMMENT 'Nama program atau kegiatan yang direncanakan',
     TUJUAN_PROGRAM VARCHAR(500) NOT NULL COMMENT 'Tujuan program',
@@ -361,8 +379,53 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.RENCANA_KEGIATAN (
     CONSTRAINT FK_RENCANA_KEGIATAN_RENCANA_KERJA FOREIGN KEY (ID_RENCANA_KERJA) REFERENCES DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN (ID_RENCANA_KERJA)
 ) COMMENT = 'Kegiatan yang direncanakan dalam rencana kerja tahunan. Tidak semua rencana sudah terlaksana atau memiliki pengeluaran | Granularitas: satu baris per kegiatan yang direncanakan | Klasifikasi: Internal';
 
+CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KAMPANYE_SUMBANGAN (
+    ID_KAMPANYE VARCHAR(30) NOT NULL COMMENT 'Pengenal kampanye sumbangan (contoh: KMP-01)',
+    ID_KESEMPATAN VARCHAR(30) NOT NULL COMMENT 'Kesempatan khusus yang melandasi kampanye',
+    NAMA_KAMPANYE VARCHAR(200) NOT NULL COMMENT 'Nama kampanye beserta tahunnya, misalnya Aksi Puasa Pembangunan 2026',
+    PERIODE_MULAI DATE NOT NULL COMMENT 'Tanggal awal pengumpulan',
+    PERIODE_SELESAI DATE NOT NULL COMMENT 'Tanggal akhir pengumpulan',
+    TARGET_DANA NUMBER(18,0) NOT NULL COMMENT 'Target dana kampanye, dalam rupiah',
+    ID_RENCANA_PENGGUNAAN VARCHAR(30) COMMENT 'Rencana kegiatan yang akan dibiayai dana kampanye, misalnya perayaan Paskah atau Natal, kosong jika belum ditentukan',
+    STATUS_KAMPANYE VARCHAR(50) NOT NULL COMMENT 'Status kampanye: Direncanakan, Berjalan, atau Selesai',
+    KETERANGAN VARCHAR(500) COMMENT 'Catatan tambahan',
+    CONSTRAINT PK_KAMPANYE_SUMBANGAN PRIMARY KEY (ID_KAMPANYE),
+    CONSTRAINT UQ_KAMPANYE_KESEMPATAN_PERIODE UNIQUE (ID_KESEMPATAN, PERIODE_MULAI),
+    CONSTRAINT FK_KAMPANYE_KESEMPATAN FOREIGN KEY (ID_KESEMPATAN) REFERENCES MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS (ID_KESEMPATAN),
+    CONSTRAINT FK_KAMPANYE_RENCANA FOREIGN KEY (ID_RENCANA_PENGGUNAAN) REFERENCES DATA_OPERASIONAL.RENCANA_KEGIATAN (ID_RENCANA)
+) COMMENT = 'Satu kampanye sumbangan pada satu periode, dengan kegiatan besar yang didanainya. Dasar analisis titik impas | Granularitas: satu baris per kesempatan khusus dan periode | Klasifikasi: Internal';
+
+CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS (
+    ID_SUMBANGAN VARCHAR(30) NOT NULL COMMENT 'Pengenal catatan sumbangan wilayah (contoh: SMB-001)',
+    ID_KAMPANYE VARCHAR(30) NOT NULL COMMENT 'Kampanye yang dilaporkan, dari sini diperoleh kesempatan khusus dan periode',
+    ID_WILAYAH VARCHAR(30) NOT NULL COMMENT 'Wilayah pelapor sumbangan',
+    JUMLAH_KELUARGA_PESERTA NUMBER(6,0) NOT NULL COMMENT 'Jumlah keluarga di wilayah yang ikut menyumbang',
+    JUMLAH_SUMBANGAN NUMBER(18,0) NOT NULL COMMENT 'Total sumbangan wilayah pada kampanye tersebut, dalam rupiah',
+    TANGGAL_PENCATATAN DATE NOT NULL COMMENT 'Tanggal laporan wilayah dicatat',
+    STATUS_VALIDASI VARCHAR(50) NOT NULL COMMENT 'Status validasi: Sudah Divalidasi, Menunggu Validasi, atau Perlu Dicek Ulang',
+    KETERANGAN VARCHAR(500) COMMENT 'Catatan tambahan',
+    CONSTRAINT PK_SUMBANGAN_KESEMPATAN_KHUSUS PRIMARY KEY (ID_SUMBANGAN),
+    CONSTRAINT UQ_SUMBANGAN_KAMPANYE_WILAYAH UNIQUE (ID_KAMPANYE, ID_WILAYAH),
+    CONSTRAINT FK_SUMBANGAN_KAMPANYE FOREIGN KEY (ID_KAMPANYE) REFERENCES DATA_OPERASIONAL.KAMPANYE_SUMBANGAN (ID_KAMPANYE),
+    CONSTRAINT FK_SUMBANGAN_WILAYAH FOREIGN KEY (ID_WILAYAH) REFERENCES MASTER_DATA.MASTER_WILAYAH (ID_WILAYAH)
+) COMMENT = 'Ringkasan sumbangan kampanye per wilayah. Harus sama dengan jumlah sumbangan keluarga di wilayah itu. Tidak dipakai untuk memeringkat wilayah | Granularitas: satu baris per kampanye dan wilayah | Klasifikasi: Internal';
+
+CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.SUMBANGAN_KELUARGA (
+    ID_SUMBANGAN_KELUARGA VARCHAR(30) NOT NULL COMMENT 'Pengenal sumbangan keluarga (contoh: SKL-00001)',
+    ID_KAMPANYE VARCHAR(30) NOT NULL COMMENT 'Kampanye yang disumbang',
+    ID_KELUARGA VARCHAR(30) NOT NULL COMMENT 'Keluarga fiktif penyumbang',
+    ID_LINGKUNGAN VARCHAR(30) NOT NULL COMMENT 'Lingkungan keluarga pada tanggal sumbangan, dicatat agar riwayat pindah lingkungan tidak mengubah angka lama',
+    JUMLAH_SUMBANGAN NUMBER(18,0) NOT NULL COMMENT 'Jumlah sumbangan keluarga pada kampanye ini, dalam rupiah',
+    TANGGAL_SUMBANGAN DATE NOT NULL COMMENT 'Tanggal sumbangan diterima',
+    CONSTRAINT PK_SUMBANGAN_KELUARGA PRIMARY KEY (ID_SUMBANGAN_KELUARGA),
+    CONSTRAINT UQ_SUMBANGAN_KELUARGA_KAMPANYE UNIQUE (ID_KAMPANYE, ID_KELUARGA),
+    CONSTRAINT FK_SUMBANGAN_KELUARGA_KAMPANYE FOREIGN KEY (ID_KAMPANYE) REFERENCES DATA_OPERASIONAL.KAMPANYE_SUMBANGAN (ID_KAMPANYE),
+    CONSTRAINT FK_SUMBANGAN_KELUARGA_KELUARGA FOREIGN KEY (ID_KELUARGA) REFERENCES DATA_OPERASIONAL.KELUARGA (ID_KELUARGA),
+    CONSTRAINT FK_SUMBANGAN_KELUARGA_LINGKUNGAN FOREIGN KEY (ID_LINGKUNGAN) REFERENCES MASTER_DATA.MASTER_LINGKUNGAN (ID_LINGKUNGAN)
+) COMMENT = 'Sumbangan setiap keluarga fiktif pada satu kampanye. Data keuangan keluarga yang teridentifikasi, hanya boleh tampil sebagai angka agregat | Granularitas: satu baris per keluarga dan kampanye | Klasifikasi: Sangat Terbatas';
+
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.ALOKASI_ANGGARAN (
-    ID_ALOKASI VARCHAR(30) NOT NULL COMMENT 'Pengenal alokasi anggaran (contoh: ALK-001)',
+    ID_ALOKASI VARCHAR(30) NOT NULL COMMENT 'Pengenal alokasi anggaran (contoh: ALK-0001)',
     ID_RENCANA VARCHAR(30) NOT NULL COMMENT 'Kegiatan yang dianggarkan',
     ID_KATEGORI_BIAYA VARCHAR(30) NOT NULL COMMENT 'Kategori biaya yang dianggarkan',
     JUMLAH_ANGGARAN NUMBER(18,0) NOT NULL COMMENT 'Jumlah anggaran yang disetujui, dalam rupiah',
@@ -375,7 +438,7 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.ALOKASI_ANGGARAN (
 ) COMMENT = 'Anggaran yang direncanakan, terpisah dari realisasi pengeluaran | Granularitas: satu baris per kegiatan dan kategori biaya | Klasifikasi: Internal';
 
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.REALISASI_PENGELUARAN (
-    ID_PENGELUARAN VARCHAR(30) NOT NULL COMMENT 'Pengenal pengeluaran (contoh: PGL-0001)',
+    ID_PENGELUARAN VARCHAR(30) NOT NULL COMMENT 'Pengenal pengeluaran (contoh: PGL-00001)',
     ID_ALOKASI VARCHAR(30) NOT NULL COMMENT 'Alokasi anggaran yang digunakan',
     TANGGAL_PENGELUARAN DATE NOT NULL COMMENT 'Tanggal pengeluaran terjadi',
     JUMLAH_PENGELUARAN NUMBER(18,0) NOT NULL COMMENT 'Jumlah pengeluaran sebenarnya, dalam rupiah',
@@ -385,7 +448,7 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.REALISASI_PENGELUARAN (
 ) COMMENT = 'Pengeluaran sebenarnya. Satu alokasi bisa memiliki banyak pengeluaran atau belum ada sama sekali | Granularitas: satu baris per transaksi pengeluaran | Klasifikasi: Internal';
 
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KEGIATAN (
-    ID_KEGIATAN VARCHAR(30) NOT NULL COMMENT 'Pengenal kegiatan (contoh: KGT-001)',
+    ID_KEGIATAN VARCHAR(30) NOT NULL COMMENT 'Pengenal kegiatan (contoh: KGT-0001)',
     ID_RENCANA VARCHAR(30) COMMENT 'Rencana kegiatan asal, kosong untuk kegiatan yang tidak direncanakan',
     NAMA_KEGIATAN VARCHAR(200) NOT NULL COMMENT 'Nama kegiatan',
     ID_SEKSI VARCHAR(30) NOT NULL COMMENT 'Seksi penyelenggara',
@@ -403,7 +466,7 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KEGIATAN (
 ) COMMENT = 'Kegiatan yang benar-benar terdaftar atau terlaksana. Satu rencana memiliki paling banyak satu kegiatan | Granularitas: satu baris per kegiatan | Klasifikasi: Internal';
 
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.LAPORAN_KEGIATAN (
-    ID_LAPORAN VARCHAR(30) NOT NULL COMMENT 'Pengenal laporan (contoh: LPK-001)',
+    ID_LAPORAN VARCHAR(30) NOT NULL COMMENT 'Pengenal laporan (contoh: LPK-0001)',
     ID_KEGIATAN VARCHAR(30) NOT NULL COMMENT 'Kegiatan yang dilaporkan',
     TANGGAL_LAPORAN DATE NOT NULL COMMENT 'Tanggal laporan dibuat atau terakhir diubah',
     STATUS_LAPORAN VARCHAR(50) NOT NULL COMMENT 'Status laporan: Final, Draf, atau Perlu Revisi',

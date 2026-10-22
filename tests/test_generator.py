@@ -8,12 +8,13 @@ import re
 import sys
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from mockdata import build, checks, dictionary, sqlwriter  # noqa: E402
+from mockdata import build, checks, config, dictionary, sqlwriter  # noqa: E402
 from mockdata.ddl import parse_ddl  # noqa: E402
 from mockdata.outputs import SQL_SOURCES, generate  # noqa: E402
 from mockdata.vocab import DAFTAR_NILAI, NILAI_TERKENDALI  # noqa: E402
@@ -31,7 +32,7 @@ class GeneratorTestCase(unittest.TestCase):
 
 class DdlTests(GeneratorTestCase):
     def test_all_expected_tables_exist(self):
-        self.assertEqual(len(self.tables), 33)
+        self.assertEqual(len(self.tables), 38)
         schemas = {t.schema for t in self.tables}
         self.assertEqual(schemas, {"MASTER_DATA", "DATA_OPERASIONAL"})
 
@@ -102,7 +103,7 @@ class DataTests(GeneratorTestCase):
 
     def test_volumes_stay_small(self):
         total = sum(len(rows) for rows in self.data.values())
-        self.assertLess(total, 8000)
+        self.assertLess(total, 20000)
         self.assertGreaterEqual(len(self.data["MASTER_DATA.MASTER_WILAYAH"]), 5)
         self.assertLessEqual(len(self.data["MASTER_DATA.MASTER_WILAYAH"]), 10)
         self.assertGreaterEqual(len(self.data["MASTER_DATA.MASTER_LINGKUNGAN"]), 15)
@@ -343,6 +344,203 @@ class CommittedFilesTests(GeneratorTestCase):
             self.assertNotIn(forbidden, selects)
 
 
+def _linear_fit(xs, ys):
+    mean_x, mean_y = sum(xs) / len(xs), sum(ys) / len(ys)
+    slope = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys)) / sum((x - mean_x) ** 2 for x in xs)
+    return slope, mean_y - slope * mean_x
+
+
+def _median(values):
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
+
+class UseCaseStoryTests(GeneratorTestCase):
+    """The demo is built to tell specific stories. These tests keep them true when the
+    generator is retuned: a failure here means the story broke, not that data is invalid."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        d = cls.data
+        cls.occurrence = {o["ID_KEJADIAN_MISA"]: o for o in d["DATA_OPERASIONAL.KEJADIAN_MISA"]}
+        cls.attendance = {a["ID_KEJADIAN_MISA"]: a for a in d["DATA_OPERASIONAL.KEHADIRAN_MISA"]}
+        best = {}
+        for c in d["DATA_OPERASIONAL.PENERIMAAN_KOLEKTE"]:
+            amount = c["JUMLAH_HASIL_PENGHITUNGAN"] if c["JUMLAH_HASIL_PENGHITUNGAN"] is not None else c["JUMLAH_PENERIMAAN"]
+            best[c["ID_KEJADIAN_MISA"]] = best.get(c["ID_KEJADIAN_MISA"], 0) + amount
+        cls.offertory_per_mass = best
+        cls.years = range(2021, 2026)
+
+        plan_year = {p["ID_RENCANA"]: p["TANGGAL_RENCANA"].year for p in d["DATA_OPERASIONAL.RENCANA_KEGIATAN"]}
+        allocation_plan = {a["ID_ALOKASI"]: a["ID_RENCANA"] for a in d["DATA_OPERASIONAL.ALOKASI_ANGGARAN"]}
+        cls.spent_by_year, cls.spent_by_plan = {}, {}
+        for x in d["DATA_OPERASIONAL.REALISASI_PENGELUARAN"]:
+            year = x["TANGGAL_PENGELUARAN"].year
+            cls.spent_by_year[year] = cls.spent_by_year.get(year, 0) + x["JUMLAH_PENGELUARAN"]
+            plan = allocation_plan[x["ID_ALOKASI"]]
+            cls.spent_by_plan[plan] = cls.spent_by_plan.get(plan, 0) + x["JUMLAH_PENGELUARAN"]
+        cls.plan_year = plan_year
+        cls.offertory_by_year = {}
+        for occ_id, amount in best.items():
+            year = cls.occurrence[occ_id]["TANGGAL_MISA"].year
+            cls.offertory_by_year[year] = cls.offertory_by_year.get(year, 0) + amount
+
+    def test_history_covers_at_least_five_years(self):
+        first = min(o["TANGGAL_MISA"] for o in self.occurrence.values())
+        self.assertLessEqual(first, date(2021, 1, 8))
+        self.assertGreaterEqual((config.AS_OF - first).days, 5 * 365)
+        self.assertEqual(min(h["TAHUN_RENCANA"] for h in self.data["DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN"]), 2021)
+
+    def test_underlying_offertory_growth_keeps_slowing(self):
+        """Per held Mass, outside event windows, the year-on-year growth shrinks every year."""
+        average = {}
+        for occ_id, amount in self.offertory_per_mass.items():
+            if self.attendance[occ_id]["ID_PERISTIWA"] is None:
+                year = self.occurrence[occ_id]["TANGGAL_MISA"].year
+                average.setdefault(year, []).append(amount)
+        means = {y: sum(v) / len(v) for y, v in average.items()}
+        growth = [means[y] / means[y - 1] - 1 for y in range(2022, 2026)]
+        early, late = (growth[0] + growth[1]) / 2, (growth[2] + growth[3]) / 2
+        self.assertGreater(early, late + 0.025, f"growth must clearly slow down: {growth}")
+        self.assertGreater(growth[0], 0.04)
+        self.assertLess(growth[-1], 0.02)
+        self.assertGreater(growth[0], growth[-1] + 0.03)
+
+    def test_offertory_is_highest_right_after_salary_day(self):
+        totals = {}
+        for occ_id, amount in self.offertory_per_mass.items():
+            day = self.occurrence[occ_id]["TANGGAL_MISA"]
+            if day.year in self.years:
+                bucket = 0 if day.day <= 7 else (2 if day.day >= 22 else 1)
+                num, den = totals.get((day.year, bucket), (0, 0))
+                totals[(day.year, bucket)] = (num + amount, den + self.attendance[occ_id]["JUMLAH_UMAT"])
+        for year in self.years:
+            first = totals[(year, 0)][0] / totals[(year, 0)][1]
+            last = totals[(year, 2)][0] / totals[(year, 2)][1]
+            self.assertGreater(first / last, 1.25, f"{year}: first week should pay clearly more per attendee than the last")
+
+    def test_offertory_follows_attendance_linearly(self):
+        xs, ys = [], []
+        for c in self.data["DATA_OPERASIONAL.PENERIMAAN_KOLEKTE"]:
+            occurrence = self.occurrence[c["ID_KEJADIAN_MISA"]]
+            if occurrence["ID_JADWAL_MISA"] == "JDW-04" and c["ID_JENIS_KOLEKTE"] == "KOL-01":
+                xs.append(self.attendance[c["ID_KEJADIAN_MISA"]]["JUMLAH_UMAT"])
+                ys.append(c["JUMLAH_PENERIMAAN"])
+        mean_x, mean_y = sum(xs) / len(xs), sum(ys) / len(ys)
+        r = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys)) / (
+            sum((x - mean_x) ** 2 for x in xs) * sum((y - mean_y) ** 2 for y in ys)) ** 0.5
+        self.assertGreater(r, 0.75)
+
+    def test_unforeseen_events_lower_attendance_and_the_log_explains_them(self):
+        severity_effect = {"Ringan": [], "Sedang": [], "Berat": []}
+        for event in self.data["DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA"]:
+            inside, before = [], []
+            for occ_id, a in self.attendance.items():
+                occurrence = self.occurrence[occ_id]
+                if occurrence["ID_JADWAL_MISA"] == "JDW-07":
+                    continue
+                day = occurrence["TANGGAL_MISA"]
+                if event["TANGGAL_MULAI"] <= day <= event["TANGGAL_SELESAI"]:
+                    inside.append(a["JUMLAH_UMAT"])
+                elif event["TANGGAL_MULAI"] - timedelta(days=56) <= day < event["TANGGAL_MULAI"]:
+                    before.append(a["JUMLAH_UMAT"])
+            ratio = (sum(inside) / len(inside)) / (sum(before) / len(before))
+            self.assertLess(ratio, 0.93, f"{event['ID_PERISTIWA']} should visibly lower attendance")
+            severity_effect[event["TINGKAT_GANGGUAN"]].append(ratio)
+        mean = {k: sum(v) / len(v) for k, v in severity_effect.items()}
+        self.assertLess(mean["Berat"], mean["Sedang"])
+        self.assertLess(mean["Sedang"], mean["Ringan"])
+
+    def test_the_log_does_not_reveal_the_size_of_the_effect(self):
+        columns = self.by_name["DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA"].column_names
+        for word in ("PERSEN", "FAKTOR", "DAMPAK", "PENGARUH"):
+            self.assertFalse([c for c in columns if word in c], "the effect must be discovered, not stored")
+
+    def test_spending_rises_every_year_and_so_does_the_cost_per_activity(self):
+        spent = [self.spent_by_year[y] for y in self.years]
+        self.assertTrue(all(a < b for a, b in zip(spent, spent[1:])), spent)
+        count = {}
+        for plan, year in self.plan_year.items():
+            if year in self.years:
+                count[year] = count.get(year, 0) + 1
+        per_plan = [spent[i] / count[y] for i, y in enumerate(self.years)]
+        self.assertTrue(all(a < b for a, b in zip(per_plan, per_plan[1:])), per_plan)
+        self.assertTrue(all(count[a] < count[b] for a, b in zip(list(self.years), list(self.years)[1:])))
+
+    def test_income_is_bigger_than_outcome_today_but_the_trendlines_cross_within_about_three_years(self):
+        for year in self.years:
+            self.assertGreater(self.offertory_by_year[year], self.spent_by_year[year], year)
+        year_to_date = sum(a for o, a in self.offertory_per_mass.items() if self.occurrence[o]["TANGGAL_MISA"].year == 2026)
+        self.assertGreater(year_to_date, self.spent_by_year[2026])
+        years = list(self.years)
+        slope_o, icpt_o = _linear_fit(years, [self.offertory_by_year[y] for y in years])
+        slope_s, icpt_s = _linear_fit(years, [self.spent_by_year[y] for y in years])
+        self.assertGreater(slope_s, 3 * slope_o, "spending must grow much faster than the offertory")
+        cross = next(y for y in range(2026, 2040) if slope_s * y + icpt_s > slope_o * y + icpt_o)
+        self.assertIn(cross, (2028, 2029, 2030), f"trendlines cross in {cross}")
+
+    def test_poorer_communities_give_less_but_one_regular_large_donor_lifts_their_mean(self):
+        gifts = self.data["DATA_OPERASIONAL.SUMBANGAN_KELUARGA"]
+        profile = {r["ID_LINGKUNGAN"]: r for r in self.data["MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN"]}
+        campaign = next(c["ID_KAMPANYE"] for c in self.data["DATA_OPERASIONAL.KAMPANYE_SUMBANGAN"]
+                        if c["NAMA_KAMPANYE"] == "Aksi Puasa Pembangunan 2025")
+        by_community = {}
+        for g in gifts:
+            if g["ID_KAMPANYE"] == campaign:
+                by_community.setdefault(g["ID_LINGKUNGAN"], []).append(g["JUMLAH_SUMBANGAN"])
+        median = {c: _median(v) for c, v in by_community.items()}
+        mean = {c: sum(v) / len(v) for c, v in by_community.items()}
+        share = {c: max(v) / sum(v) for c, v in by_community.items()}
+        category = {c: profile[c]["KATEGORI_EKONOMI"] for c in by_community}
+        low = [c for c in by_community if category[c] == "Rendah"]
+        high = [c for c in by_community if category[c] == "Tinggi"]
+        self.assertTrue(low and high)
+        self.assertLess(max(median[c] for c in low), min(median[c] for c in high), "medians must show the gap")
+        outliers = [c for c in low if mean[c] / median[c] >= 1.4 and share[c] >= 0.4]
+        self.assertGreaterEqual(len(outliers), 3, "most poorer communities should have a dominant regular donor")
+        mid_low = [c for c in by_community if category[c] == "Menengah Bawah" and mean[c] / median[c] < 1.2]
+        self.assertTrue(any(mean[o] >= mean[m] for o in outliers for m in mid_low),
+                        "the outlier must lift a poor community mean up to the level of better-off ones")
+        top_high = [c for c in high if share[c] < 0.3]
+        self.assertTrue(all(mean[c] / median[c] < 1.2 for c in top_high), "no outlier in the richer communities")
+
+    def test_total_per_household_and_median_tell_different_stories(self):
+        gifts = self.data["DATA_OPERASIONAL.SUMBANGAN_KELUARGA"]
+        campaign = next(c["ID_KAMPANYE"] for c in self.data["DATA_OPERASIONAL.KAMPANYE_SUMBANGAN"]
+                        if c["NAMA_KAMPANYE"] == "Aksi Puasa Pembangunan 2025")
+        by_community = {}
+        for g in gifts:
+            if g["ID_KAMPANYE"] == campaign:
+                by_community.setdefault(g["ID_LINGKUNGAN"], []).append(g["JUMLAH_SUMBANGAN"])
+        by_total = sorted(by_community, key=lambda c: sum(by_community[c]))
+        by_median = sorted(by_community, key=lambda c: _median(by_community[c]))
+        by_mean = sorted(by_community, key=lambda c: sum(by_community[c]) / len(by_community[c]))
+        self.assertNotEqual(by_total, by_median)
+        self.assertNotEqual(by_mean, by_median)
+
+    def test_easter_stays_close_to_break_even_and_christmas_turns_into_a_deficit(self):
+        campaigns = {c["ID_KAMPANYE"]: c for c in self.data["DATA_OPERASIONAL.KAMPANYE_SUMBANGAN"]}
+        collected = {}
+        for g in self.data["DATA_OPERASIONAL.SUMBANGAN_KELUARGA"]:
+            collected[g["ID_KAMPANYE"]] = collected.get(g["ID_KAMPANYE"], 0) + g["JUMLAH_SUMBANGAN"]
+        net = {"KSK-01": {}, "KSK-02": {}}
+        for cid, campaign in campaigns.items():
+            plan = campaign["ID_RENCANA_PENGGUNAAN"]
+            if campaign["ID_KESEMPATAN"] in net and cid in collected:
+                net[campaign["ID_KESEMPATAN"]][campaign["PERIODE_MULAI"].year] = collected[cid] - self.spent_by_plan[plan]
+        easter, christmas = net["KSK-01"], net["KSK-02"]
+        self.assertTrue(all(v > 0 for v in easter.values()), easter)
+        self.assertGreater(easter[2021], easter[2026], "the Easter surplus shrinks")
+        self.assertLess(easter[2026], 0.15 * collected[next(c for c, x in campaigns.items() if x["NAMA_KAMPANYE"] == "Aksi Puasa Pembangunan 2026")])
+        self.assertGreater(christmas[2021], 0, "Christmas starts with a surplus")
+        deficit_years = [y for y in sorted(christmas) if christmas[y] < 0]
+        self.assertTrue(deficit_years and deficit_years[0] in (2023, 2024), deficit_years)
+        self.assertEqual(deficit_years, list(range(deficit_years[0], 2026)), "once in deficit, it stays in deficit")
+        self.assertTrue(all(christmas[a] > christmas[b] for a, b in zip(range(2021, 2025), range(2022, 2026))))
+
+
 class DocumentationTests(GeneratorTestCase):
     def test_er_diagrams_match_the_declared_foreign_keys(self):
         """Every foreign key is drawn, and every solid line is a real foreign key."""
@@ -388,12 +586,12 @@ class CsvExportTests(GeneratorTestCase):
     def test_command_line_csv_export(self):
         import subprocess
         with tempfile.TemporaryDirectory() as folder:
-            before = (ROOT / "sql" / "04_load_mock_data.sql").read_bytes()
+            before = (ROOT / "sql" / "04b_load_offertory.sql").read_bytes()
             result = subprocess.run([sys.executable, str(ROOT / "scripts" / "generate_mock_data.py"), "--csv-dir", folder],
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(len(list(Path(folder).glob("*.csv"))), 33)
-            self.assertEqual(before, (ROOT / "sql" / "04_load_mock_data.sql").read_bytes(), "regeneration must be stable")
+            self.assertEqual(len(list(Path(folder).glob("*.csv"))), len(build.load_tables(DDL_PATH)))
+            self.assertEqual(before, (ROOT / "sql" / "04b_load_offertory.sql").read_bytes(), "regeneration must be stable")
 
 
 if __name__ == "__main__":

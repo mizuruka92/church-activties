@@ -89,6 +89,7 @@ def check_integrity(tables, data):
                 problems.append(f"{qualified}.{column}: {row[column]!r} is not in vocabulary {group}")
 
     problems += _check_masses(data)
+    problems += _check_donations(data)
     problems += _check_parishioners(data)
     problems += _check_planning(data)
     problems += _check_surveys(data)
@@ -115,6 +116,26 @@ def _check_masses(data):
             problems.append(f"{occ['ID_KEJADIAN_MISA']}: end time not after start time")
         if (day > config.AS_OF) != (occ["STATUS_PELAKSANAAN"] == "Terjadwal"):
             problems.append(f"{occ['ID_KEJADIAN_MISA']}: status {occ['STATUS_PELAKSANAAN']} inconsistent with date {day}")
+
+    events = {e["ID_PERISTIWA"]: e for e in data["DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA"]}
+    ordered = sorted(events.values(), key=lambda e: e["TANGGAL_MULAI"])
+    for first, second in zip(ordered, ordered[1:]):
+        if second["TANGGAL_MULAI"] <= first["TANGGAL_SELESAI"]:
+            problems.append(f"{second['ID_PERISTIWA']}: overlaps {first['ID_PERISTIWA']}")
+    for e in events.values():
+        if e["TANGGAL_SELESAI"] < e["TANGGAL_MULAI"]:
+            problems.append(f"{e['ID_PERISTIWA']}: ends before it starts")
+    for a in data["DATA_OPERASIONAL.KEHADIRAN_MISA"]:
+        occurrence = occurrences.get(a["ID_KEJADIAN_MISA"])
+        if occurrence is None:
+            continue  # reported as an orphan by the foreign key check
+        day = occurrence["TANGGAL_MISA"]
+        linked = events.get(a["ID_PERISTIWA"]) if a["ID_PERISTIWA"] else None
+        inside = [e for e in events.values() if e["TANGGAL_MULAI"] <= day <= e["TANGGAL_SELESAI"]]
+        if linked is not None and not (linked["TANGGAL_MULAI"] <= day <= linked["TANGGAL_SELESAI"]):
+            problems.append(f"{a['ID_KEHADIRAN']}: linked event does not cover the Mass date")
+        if bool(inside) != (linked is not None):
+            problems.append(f"{a['ID_KEHADIRAN']}: attendance during an event must be linked to it, and only then")
 
     attended = {a["ID_KEJADIAN_MISA"] for a in data["DATA_OPERASIONAL.KEHADIRAN_MISA"]}
     collected = {c["ID_KEJADIAN_MISA"] for c in data["DATA_OPERASIONAL.PENERIMAAN_KOLEKTE"]}
@@ -193,7 +214,7 @@ def _check_planning(data):
             problems.append(f"{x['ID_PENGELUARAN']}: expenditure after the as-of date")
         if plan["STATUS_PELAKSANAAN"] in ("Direncanakan",) or (plan["STATUS_PELAKSANAAN"] == "Dibatalkan"):
             problems.append(f"{x['ID_PENGELUARAN']}: expenditure on a plan that is {plan['STATUS_PELAKSANAAN']}")
-        if x["TANGGAL_PENGELUARAN"].year != config.PLAN_YEAR:
+        if x["TANGGAL_PENGELUARAN"].year != headers[plan["ID_RENCANA_KERJA"]]["TAHUN_RENCANA"]:
             problems.append(f"{x['ID_PENGELUARAN']}: expenditure outside the plan year")
 
     event_of_plan = {}
@@ -230,6 +251,53 @@ def _check_planning(data):
             if any(r[c] is None for c in ("RINGKASAN_PELAKSANAAN", "REALISASI_BIAYA", "EVALUASI_LOGISTIK",
                                           "HASIL_KEGIATAN", "REKOMENDASI_TINDAK_LANJUT")):
                 problems.append(f"{r['ID_LAPORAN']}: final report has empty fields")
+    return problems
+
+
+def _check_donations(data):
+    problems = []
+    campaigns = {c["ID_KAMPANYE"]: c for c in data["DATA_OPERASIONAL.KAMPANYE_SUMBANGAN"]}
+    plans = {p["ID_RENCANA"]: p for p in data["DATA_OPERASIONAL.RENCANA_KEGIATAN"]}
+    links = {}
+    for link in data["DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN"]:
+        links.setdefault(link["ID_KELUARGA"], []).append(link)
+    region_of = {l["ID_LINGKUNGAN"]: l["ID_WILAYAH"] for l in data["MASTER_DATA.MASTER_LINGKUNGAN"]}
+
+    for c in campaigns.values():
+        if c["PERIODE_SELESAI"] < c["PERIODE_MULAI"]:
+            problems.append(f"{c['ID_KAMPANYE']}: ends before it starts")
+        expected = "Selesai" if c["PERIODE_SELESAI"] <= config.AS_OF else ("Berjalan" if c["PERIODE_MULAI"] <= config.AS_OF else "Direncanakan")
+        if c["STATUS_KAMPANYE"] != expected:
+            problems.append(f"{c['ID_KAMPANYE']}: status {c['STATUS_KAMPANYE']} but dates say {expected}")
+        funded = plans.get(c["ID_RENCANA_PENGGUNAAN"]) if c["ID_RENCANA_PENGGUNAAN"] else None
+        if c["ID_RENCANA_PENGGUNAAN"] and (funded is None or funded["TANGGAL_RENCANA"] < c["PERIODE_MULAI"]):
+            problems.append(f"{c['ID_KAMPANYE']}: the funded activity must not start before the campaign")
+
+    sums = {}
+    for g in data["DATA_OPERASIONAL.SUMBANGAN_KELUARGA"]:
+        c = campaigns[g["ID_KAMPANYE"]]
+        if not c["PERIODE_MULAI"] <= g["TANGGAL_SUMBANGAN"] <= min(c["PERIODE_SELESAI"], config.AS_OF):
+            problems.append(f"{g['ID_SUMBANGAN_KELUARGA']}: gift dated outside its campaign")
+        covering = [l for l in links.get(g["ID_KELUARGA"], [])
+                    if l["TANGGAL_MULAI_BERLAKU"] <= g["TANGGAL_SUMBANGAN"]
+                    and (l["TANGGAL_AKHIR_BERLAKU"] is None or g["TANGGAL_SUMBANGAN"] <= l["TANGGAL_AKHIR_BERLAKU"])]
+        if len(covering) != 1 or covering[0]["ID_LINGKUNGAN"] != g["ID_LINGKUNGAN"]:
+            problems.append(f"{g['ID_SUMBANGAN_KELUARGA']}: community differs from the household assignment on that date")
+        key = (g["ID_KAMPANYE"], region_of[g["ID_LINGKUNGAN"]])
+        count, total = sums.get(key, (0, 0))
+        sums[key] = (count + 1, total + g["JUMLAH_SUMBANGAN"])
+
+    seen = set()
+    for r in data["DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS"]:
+        key = (r["ID_KAMPANYE"], r["ID_WILAYAH"])
+        seen.add(key)
+        if sums.get(key, (0, 0)) != (r["JUMLAH_KELUARGA_PESERTA"], r["JUMLAH_SUMBANGAN"]):
+            problems.append(f"{r['ID_SUMBANGAN']}: regional summary differs from the household gifts")
+        if r["TANGGAL_PENCATATAN"] < campaigns[r["ID_KAMPANYE"]]["PERIODE_SELESAI"]:
+            problems.append(f"{r['ID_SUMBANGAN']}: recorded before the campaign ended")
+    for key in sums:
+        if key not in seen:
+            problems.append(f"{key}: household gifts without a regional summary")
     return problems
 
 
@@ -327,6 +395,18 @@ def check_scenarios(data):
     for value in ("Aktif", "Pindah Paroki", "Tidak Aktif", "Meninggal Dunia"):
         need(states("UMAT", "STATUS_KEANGGOTAAN")[value] > 0, f"no parishioner with status {value}")
     need(states("KELUARGA", "STATUS_KELUARGA")["Pindah Paroki"] > 0, "no household that left the parish")
+
+    attendance = data["DATA_OPERASIONAL.KEHADIRAN_MISA"]
+    need(any(a["ID_PERISTIWA"] for a in attendance), "no attendance record linked to an unforeseen event")
+    need({e["JENIS_PERISTIWA"] for e in data["DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA"]}
+         >= {"Hujan Deras dan Banjir", "Kabut Asap", "Abu Vulkanik"}, "the event log lacks rain, haze or volcanic ash")
+    need(any(m["STATUS_PELAKSANAAN"] == "Dibatalkan" and m["KETERANGAN"] and "abu" in m["KETERANGAN"]
+             for m in data["DATA_OPERASIONAL.KEJADIAN_MISA"]), "no Mass cancelled because of volcanic ash")
+    need(states("KAMPANYE_SUMBANGAN", "STATUS_KAMPANYE")["Direncanakan"] > 0, "no planned campaign")
+    first_year = min(m["TANGGAL_MISA"].year for m in data["DATA_OPERASIONAL.KEJADIAN_MISA"])
+    need(first_year <= config.AS_OF.year - 5, "the Mass history is shorter than five years")
+    need(min(h["TAHUN_RENCANA"] for h in data["DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN"]) <= config.AS_OF.year - 5,
+         "the plan history is shorter than five years")
 
     survey_status = Counter(s["STATUS_SURVEI"] for s in data["MASTER_DATA.SURVEI"])
     for value in ("Direncanakan", "Sedang Berjalan", "Selesai"):
