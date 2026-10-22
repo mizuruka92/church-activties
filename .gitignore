@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Optional CSV export of the mock data (see scripts/generate_mock_data.py --csv-dir)
+data/generated/
+
+# Local credentials and tool configuration: never commit these
+.env
+*.pem
+*.p8
+connections.toml
+config.toml
+.snowflake/
