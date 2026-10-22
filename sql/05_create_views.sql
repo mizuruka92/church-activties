@@ -19,7 +19,9 @@
 --     depend on a session setting. Years count as complete only when the snapshot date in
 --     MASTER_DATA.INFO_DATASET has passed 31 December.
 --   * Views are listed in dependency order: a view only reads views defined above it
---     (views 8 and 9 read view 7, view 10 reads view 9, view 12 reads view 11).
+--     (views 8 and 9 read view 7, view 10 reads view 9, view 12 reads view 11, view 23 reads view 7).
+--   * "Upcoming" is always relative to the snapshot date in MASTER_DATA.INFO_DATASET, never to the
+--     clock, so the demo gives the same answer on any day. With real data, replace it by CURRENT_DATE.
 -- =============================================================================
 
 USE DATABASE PUSAT_INFORMASI_PAROKI;
@@ -952,3 +954,48 @@ LEFT JOIN SUMBANGAN s
     ON s.ID_KAMPANYE = k.ID_KAMPANYE
 LEFT JOIN ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM p
     ON p.ID_RENCANA = k.ID_RENCANA_PENGGUNAAN;
+
+-- 23. Upcoming activities: from the annual plan to a scheduled event -------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.KEGIATAN_MENDATANG
+    COMMENT = 'Kegiatan yang akan datang, satu baris per rencana yang belum terlaksana: sudah dijadwalkan sebagai kegiatan, masih berupa rencana tahunan, atau ditunda tahun ini dan perlu jadwal baru. Lengkap dengan tanggal, tempat, target peserta, anggaran, dan dana pendukung. Acuan waktu adalah tanggal data. Data simulasi.'
+AS
+WITH DANA AS (
+    SELECT ID_RENCANA_PENGGUNAAN AS ID_RENCANA,
+           MIN(NAMA_KAMPANYE) AS NAMA_KAMPANYE,
+           SUM(TARGET_DANA) AS TARGET_DANA
+    FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN
+    WHERE ID_RENCANA_PENGGUNAAN IS NOT NULL
+    GROUP BY ID_RENCANA_PENGGUNAAN
+)
+SELECT
+    p.ID_RENCANA,
+    p.TAHUN_RENCANA,
+    p.ID_SEKSI,
+    p.NAMA_SEKSI,
+    p.NAMA_PROGRAM,
+    CASE WHEN p.STATUS_PELAKSANAAN = 'Ditunda' THEN 'Ditunda, perlu jadwal baru'
+         WHEN g.ID_KEGIATAN IS NOT NULL THEN 'Sudah dijadwalkan'
+         ELSE 'Masih rencana tahunan'
+    END AS TAHAP,
+    p.STATUS_PELAKSANAAN AS STATUS_RENCANA,
+    g.ID_KEGIATAN,
+    COALESCE(g.TANGGAL_MULAI, p.TANGGAL_RENCANA) AS TANGGAL_MULAI,
+    COALESCE(g.TANGGAL_SELESAI, p.TANGGAL_RENCANA) AS TANGGAL_SELESAI,
+    DATEDIFF('day', i.TANGGAL_SNAPSHOT, COALESCE(g.TANGGAL_MULAI, p.TANGGAL_RENCANA)) AS HARI_DARI_TANGGAL_DATA,
+    g.LOKASI,
+    g.TARGET_PESERTA,
+    p.ANGGARAN_RENCANA,
+    g.KETERANGAN AS CATATAN_KEGIATAN,
+    d.NAMA_KAMPANYE AS DIDANAI_KAMPANYE,
+    d.TARGET_DANA AS TARGET_DANA_KAMPANYE,
+    CASE WHEN d.ID_RENCANA IS NOT NULL THEN d.TARGET_DANA - p.ANGGARAN_RENCANA END AS SELISIH_TARGET_DANA_VS_ANGGARAN,
+    i.TANGGAL_SNAPSHOT AS TANGGAL_DATA,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM p
+CROSS JOIN MASTER_DATA.INFO_DATASET i
+LEFT JOIN DATA_OPERASIONAL.KEGIATAN g
+    ON g.ID_RENCANA = p.ID_RENCANA
+LEFT JOIN DANA d
+    ON d.ID_RENCANA = p.ID_RENCANA
+WHERE p.STATUS_PELAKSANAAN = 'Direncanakan'
+   OR (p.STATUS_PELAKSANAAN = 'Ditunda' AND p.TAHUN_RENCANA = EXTRACT(YEAR FROM i.TANGGAL_SNAPSHOT));

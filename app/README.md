@@ -5,7 +5,7 @@ data is fictional, and every page says so.
 
 * `streamlit_app.py` is the whole app, in one file on purpose: it can be pasted into the Snowsight Streamlit
   editor or deployed from the Git repository.
-* It reads **only the 20 aggregate views of the `ANALISIS` schema**, never the detail tables. It shows no
+* It reads **only the 21 aggregate views of the `ANALISIS` schema**, never the detail tables. It shows no
   names, households or single gifts.
 * The page-by-page description, design rules and the list of views per page are in
   [../docs/DASHBOARD.md](../docs/DASHBOARD.md).

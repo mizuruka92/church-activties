@@ -29,7 +29,7 @@ try:
 except ImportError:  # pragma: no cover
     HAVE_SQLGLOT = False
 
-from mockdata import build, validation  # noqa: E402
+from mockdata import build, config, validation  # noqa: E402
 
 if HAVE_DUCKDB:
     import duckdb_shim as shim
@@ -42,6 +42,9 @@ FIRST_FINAL_REPORT = _FINAL_REPORT["ID_LAPORAN"]
 FIRST_PLANNED_HELD_EVENT = next(e["ID_KEGIATAN"] for e in DATA["DATA_OPERASIONAL.KEGIATAN"]
                                 if e["ID_RENCANA"] and e["STATUS_KEGIATAN"] == "Terlaksana")
 FIRST_EXPENDITURE = DATA["DATA_OPERASIONAL.REALISASI_PENGELUARAN"][0]["ID_PENGELUARAN"]
+_EVENT_PLANS = {e["ID_RENCANA"] for e in DATA["DATA_OPERASIONAL.KEGIATAN"]}
+FIRST_PLAN_ONLY = next(r["ID_RENCANA"] for r in DATA["DATA_OPERASIONAL.RENCANA_KEGIATAN"]
+                       if r["STATUS_PELAKSANAAN"] == "Direncanakan" and r["ID_RENCANA"] not in _EVENT_PLANS)
 FIRST_ATTENDANCE = next(a["ID_KEHADIRAN"] for a in DATA["DATA_OPERASIONAL.KEHADIRAN_MISA"] if a["ID_KEJADIAN_MISA"] == FIRST_HELD_MASS)
 FIRST_OFFERTORY = next(c["ID_KOLEKTE"] for c in DATA["DATA_OPERASIONAL.PENERIMAAN_KOLEKTE"] if c["ID_KEJADIAN_MISA"] == FIRST_HELD_MASS)
 VIEWS = validation.view_names((ROOT / "sql" / "05_create_views.sql").read_text(encoding="utf-8"))
@@ -269,6 +272,13 @@ class MutationTests(unittest.TestCase):
     def test_event_and_plan_disagree(self):
         self.assertDetected(f"UPDATE DATA_OPERASIONAL.KEGIATAN SET STATUS_KEGIATAN = 'Dibatalkan' WHERE ID_KEGIATAN = '{FIRST_PLANNED_HELD_EVENT}'",
                             "PLANNING", "Event status differs from its plan status")
+
+    def test_open_plan_dated_before_the_snapshot_is_warned_not_failed(self):
+        failed, rows = self.failing(f"UPDATE DATA_OPERASIONAL.RENCANA_KEGIATAN SET TANGGAL_RENCANA = DATE '2026-09-01' "
+                                    f"WHERE ID_RENCANA = '{FIRST_PLAN_ONLY}'")
+        self.assertEqual(failed, set())
+        warned = [r for r in rows if r["CHECK_NAME"] == "Upcoming activity dated before the snapshot date"]
+        self.assertEqual([(r["RESULT"], r["FOUND_COUNT"]) for r in warned], [("WARN", 1)])
 
     def test_completed_plan_loses_its_event(self):
         self.assertDetected([f"DELETE FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE ID_KEGIATAN = '{FIRST_PLANNED_HELD_EVENT}'",
@@ -621,6 +631,77 @@ class UseCaseViewTests(unittest.TestCase):
                               "AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= DATE '2026-04-04')")
         self.assertLessEqual(total, expected)
         self.assertGreater(total, 0.9 * expected)
+
+
+@unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
+class UpcomingViewTests(unittest.TestCase):
+    """KEGIATAN_MENDATANG: the step between the annual plan and the post-event report."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.connection = shim.build_database(keep_constraints=False)
+        cursor = cls.connection.execute("SELECT * FROM ANALISIS.KEGIATAN_MENDATANG")
+        names = [d[0] for d in cursor.description]
+        cls.rows = [dict(zip(names, row)) for row in cursor.fetchall()]
+
+    def stage(self, name):
+        return [r for r in self.rows if r["TAHAP"] == name]
+
+    def test_every_open_plan_appears_exactly_once(self):
+        open_plans = sorted(r["ID_RENCANA"] for r in DATA["DATA_OPERASIONAL.RENCANA_KEGIATAN"] if r["STATUS_PELAKSANAAN"] == "Direncanakan")
+        listed = sorted(r["ID_RENCANA"] for r in self.rows if r["STATUS_RENCANA"] == "Direncanakan")
+        self.assertEqual(listed, open_plans)
+        self.assertEqual(len({r["ID_RENCANA"] for r in self.rows}), len(self.rows))
+
+    def test_the_demo_shows_all_three_stages(self):
+        self.assertGreaterEqual(len(self.stage("Sudah dijadwalkan")), 1)
+        self.assertGreaterEqual(len(self.stage("Masih rencana tahunan")), 1)
+        self.assertGreaterEqual(len(self.stage("Ditunda, perlu jadwal baru")), 1)
+        self.assertEqual({r["TAHAP"] for r in self.rows},
+                         {"Sudah dijadwalkan", "Masih rencana tahunan", "Ditunda, perlu jadwal baru"})
+
+    def test_scheduled_events_have_place_and_target_and_plan_only_items_do_not(self):
+        for row in self.stage("Sudah dijadwalkan"):
+            self.assertTrue(row["ID_KEGIATAN"] and row["LOKASI"] and row["TARGET_PESERTA"] > 0, row["NAMA_PROGRAM"])
+        for row in self.stage("Masih rencana tahunan"):
+            self.assertIsNone(row["ID_KEGIATAN"])
+            self.assertIsNone(row["LOKASI"])
+            self.assertIsNone(row["TARGET_PESERTA"])
+
+    def test_postponed_items_are_this_years_and_explain_why(self):
+        snapshot = self.rows[0]["TANGGAL_DATA"]
+        for row in self.stage("Ditunda, perlu jadwal baru"):
+            self.assertEqual(row["TAHUN_RENCANA"], snapshot.year)
+            self.assertTrue(row["CATATAN_KEGIATAN"], row["NAMA_PROGRAM"])
+            self.assertLess(row["HARI_DARI_TANGGAL_DATA"], 0, "the original date has passed")
+
+    def test_days_are_counted_from_the_snapshot_date_not_the_clock(self):
+        snapshot = self.rows[0]["TANGGAL_DATA"]
+        self.assertEqual(snapshot, config.AS_OF)
+        for row in self.rows:
+            self.assertEqual(row["HARI_DARI_TANGGAL_DATA"], (row["TANGGAL_MULAI"] - snapshot).days)
+        for row in self.stage("Sudah dijadwalkan") + self.stage("Masih rencana tahunan"):
+            self.assertGreater(row["HARI_DARI_TANGGAL_DATA"], 0)
+
+    def test_budget_matches_the_program_budget_view(self):
+        view = {r[0]: r[1] for r in self.connection.execute(
+            "SELECT ID_RENCANA, ANGGARAN_RENCANA FROM ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM").fetchall()}
+        for row in self.rows:
+            self.assertEqual(row["ANGGARAN_RENCANA"], view[row["ID_RENCANA"]], row["ID_RENCANA"])
+            self.assertGreater(row["ANGGARAN_RENCANA"], 0)
+
+    def test_the_christmas_celebration_shows_a_funding_gap(self):
+        funded = [r for r in self.rows if r["DIDANAI_KAMPANYE"]]
+        self.assertEqual(len(funded), 1)
+        row = funded[0]
+        self.assertIn("Natal", row["NAMA_PROGRAM"])
+        self.assertEqual(row["SELISIH_TARGET_DANA_VS_ANGGARAN"], row["TARGET_DANA_KAMPANYE"] - row["ANGGARAN_RENCANA"])
+        self.assertLess(row["SELISIH_TARGET_DANA_VS_ANGGARAN"], 0)
+
+    def test_no_row_names_a_person_or_a_household(self):
+        for forbidden in ("ID_UMAT", "ID_KELUARGA", "NAMA_FIKTIF", "TAHUN_LAHIR"):
+            self.assertNotIn(forbidden, self.rows[0])
+        self.assertEqual({r["SUMBER_DATA"] for r in self.rows}, {"Data simulasi (fiktif)"})
 
 
 @unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")

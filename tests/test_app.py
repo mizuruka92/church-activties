@@ -39,7 +39,7 @@ if HAVE_APP_STACK:
 
 NEEDS = "streamlit, altair, pandas or duckdb is not installed (pip install -r tests/requirements.txt)"
 
-PAGES = ["Ringkasan", "Pemasukan dan pengeluaran", "Kolekte dan kehadiran", "Peristiwa luar biasa", "Sumbangan khusus",
+PAGES = ["Ringkasan", "Kegiatan mendatang", "Pemasukan dan pengeluaran", "Kolekte dan kehadiran", "Peristiwa luar biasa", "Sumbangan khusus",
          "Rencana, anggaran, kegiatan", "Survei umat", "Tentang data"]
 CHART_PAGES = [p for p in PAGES if p != "Tentang data"]
 RANKING_WORDS = ("peringkat", "terbaik", "terburuk", "dermawan", "juara")
@@ -99,6 +99,11 @@ class SourceRuleTests(unittest.TestCase):
         created = set(re.findall(r"CREATE OR REPLACE VIEW ANALISIS\.(\w+)", sql))
         self.assertEqual(set(app.VIEWS) - created, set())
         self.assertEqual(len(app.VIEWS), len(set(app.VIEWS)), "no duplicates")
+
+    def test_the_dashboard_never_reads_the_clock(self):
+        """'Upcoming' is relative to the data date, so the demo gives the same answer on any day."""
+        for call in ("date.today(", "datetime.now(", "datetime.today(", "Timestamp.now(", "Timestamp.today(", "time.time("):
+            self.assertNotIn(call, self.source, call)
 
     def test_every_page_function_is_reachable_from_the_menu(self):
         tree = ast.parse(self.source)
@@ -263,6 +268,43 @@ class PageTests(unittest.TestCase):
         self.assertTrue(table["Status"].str.contains("Defisit").any())
         self.assertTrue(table["Status"].str.contains("Surplus").any())
 
+    def test_summary_lists_the_nearest_activities_in_date_order(self):
+        at = self.pages["Ringkasan"]
+        table = next(d.value for d in at.dataframe if "Dalam" in d.value.columns)
+        self.assertEqual(len(table), 3)
+        self.assertEqual(table["Tahap"].str.contains("Sudah dijadwalkan").all(), True)
+        days = [int(v.split()[0]) for v in table["Tanggal"]]
+        self.assertEqual(days, sorted(days))
+        self.assertEqual(list(table["Kegiatan"]), ["Misa Syukur Hari Ulang Tahun Paroki", "Penyuluhan Gizi Keluarga",
+                                                   "Misa Syukur Ulang Tahun Perkawinan"])
+        self.assertIn("4", page_text(at))  # postponed count in "Perlu perhatian"
+
+    def test_upcoming_page_shows_the_whole_pipeline_from_plan_to_scheduled_event(self):
+        at = self.pages["Kegiatan mendatang"]
+        values = {m.label: str(m.value) for m in at.metric}
+        self.assertEqual(values["Kegiatan mendatang"], "11")
+        self.assertEqual(values["Sudah dijadwalkan"], "3")
+        self.assertEqual(values["Masih rencana tahunan"], "8")
+        self.assertIn("30 September 2026", page_text(at))
+        self.assertEqual(at.radio(key="jangka_waktu").value, "Semua yang akan datang")
+        self.assertEqual(len(charts(at)), 1, "the timeline")
+
+    def test_upcoming_page_flags_postponed_activities_with_their_reasons_and_the_christmas_funding_gap(self):
+        text = page_text(self.pages["Kegiatan mendatang"])
+        self.assertIn("4 kegiatan ditunda", text)
+        self.assertIn("Ditunda karena bertepatan dengan ujian sekolah", text)
+        self.assertNotIn("..", text.replace("...", ""))
+        self.assertIn("Rangkaian Perayaan Natal", text)
+        self.assertIn("masih kurang Rp 11,1 jt", text)
+        self.assertIn("kurang dari 45 hari lagi", text)
+
+    def test_upcoming_masses_are_listed_with_their_scheduled_times(self):
+        at = self.pages["Kegiatan mendatang"]
+        table = next(d.value for d in at.dataframe if "Jam mulai" in d.value.columns)
+        self.assertEqual(len(table), 25)
+        self.assertTrue(table["Jam mulai"].str.fullmatch(r"\d\d:\d\d").all())
+        self.assertTrue(table["Tanggal"].str.contains("Oktober 2026").all())
+
     def test_survey_page_shows_aggregates_only(self):
         text = page_text(self.pages["Survei umat"])
         self.assertIn("responden", text)
@@ -279,6 +321,33 @@ class InteractionTests(unittest.TestCase):
         slider.set_range(years[0], years[0]).run()
         self.assertEqual([str(e.value) for e in at.exception], [])
         self.assertEqual(len(charts(at)), before)
+
+    def test_the_30_day_horizon_and_a_section_filter_narrow_the_agenda(self):
+        at = open_page("Kegiatan mendatang")
+        at.radio(key="jangka_waktu").set_value("30 hari ke depan").run()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        self.assertEqual({m.label: str(m.value) for m in at.metric}["Kegiatan mendatang"], "3")
+        at.radio(key="jangka_waktu").set_value("Semua yang akan datang").run()
+        at.selectbox(key="seksi_mendatang").select("Seksi Liturgi").run()
+        values = {m.label: str(m.value) for m in at.metric}
+        self.assertEqual(values["Kegiatan mendatang"], "3", "Misa Syukur HUT Paroki, Latihan Koor, Natal")
+        self.assertEqual([str(e.value) for e in at.exception], [])
+
+    def test_a_section_without_upcoming_activities_shows_a_plain_message(self):
+        at = open_page("Kegiatan mendatang")
+        at.radio(key="jangka_waktu").set_value("30 hari ke depan").run()
+        at.selectbox(key="seksi_mendatang").select("Seksi Liturgi").run()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        at.selectbox(key="seksi_mendatang").select("Seksi Kitab Suci").run()
+        self.assertTrue(any("Tidak ada kegiatan pada pilihan ini" in str(i.value) for i in at.info))
+        self.assertEqual([str(e.value) for e in at.exception], [])
+
+    def test_a_single_mass_session_can_be_chosen_on_the_masses_tab(self):
+        at = open_page("Kegiatan mendatang")
+        sessions = list(at.selectbox(key="sesi_mendatang").options)
+        self.assertEqual(sessions[0], "Semua sesi")
+        at.selectbox(key="sesi_mendatang").select(sessions[1]).run()
+        self.assertEqual([str(e.value) for e in at.exception], [])
 
     def test_choosing_a_single_mass_session_still_renders(self):
         at = open_page("Kolekte dan kehadiran")

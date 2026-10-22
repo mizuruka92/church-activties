@@ -15,8 +15,8 @@ Python. You will copy and paste.
 ## 0. What you will have at the end
 
 1. A Snowflake account (a free trial is enough).
-2. A database called `PUSAT_INFORMASI_PAROKI` with 38 tables of simulated parish data and 22 summary views.
-3. A dashboard in Bahasa Indonesia, running inside Snowflake, that shows income versus spending, offertory and
+2. A database called `PUSAT_INFORMASI_PAROKI` with 38 tables of simulated parish data and 23 summary views.
+3. A dashboard in Bahasa Indonesia, running inside Snowflake, that shows income versus spending, upcoming activities, offertory and
    attendance, unforeseen events, Lent and Advent donations versus Easter and Christmas costs, plans and budgets,
    and survey results.
 
@@ -130,7 +130,7 @@ replace the text, then Run All again.
 | 4d | [`sql/04d_load_surveys.sql`](../sql/04d_load_surveys.sql) | Survey answers. |
 | 4e | [`sql/04e_load_plans_and_events.sql`](../sql/04e_load_plans_and_events.sql) | Plans, budgets, spending, events, reports. |
 | 4f | [`sql/04f_load_donations.sql`](../sql/04f_load_donations.sql) | Donation campaigns and gifts. Needs 4c and 4e. |
-| 5 | [`sql/05_create_views.sql`](../sql/05_create_views.sql) | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 22 views. |
+| 5 | [`sql/05_create_views.sql`](../sql/05_create_views.sql) | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 23 views. |
 | 6 | [`sql/06_validate_data.sql`](../sql/06_validate_data.sql) | The first two rows say `FAIL = 0` and `WARN = 1`, both `PASS`. See part 7. |
 
 Good to know:
@@ -366,7 +366,9 @@ and have not been tried here.
   expected to pass the offertory (**2029**), how much of the Easter and Christmas costs the Lent and Advent donations cover
   (Easter above 100%, Christmas about 66%), and the number of unforeseen events (10).
 * A chart with two solid lines (offertory in blue, spending in orange) and dashed trend lines crossing at 2029.
-* A menu on the left with eight pages. Click through them.
+* A short list **Kegiatan terdekat** (the three nearest upcoming activities) further down the page.
+* A menu on the left with nine pages. Click through them. **Kegiatan mendatang** shows what is coming up: 11 activities after the data
+  date (3 already scheduled, 8 still only in the annual plan), 4 postponed ones that need a new date, and the 25 Masses scheduled for October.
 
 If you see a red box saying **"Data belum dapat dimuat dari Snowflake"**, open **"Detail teknis untuk pengelola"** and go to part 11.
 

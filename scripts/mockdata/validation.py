@@ -330,6 +330,19 @@ def _business_arms(views):
     add("PLANNING", "Plan date outside the plan year", plan,
         f"SELECT COUNT(*) FROM {plan} p JOIN {hdr} h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM p.TANGGAL_RENCANA) <> h.TAHUN_RENCANA",
         "ZERO_FAIL", "Planned dates must fall in the year of the annual plan.")
+    up = f"{A}.KEGIATAN_MENDATANG"
+    add("PLANNING", "Open plan missing from the upcoming activities view", plan,
+        f"SELECT COUNT(*) FROM {plan} p WHERE p.STATUS_PELAKSANAAN = 'Direncanakan' AND NOT EXISTS "
+        f"(SELECT 1 FROM {up} u WHERE u.ID_RENCANA = p.ID_RENCANA)", "ZERO_FAIL",
+        "Every plan that has not been carried out yet must show up on the upcoming activities page.")
+    add("PLANNING", "Plan listed twice in the upcoming activities view", up,
+        f"SELECT COUNT(*) FROM (SELECT ID_RENCANA FROM {up} GROUP BY ID_RENCANA HAVING COUNT(*) > 1) d", "ZERO_FAIL",
+        "One row per plan: a duplicate would double the budget shown for upcoming activities.")
+    add("PLANNING", "Upcoming activity dated before the snapshot date", up,
+        f"SELECT COUNT(*) FROM {up} WHERE TAHAP <> 'Ditunda, perlu jadwal baru' AND TANGGAL_MULAI < TANGGAL_DATA", "ZERO_WARN",
+        "A plan still marked Direncanakan after its date is overdue and should be updated.")
+    add("PLANNING", "Upcoming activities", up, f"SELECT COUNT(*) FROM {up}", "INFO",
+        "Deliberate demo scenario: scheduled events, plan-only activities and postponed ones.")
     add("PLANNING", "Expenditure outside the plan year", rl,
         f"SELECT COUNT(*) FROM {rl} x JOIN {alk} a ON a.ID_ALOKASI = x.ID_ALOKASI JOIN {plan} p ON p.ID_RENCANA = a.ID_RENCANA "
         f"JOIN {hdr} h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM x.TANGGAL_PENGELUARAN) <> h.TAHUN_RENCANA",
