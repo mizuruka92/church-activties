@@ -420,14 +420,72 @@ class PageTests(unittest.TestCase):
             self.assertEqual(at.radio(key=key).value, app.VIEW_RECENT, label)
             self.assertEqual(list(at.radio(key=key).options), [app.VIEW_RECENT, app.VIEW_ALL])
 
-    def test_forecast_and_actual_are_also_offered_side_by_side_as_a_table(self):
+    def test_forecast_and_actual_are_also_offered_side_by_side_as_a_table_of_the_weeks_drawn(self):
         for label in ("Kolekte dan kehadiran", "Perkiraan kolekte"):
             at = self.pages[label]
             table = next(d.value for d in at.dataframe if "Perkiraan kolekte" in d.value.columns and "Kolekte aktual" in d.value.columns)
-            self.assertGreater(len(table), 100, label)
+            self.assertEqual(len(table), app.RECENT_WEEKS + 5, f"{label}: the table lists the 52 weeks of the zoomed chart and the 5 ahead")
             self.assertIn("Selisih", table.columns)
             done = table[table["Kolekte aktual"] != "-"]
+            self.assertEqual(len(done), app.RECENT_WEEKS)
             self.assertTrue(done["Perkiraan kolekte"].str.startswith("Rp ").all(), label)
+
+    def test_the_table_follows_the_zoom_of_the_chart(self):
+        at = open_page("Perkiraan kolekte")
+        at.radio(key="jangka_grafik_perkiraan").set_value(app.VIEW_ALL).run()
+        table = next(d.value for d in at.dataframe if "Perkiraan kolekte" in d.value.columns and "Kolekte aktual" in d.value.columns)
+        self.assertEqual(len(table), 274)
+
+    def test_accuracy_figures_describe_exactly_the_weeks_that_the_year_filter_selects(self):
+        frame = app._normalise(app_support.run_query(f"SELECT * FROM {app.DATABASE}.ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN"))
+        for first, last in ((2021, 2026), (2022, 2022), (2025, 2026)):
+            chosen = frame[(app.week_year(frame) >= first) & (app.week_year(frame) <= last)]
+            table = app.accuracy_by_kind(chosen)
+            compared = chosen[chosen["STATUS_PEKAN"] == "Lengkap"]
+            self.assertEqual(int(table["Pekan"].sum()), len(compared), (first, last))
+            ordinary = compared[compared["JENIS_PEKAN"] == app.KIND_ORDINARY]
+            expected = (100 * (ordinary["KOLEKTE_AKTUAL"] - ordinary["JUMLAH_PERKIRAAN"]).abs() / ordinary["JUMLAH_PERKIRAAN"]).mean()
+            self.assertAlmostEqual(float(table.loc[table["Jenis pekan"] == app.KIND_ORDINARY, "Galat"].iloc[0]), float(expected), places=6)
+        full = app.accuracy_by_kind(frame).set_index("Jenis pekan")
+        yearly = app._normalise(app_support.run_query(f"SELECT * FROM {app.DATABASE}.ANALISIS.AKURASI_PERKIRAAN_TAHUNAN"))
+        for kind in app.FORECAST_KINDS:
+            rows = yearly[yearly["JENIS_PEKAN"] == kind]
+            self.assertEqual(int(rows["JUMLAH_PEKAN"].sum()), int(full.loc[kind, "Pekan"]))
+            weighted = float((rows["GALAT_RATA_RATA_PERSEN"] * rows["JUMLAH_PEKAN"]).sum() / rows["JUMLAH_PEKAN"].sum())
+            self.assertAlmostEqual(weighted, float(full.loc[kind, "Galat"]), delta=0.1, msg="the page and the SQL view agree over all years")
+
+    def test_the_tiles_of_the_forecast_page_follow_the_year_filter(self):
+        at = open_page("Perkiraan kolekte")
+        at.select_slider[0].set_range(2022, 2022).run()
+        frame = app._normalise(app_support.run_query(f"SELECT * FROM {app.DATABASE}.ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN"))
+        chosen = frame[(app.week_year(frame) >= 2022) & (app.week_year(frame) <= 2022)]
+        table = app.accuracy_by_kind(chosen).set_index("Jenis pekan")
+        shown = {m.label: str(m.value) for m in at.metric}
+        self.assertEqual(shown["Galat pekan biasa"], app.percent(table.loc[app.KIND_ORDINARY, "Galat"]))
+        self.assertEqual(shown["Berperistiwa dalam rentang"], app.percent(table.loc[app.KIND_EVENT, "Dalam rentang"], 0))
+
+    def test_the_events_page_never_calls_the_eight_week_average_a_forecast(self):
+        text = page_text(self.pages["Peristiwa luar biasa"])
+        for wrong in ("terhadap perkiraan", "dari perkiraan,", "% dari perkiraan"):
+            self.assertNotIn(wrong, text)
+        self.assertIn("rata-rata 8 pekan sebelumnya", text)
+
+    def test_a_runtime_without_a_download_button_still_shows_the_guide_and_says_so(self):
+        from unittest import mock
+        with mock.patch.object(app.st, "download_button", side_effect=RuntimeError("not available")):
+            at = open_page("Layanan dan prosedur")
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        self.assertEqual(len(at.get("download_button")), 0)
+        text = page_text(at)
+        self.assertIn("Tombol unduh tidak tersedia", text)
+        self.assertIn("Berusia 17 tahun ke atas", text)
+
+    def test_a_missing_guide_file_shows_a_different_message_than_a_missing_button(self):
+        from unittest import mock
+        with mock.patch.object(app, "read_guide", return_value=None):
+            at = open_page("Layanan dan prosedur")
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        self.assertIn("tidak ditemukan di samping aplikasi ini", page_text(at))
 
     def test_event_chart_lists_events_by_date_not_by_size(self):
         at = self.pages["Perkiraan kolekte"]

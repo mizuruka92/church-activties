@@ -521,13 +521,21 @@ def event_gap_chart(events, typical):
     show_chart(alt.layer(*layers), height=max(160, 34 * len(data) + 50))
 
 
-def pooled(frame, kind, column):
-    """Average of an accuracy column over the selected years, weighted by the number of weeks."""
-    rows = frame[frame["JENIS_PEKAN"] == kind]
-    weeks = rows["JUMLAH_PEKAN"].sum()
-    if rows.empty or weeks == 0:
-        return None
-    return float((rows[column].astype(float) * rows["JUMLAH_PEKAN"]).sum() / weeks)
+def accuracy_by_kind(weeks):
+    """Accuracy per kind of week, computed from the compared (complete) weeks of the frame, so that the figures always
+    describe the weeks of the chart and follow the year filter exactly. Returns one row per kind that has weeks:
+    number of weeks, mean absolute error (%), mean signed error (%) and share of weeks inside the range (%)."""
+    done = weeks[weeks["STATUS_PEKAN"] == "Lengkap"]
+    rows = []
+    for kind in FORECAST_KINDS:
+        part = done[done["JENIS_PEKAN"] == kind]
+        if part.empty:
+            continue
+        actual, forecast = part["KOLEKTE_AKTUAL"].astype(float), part["JUMLAH_PERKIRAAN"].astype(float)
+        error = 100.0 * (actual - forecast) / forecast
+        rows.append({"Jenis pekan": kind, "Pekan": len(part), "Galat": float(error.abs().mean()), "Selisih": float(error.mean()),
+                     "Dalam rentang": float(100.0 * (part["POSISI_TERHADAP_RENTANG"] == "Dalam rentang").mean())})
+    return pd.DataFrame(rows, columns=["Jenis pekan", "Pekan", "Galat", "Selisih", "Dalam rentang"])
 
 
 RECENT_WEEKS = 52
@@ -961,14 +969,15 @@ def page_offertory_attendance():
         st.subheader("Kolekte aktual dan perkiraan kolekte, per pekan")
         forecasts = get("KOLEKTE_AKTUAL_VS_PERKIRAAN")
         in_range = forecasts[(week_year(forecasts) >= first) & (week_year(forecasts) <= last)]
-        forecast_chart(forecast_view_choice(in_range, "jangka_grafik_kolekte"), height=340)
+        drawn = forecast_view_choice(in_range, "jangka_grafik_kolekte")
+        forecast_chart(drawn, height=340)
         st.caption("Garis biru adalah kolekte aktual seluruh sesi Misa, garis putus-putus oranye adalah perkiraan kolekte yang dibuat empat pekan sebelumnya, "
                    "dan pita oranye muda adalah rentang 80%. Pekan berlatar abu-abu terkena peristiwa luar biasa. Ke kanan garis putus-putus vertikal "
                    "hanya ada perkiraan. Seberapa tepat perkiraan ini dibahas pada halaman \"Perkiraan kolekte\".")
         if choice != "Semua sesi":
             st.info("Perkiraan dibuat untuk seluruh sesi Misa, sehingga grafik ini tidak mengikuti pilihan sesi di atas.")
         with st.expander("Tabel perkiraan dan kolekte aktual per pekan"):
-            side_by_side_table(in_range)
+            side_by_side_table(drawn)
         preferred = ["Kolekte Pertama", "Kolekte Kedua", "Kolekte Khusus"]
         found = set(off["NAMA_JENIS_KOLEKTE"].unique())
         types = [t for t in preferred if t in found] + sorted(found - set(preferred))
@@ -1127,21 +1136,21 @@ def page_events():
         inside["Teks kolekte"] = [percent(v, 0) for v in inside["PERSEN_KOLEKTE_TERHADAP_HARAPAN"]]
         left, right = st.columns(2)
         with left:
-            st.markdown("**Kehadiran terhadap perkiraan (%)**")
-            horizontal_bar_chart(inside, "NAMA_PERISTIWA", "PERSEN_KEHADIRAN_TERHADAP_HARAPAN", "% dari perkiraan", order,
+            st.markdown("**Kehadiran terhadap rata-rata 8 pekan sebelumnya (%)**")
+            horizontal_bar_chart(inside, "NAMA_PERISTIWA", "PERSEN_KEHADIRAN_TERHADAP_HARAPAN", "% dari rata-rata 8 pekan", order,
                                  reference=100, label_column="Teks hadir", color_index=0, max_value=125)
         with right:
-            st.markdown("**Kolekte terhadap perkiraan (%)**")
-            horizontal_bar_chart(inside, "NAMA_PERISTIWA", "PERSEN_KOLEKTE_TERHADAP_HARAPAN", "% dari perkiraan", order,
+            st.markdown("**Kolekte terhadap rata-rata 8 pekan sebelumnya (%)**")
+            horizontal_bar_chart(inside, "NAMA_PERISTIWA", "PERSEN_KOLEKTE_TERHADAP_HARAPAN", "% dari rata-rata 8 pekan", order,
                                  reference=100, label_column="Teks kolekte", color_index=1, max_value=125)
-        st.caption("Garis abu-abu vertikal adalah 100%, yaitu sama dengan perkiraan. Urutan mengikuti tanggal kejadian, bukan besar dampak.")
+        st.caption("Garis abu-abu vertikal adalah 100%, yaitu sama dengan rata-rata 8 pekan sebelumnya. Urutan mengikuti tanggal kejadian, bukan besar dampak.")
 
         lost = inside["PERKIRAAN_KOLEKTE_YANG_TIDAK_DITERIMA"].clip(lower=0).sum()
-        st.markdown(f"Perkiraan kolekte yang tidak diterima akibat {len(inside)} peristiwa pada rentang ini: **{juta(lost)}**. "
+        st.markdown(f"Kolekte yang tidak diterima akibat {len(inside)} peristiwa pada rentang ini, dibandingkan rata-rata 8 pekan sebelumnya: **{juta(lost)}**. "
                     "Angka ini kasar, karena belum membedakan pengaruh hari gajian dan musim.")
         masked = inside[(inside["PERSEN_KOLEKTE_TERHADAP_HARAPAN"] > 100) & (inside["PERSEN_KEHADIRAN_TERHADAP_HARAPAN"] < 100)]
         for _, row in masked.iterrows():
-            st.info(f"**{row['NAMA_PERISTIWA']}**: kehadiran {percent(row['PERSEN_KEHADIRAN_TERHADAP_HARAPAN'], 0)} dari perkiraan, "
+            st.info(f"**{row['NAMA_PERISTIWA']}**: kehadiran {percent(row['PERSEN_KEHADIRAN_TERHADAP_HARAPAN'], 0)} dari rata-rata 8 pekan sebelumnya, "
                     f"tetapi kolekte {percent(row['PERSEN_KOLEKTE_TERHADAP_HARAPAN'], 0)}. Peristiwa jatuh pada awal bulan sesudah gajian, "
                     "sehingga kolekte per umat yang lebih tinggi menutupi penurunan kehadiran. Contoh ini menunjukkan mengapa "
                     "perbandingan sederhana bisa menyesatkan.")
@@ -1154,8 +1163,8 @@ def page_events():
         st.write(row["DESKRIPSI"])
         tiles = st.columns(4)
         tiles[0].metric("Misa terlaksana / dibatalkan", f"{whole(row['JUMLAH_MISA_TERLAKSANA'])} / {whole(row['JUMLAH_MISA_DIBATALKAN'])}")
-        tiles[1].metric("Kehadiran terhadap perkiraan", percent(row["PERSEN_KEHADIRAN_TERHADAP_HARAPAN"], 0))
-        tiles[2].metric("Kolekte terhadap perkiraan", percent(row["PERSEN_KOLEKTE_TERHADAP_HARAPAN"], 0))
+        tiles[1].metric("Kehadiran terhadap rata-rata", percent(row["PERSEN_KEHADIRAN_TERHADAP_HARAPAN"], 0))
+        tiles[2].metric("Kolekte terhadap rata-rata", percent(row["PERSEN_KOLEKTE_TERHADAP_HARAPAN"], 0))
         tiles[3].metric("Kolekte yang tidak diterima", juta(row["PERKIRAAN_KOLEKTE_YANG_TIDAK_DITERIMA"]))
         st.caption(row["CATATAN_METODE"])
 
@@ -1169,7 +1178,8 @@ def page_events():
                 ("PERKIRAAN_KOLEKTE_YANG_TIDAK_DITERIMA", "Kolekte tidak diterima", rupiah),
             ])
 
-    st.caption("Untuk melihat bagaimana peristiwa-peristiwa ini membuat perkiraan kolekte meleset, buka halaman \"Perkiraan kolekte\".")
+    st.caption("Bagian di bawah grafik membandingkan dengan rata-rata 8 pekan sebelumnya, pembanding kasar yang sama untuk kehadiran dan kolekte. "
+               "Untuk melihat bagaimana peristiwa-peristiwa ini membuat perkiraan kolekte yang disimpan meleset, buka halaman \"Perkiraan kolekte\".")
     how_to_read(
         "Catatan peristiwa menjelaskan mengapa angka pada suatu periode menyimpang dari tren. Dampaknya tidak disimpan sebagai angka, "
         "tetapi dihitung dari perbandingan dengan delapan pekan sebelumnya.",
@@ -1187,7 +1197,7 @@ def page_forecast():
     events = get("BIAS_PERKIRAAN_PER_PERISTIWA").sort_values("TANGGAL_MULAI").reset_index(drop=True)
     accuracy = get("AKURASI_PERKIRAAN_TAHUNAN")
 
-    st.write("Perkiraan bayangan dibuat **empat pekan sebelum** pekan yang diperkirakan, hanya dari data yang saat itu sudah ada, "
+    st.write("Perkiraan kolekte ini adalah perkiraan bayangan: dibuat **empat pekan sebelum** pekan yang diperkirakan, hanya dari data yang saat itu sudah ada, "
              "lalu disimpan apa adanya. Perkiraan tidak pernah diubah setelah hasilnya diketahui, sehingga dapat dibandingkan "
              "dengan kolekte aktual secara jujur. Perkiraan tidak mengetahui peristiwa yang belum terjadi, dan di situlah "
              "catatan peristiwa luar biasa menjelaskan selisihnya.")
@@ -1196,23 +1206,24 @@ def page_forecast():
     chosen = weeks[(week_year(weeks) >= first) & (week_year(weeks) <= last)]
     years = accuracy[(accuracy["TAHUN"] >= first) & (accuracy["TAHUN"] <= last)]
 
-    ordinary_error = pooled(years, KIND_ORDINARY, "GALAT_RATA_RATA_PERSEN")
-    ordinary_inside = pooled(years, KIND_ORDINARY, "PERSEN_DALAM_RENTANG")
-    event_error = pooled(years, KIND_EVENT, "GALAT_RATA_RATA_PERSEN")
-    event_inside = pooled(years, KIND_EVENT, "PERSEN_DALAM_RENTANG")
+    table = accuracy_by_kind(chosen).set_index("Jenis pekan")
+    figure = lambda kind, column: table[column].get(kind) if kind in table.index else None  # noqa: E731
+    ordinary_error, ordinary_inside = figure(KIND_ORDINARY, "Galat"), figure(KIND_ORDINARY, "Dalam rentang")
+    event_error, event_inside = figure(KIND_EVENT, "Galat"), figure(KIND_EVENT, "Dalam rentang")
     tiles = st.columns(4)
     tiles[0].metric("Galat pekan biasa", percent(ordinary_error), help="Rata-rata selisih mutlak terhadap perkiraan pada pekan tanpa peristiwa dan tanpa hari raya.")
     tiles[1].metric("Pekan biasa dalam rentang", percent(ordinary_inside, 0), help="Rentang perkiraan dirancang memuat sekitar 80% pekan.")
     tiles[2].metric("Galat pekan berperistiwa", percent(event_error), help="Rata-rata selisih mutlak pada pekan yang terkena peristiwa luar biasa.")
     tiles[3].metric("Berperistiwa dalam rentang", percent(event_inside, 0), help="Peristiwa membuat kolekte keluar dari rentang perkiraan.")
 
-    forecast_chart(forecast_view_choice(chosen, "jangka_grafik_perkiraan"))
+    drawn = forecast_view_choice(chosen, "jangka_grafik_perkiraan")
+    forecast_chart(drawn)
     st.caption("Garis biru adalah kolekte aktual, garis putus-putus oranye adalah perkiraan kolekte yang dibuat empat pekan sebelumnya, dan pita oranye muda "
                "adalah rentang yang diharapkan memuat 80% hasil. Pekan berlatar abu-abu terkena peristiwa luar biasa. "
                "Garis putus-putus vertikal menandai awal pekan yang belum lengkap pada tanggal data: ke kanan hanya ada perkiraan.")
     with st.expander("Tabel perkiraan dan kolekte aktual per pekan"):
-        side_by_side_table(chosen)
-    with st.expander("Tabel pekan yang kolekte aktualnya di luar rentang"):
+        side_by_side_table(drawn)
+    with st.expander("Tabel pekan yang kolekte aktualnya di luar rentang (semua tahun yang dipilih)"):
         outside = chosen[chosen["POSISI_TERHADAP_RENTANG"].isin(["Di bawah rentang", "Di atas rentang"])]
         if outside.empty:
             st.write("Tidak ada pekan di luar rentang pada tahun yang dipilih.")
@@ -1222,9 +1233,10 @@ def page_forecast():
                 ("KOLEKTE_AKTUAL", "Kolekte aktual", rupiah), ("SELISIH_PERSEN", "Selisih", signed_percent),
                 ("POSISI_TERHADAP_RENTANG", "Posisi", text), ("PENJELASAN_SELISIH", "Penjelasan", text),
                 ("NAMA_PERISTIWA", "Peristiwa", text)])
-        unexplained = int((outside["PENJELASAN_SELISIH"] == "Di luar rentang, tanpa peristiwa tercatat").sum())
-        st.caption(f"{unexplained} dari {len(outside)} pekan di luar rentang tidak memiliki peristiwa tercatat. Itu wajar: rentang 80% memang "
-                   "diperkirakan meleset pada sekitar satu dari lima pekan biasa.")
+        if not outside.empty:
+            unexplained = int((outside["PENJELASAN_SELISIH"] == "Di luar rentang, tanpa peristiwa tercatat").sum())
+            st.caption(f"{unexplained} dari {len(outside)} pekan di luar rentang tidak memiliki peristiwa tercatat. Itu wajar: rentang 80% memang "
+                       "diperkirakan meleset pada sekitar satu dari lima pekan biasa.")
 
     st.subheader("Mengapa perkiraan meleset?")
     inside_events = events[(events["TANGGAL_MULAI"].dt.year >= first) & (events["TANGGAL_MULAI"].dt.year <= last)]
@@ -1234,7 +1246,7 @@ def page_forecast():
         typical = inside_events["GALAT_PEKAN_BIASA_PERSEN"].dropna().iloc[0] if inside_events["GALAT_PEKAN_BIASA_PERSEN"].notna().any() else None
         event_gap_chart(inside_events, typical)
         st.caption("Setiap batang menunjukkan selisih total kolekte pada pekan-pekan peristiwa terhadap perkiraannya. Pita abu-abu adalah galat biasa "
-                   f"pada pekan tanpa peristiwa (sekitar plus minus {percent(typical)}). Batang yang jauh keluar dari pita tidak bisa dijelaskan "
+                   f"pada pekan tanpa peristiwa sepanjang seluruh riwayat (sekitar plus minus {percent(typical)}). Batang yang jauh keluar dari pita tidak bisa dijelaskan "
                    "oleh kebiasaan perkiraan, tetapi oleh peristiwa itu sendiri. Urutan mengikuti tanggal kejadian, bukan besar selisih.")
 
         names = list(inside_events["NAMA_PERISTIWA"])
@@ -1254,21 +1266,16 @@ def page_forecast():
             st.info("Selisihnya masih dalam batas galat biasa: peristiwa ini nyaris tidak terlihat pada kolekte. "
                     "Perkiraan sudah memperhitungkan kenaikan kolekte setelah hari gajian, dan peristiwa jatuh pada awal bulan.")
         elif not _missing(multiple):
-            st.markdown(f"Selisih ini sekitar **{number(multiple, 1)} kali** galat biasa pada pekan tanpa peristiwa. "
+            st.markdown(f"Selisih ini sekitar **{number(multiple, 1)} kali** galat biasa pada pekan tanpa peristiwa (sepanjang seluruh riwayat). "
                         "Perkiraan dibuat sebelum peristiwa terjadi dan tidak dapat mengetahuinya.")
         close = weeks[(weeks["AWAL_PEKAN"] >= row["PEKAN_PERTAMA"] - pd.Timedelta(days=42))
                       & (weeks["AWAL_PEKAN"] <= row["PEKAN_TERAKHIR"] + pd.Timedelta(days=42))]
         forecast_chart(close, height=300, close_up=True)
 
     st.subheader("Seberapa tepat perkiraan ini?")
-    summary = []
-    for kind in FORECAST_KINDS:
-        n = years[years["JENIS_PEKAN"] == kind]["JUMLAH_PEKAN"].sum()
-        if n:
-            summary.append({"Jenis pekan": kind, "Pekan": int(n), "Galat": pooled(years, kind, "GALAT_RATA_RATA_PERSEN"),
-                            "Selisih": pooled(years, kind, "SELISIH_RATA_RATA_PERSEN"), "Dalam rentang": pooled(years, kind, "PERSEN_DALAM_RENTANG")})
-    if summary:
-        table = pd.DataFrame(summary)
+    summary = accuracy_by_kind(chosen)
+    if not summary.empty:
+        table = summary
         order = list(table["Jenis pekan"])
         table["Teks galat"] = [percent(v) for v in table["Galat"]]
         table["Teks rentang"] = [percent(v, 0) for v in table["Dalam rentang"]]
@@ -1664,10 +1671,18 @@ def page_services():
 
     st.info("**Catatan penting.** " + str(row["CATATAN_PENTING"]))
     content = read_guide(row["NAMA_BERKAS_PANDUAN"])
+    offered = False
     if content is not None:
-        st.download_button("Unduh panduan (PDF)", data=content, file_name=row["NAMA_BERKAS_PANDUAN"], mime="application/pdf")
-    else:
+        try:
+            st.download_button("Unduh panduan (PDF)", data=content, file_name=row["NAMA_BERKAS_PANDUAN"], mime="application/pdf")
+            offered = True
+        except Exception:  # noqa: BLE001 - some Streamlit in Snowflake runtimes have no download button: the text above is complete
+            offered = False
+    if content is None:
         st.caption(f"Panduan PDF ({row['NAMA_BERKAS_PANDUAN']}) tidak ditemukan di samping aplikasi ini. Berkasnya tersimpan di folder "
+                   f"app/{GUIDE_FOLDER} pada repositori. Isi panduan tetap dapat dibaca pada halaman ini.")
+    elif not offered:
+        st.caption(f"Tombol unduh tidak tersedia pada lingkungan ini. Panduan PDF ({row['NAMA_BERKAS_PANDUAN']}) tersimpan di folder "
                    f"app/{GUIDE_FOLDER} pada repositori. Isi panduan tetap dapat dibaca pada halaman ini.")
     how_to_read(
         "Isi halaman ini sama dengan isi panduan PDF: keduanya dibuat dari data yang sama.",

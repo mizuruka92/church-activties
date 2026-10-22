@@ -102,5 +102,6 @@ comma for decimals); the numeric tick labels on axes follow the browser locale.
   Snowflake. Things that can differ in a real account: the Streamlit version and runtime, how `st.set_page_config` and `st.context`
   behave in the container, and the time the first query takes while the warehouse starts.
 * Layout was reviewed on desktop-width screens (about 1,400 px). Phone widths were not reviewed.
+* The PDF download on "Layanan dan prosedur" needs the files next to the app and a runtime that offers `st.download_button`. Snowflake's documentation for Native Apps lists that button as unsupported on the warehouse runtime and the general limitations page does not mention it, so it is unverified for an ordinary Streamlit in Snowflake app. The page works either way: it shows the whole guide as text, and says in a caption when the file or the button is missing.
 * The close-up chart on the forecast page labels its date axis with a small Vega expression (Indonesian month abbreviations, because the axis library would otherwise print English months). It rendered correctly on Streamlit 1.35 and 1.66 in a headless browser, but not in Streamlit in Snowflake.
 * Charts are drawn by Vega-Lite through Altair, so very old Streamlit releases that predate Altair 4 are not supported.

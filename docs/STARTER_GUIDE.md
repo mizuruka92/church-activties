@@ -369,9 +369,10 @@ and have not been tried here.
   (Easter above 100%, Christmas about 66%), and the number of unforeseen events (10).
 * A chart with two solid lines (offertory in blue, spending in orange) and dashed trend lines crossing at 2029.
 * A short list **Kegiatan terdekat** (the three nearest upcoming activities) further down the page.
-* A menu on the left with eleven pages. Click through them. **Perkiraan kolekte** sets the stored forecast against the real weekly offertory
-  and shows which unforeseen events explain the big misses. **Layanan dan prosedur** shows the steps and requirements of six parish services,
-  with a button to download each guide as a PDF. **Kegiatan mendatang** shows what is coming up: 11 activities after the data
+* A menu on the left with eleven pages. Click through them. The forecast of the weekly offertory is drawn in the same chart as the real offertory on the **Kolekte** tab of **Kolekte dan kehadiran**,
+  and **Perkiraan kolekte** adds how accurate it is and which unforeseen events explain the big misses. **Layanan dan prosedur** shows the steps and
+  requirements of six parish services as text. The button to download each guide as a PDF appears only when the PDF files are next to the app
+  (Option 2, which copies the whole `app` folder) and the runtime offers a download button. With Option 1 you see the text only. Neither was tried in Snowflake. **Kegiatan mendatang** shows what is coming up: 11 activities after the data
   date (3 already scheduled, 8 still only in the annual plan), 4 postponed ones that need a new date, and the 25 Masses scheduled for October.
 
 If you see a red box saying **"Data belum dapat dimuat dari Snowflake"**, open **"Detail teknis untuk pengelola"** and go to part 11.
