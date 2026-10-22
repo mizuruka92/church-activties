@@ -16842,7 +16842,7 @@ SELECT
     ROUND(d.KOLEKTE_DIHARAPKAN, 0) AS KOLEKTE_DIHARAPKAN,
     ROUND(100.0 * d.KOLEKTE_AKTUAL / NULLIF(d.KOLEKTE_DIHARAPKAN, 0), 1) AS PERSEN_KOLEKTE_TERHADAP_HARAPAN,
     ROUND(d.KOLEKTE_DIHARAPKAN - d.KOLEKTE_AKTUAL, 0) AS PERKIRAAN_KOLEKTE_YANG_TIDAK_DITERIMA,
-    'Perkiraan kasar: dibandingkan dengan rata-rata 8 pekan sebelumnya untuk sesi Misa yang sama, tanpa koreksi hari gajian dan musim.' AS CATATAN_METODE,
+    'Pembanding kasar: rata-rata 8 pekan sebelumnya untuk sesi Misa yang sama, tanpa koreksi hari gajian dan musim.' AS CATATAN_METODE,
     'Data simulasi (fiktif)' AS SUMBER_DATA
 FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA e
 LEFT JOIN SELAMA d

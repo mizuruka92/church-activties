@@ -5,7 +5,6 @@ Standard library only:   python -m unittest tests.test_layanan
 The SQL views are tested in test_sql_local.py and the dashboard page in test_app.py.
 """
 
-import re
 import subprocess
 import sys
 import unittest
