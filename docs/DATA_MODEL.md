@@ -177,7 +177,8 @@ The model keeps every suggested attribute. These were deliberately placed differ
 `ANALISIS` is the only schema meant for dashboards. A view in Snowflake runs with its owner's
 privileges, so a dashboard role needs only `USAGE` on the database and the `ANALISIS` schema and
 `SELECT` on its views, without any access to `DATA_OPERASIONAL`. Implementing roles and grants is
-Phase 3 and is not part of this repository. The validation script confirms that no `ANALISIS` view
+Phase 3 and is not part of this repository. The Streamlit dashboard ([DASHBOARD.md](DASHBOARD.md)) follows this rule: it reads only `ANALISIS` views and a test fails if its source names a detail
+schema or a personal column. The validation script confirms that no `ANALISIS` view
 exposes a name, a person or household identifier, a household gift identifier, or a birth year.
 
 ## 7. Limits of this version

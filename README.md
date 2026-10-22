@@ -10,8 +10,11 @@ prepared for reporting in **Snowflake**.
 > Business content (data values, labels, view columns, the data dictionary) is in **Bahasa
 > Indonesia**. Technical documentation and code comments are in English.
 
-This repository is **Phase 1** of [CLAUDE.md](CLAUDE.md): data model, synthetic data, load scripts,
-validation and documentation. There is no dashboard yet (Phase 2).
+This repository covers **Phase 1** (data model, synthetic data, load scripts, validation, documentation) and
+**Phase 2** (a Streamlit dashboard in Bahasa Indonesia) of [CLAUDE.md](CLAUDE.md).
+
+> **New to Snowflake?** Follow the [starter guide](docs/STARTER_GUIDE.md). It takes you from creating a free account,
+> through connecting GitHub and running the setup, to the running dashboard, with no prior knowledge needed.
 
 The data covers **five and three-quarter years** (January 2021 to a fixed snapshot on 30 September
 2026), so it can show trends and forecasts. Four ready-made analysis stories are described in
@@ -28,6 +31,7 @@ donations cover the Easter and Christmas celebrations.
 | Summary views | 22, aggregates only |
 | Synthetic rows | about 13,900, six regions, 18 communities, nine parish sections, 227 households, 653 people |
 | Validation checks | 320 result rows, returned as one result table |
+| Dashboard | One Streamlit file, 8 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
 
 The nine business domains and their tables are listed in
 [docs/DATA_MODEL.md](docs/DATA_MODEL.md). Column meanings, grain and allowed values are in the
@@ -94,6 +98,17 @@ browser worksheet. The split follows the business areas; there is no other meani
 
 Prefer the command line? See [docs/SETUP_SNOWFLAKE.md](docs/SETUP_SNOWFLAKE.md) for Snowflake CLI
 and SnowSQL commands.
+
+## The dashboard
+
+After the setup, create the dashboard from [`app/streamlit_app.py`](app/streamlit_app.py): in Snowsight choose
+**Projects, Streamlit, + Streamlit App**, paste the file into the editor, and run it. The starter guide has the
+screens ([part 8](docs/STARTER_GUIDE.md#8-create-the-dashboard)), including how to create it from a connected
+GitHub repository. What each page shows and why it was designed that way is in
+[docs/DASHBOARD.md](docs/DASHBOARD.md); developer notes are in [app/README.md](app/README.md).
+
+The dashboard runs inside Snowflake, needs no installation, and reads only aggregate views. Every page carries the
+"DATA SIMULASI" notice, and no page ranks regions, communities or Mass sessions.
 
 ## Try it
 
@@ -211,8 +226,8 @@ dictionary is built from their comments.
 Run the tests:
 
 ```bash
-python -m unittest discover -s tests -v          # the SQL tests skip themselves without the packages below
-pip install -r tests/requirements.txt            # optional: DuckDB and sqlglot for the local SQL tests
+python -m unittest discover -s tests -v          # the SQL and dashboard tests skip themselves without the packages below
+pip install -r tests/requirements.txt            # optional: DuckDB, sqlglot, Streamlit, Altair, pandas
 ```
 
 ## Verification status: please read
@@ -224,6 +239,7 @@ What has been **tested locally**:
 * The real SQL files (tables, loads, views, validation, and the all-in-one script) were executed against **DuckDB**, a different database engine used as a stand-in. Loading twice does not duplicate rows, the validation reports 0 FAIL and 1 WARN, and each of 34 deliberately corrupted copies of the data was detected.
 * The analysis stories are tested as properties of the views (offertory growth slows, spending overtakes the offertory trend, payday and attendance effects, every event shows a dip, Christmas goes into deficit while Easter stays in surplus, mean differs from median in the large-donor communities). The figures in [docs/USE_CASES.md](docs/USE_CASES.md) come from that local run.
 * Every SQL file parses with the Snowflake grammar of `sqlglot` (a syntax lint, not Snowflake).
+* The dashboard was driven page by page with Streamlit's test runner against the same DuckDB stand-in, and viewed in a headless browser in light and dark themes. It was also run on an older stack (Python 3.11, Streamlit 1.35, Altair 4.2) and the current one (Streamlit 1.66). It reads only allowed views, and a test fails if a page shows ranking words.
 
 What has **not** been done: **nothing has been executed in Snowflake.** No connection to Snowflake
 was made while building this repository, so successful loading in your account has not been
@@ -234,7 +250,9 @@ verified. Points most worth watching on the first real run:
 3. Compile time of the single validation statement with about 300 `UNION ALL` branches (`sql/06`).
 4. Functions used by the new views that DuckDB implements slightly differently: `MEDIAN`, `CORR`, `REGR_SLOPE`, `REGR_INTERCEPT`, `REGR_R2`, `DATEADD`, `DATEDIFF`, `MOD`, `LEAST` (`sql/05`).
 5. Whether Snowsight accepts the 1.8 MB `full_setup.sql` in one paste. The step files are the fallback.
-6. Menu labels in Snowsight, which change between releases.
+6. How the dashboard behaves inside Streamlit in Snowflake (Streamlit version and runtime, theme detection, first-start time).
+7. The Git integration statements, `EXECUTE IMMEDIATE FROM` on the larger files, and `CREATE STREAMLIT ... FROM` in the starter guide. They follow Snowflake's published documentation and were not run in an account.
+8. Menu labels in Snowsight, which change between releases.
 
 If anything fails, the error message names the statement. Report it so the generator can be fixed;
 the generated files should never be hand-edited.
@@ -251,8 +269,15 @@ sql/                          SQL steps 00-06, 99 (destructive) and full_setup.s
 scripts/
   generate_mock_data.py       Command line entry point
   mockdata/                   Generator modules (reference, liturgy, peristiwa, parish, surveys, planning, donations, ...)
-tests/                        Unit tests; SQL tests run on DuckDB
+app/                          The Streamlit dashboard (Phase 2)
+  streamlit_app.py            The whole app in one file; reads only ANALISIS views
+  README.md                   Developer notes
+  requirements.txt            Only for running it on your own computer
+  .streamlit/secrets.toml.example   Template for local connection settings (the real file is ignored by Git)
+tests/                        Unit tests; SQL and dashboard tests run on DuckDB
 docs/
+  STARTER_GUIDE.md            From no account to a running dashboard, for people new to Snowflake
+  DASHBOARD.md                Dashboard pages, views used, design decisions (English)
   DATA_MODEL.md               Relationships, grain, design decisions (English)
   USE_CASES.md                Analysis stories, expected results, judgement calls (English)
   DATA_DICTIONARY.md          Tables, columns, values (Bahasa Indonesia, generated)
@@ -266,5 +291,7 @@ it was read or copied into the synthetic data.
 
 ## Next phase
 
-Phase 2 will add a simple Streamlit dashboard on top of the `ANALISIS` views only, with Bahasa
-Indonesia labels and a visible "simulated data" notice. It is not started.
+Phase 3 (real data sources, automated ingestion, access control, spatial analysis) is not started and will not be
+unless requested. Ideas that would build directly on the dashboard: role-based access to the app, a map of the
+illustrative geometry (clearly labelled as not official), and household-level economic attributes with an explicit
+classification.

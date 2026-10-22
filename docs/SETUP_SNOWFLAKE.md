@@ -1,6 +1,7 @@
 # Setting up the demo in Snowflake
 
-This guide expands the quick start in the [README](../README.md). Nothing in this repository connects
+This guide expands the quick start in the [README](../README.md). If you have never used Snowflake, start with the
+[starter guide](STARTER_GUIDE.md) instead: it also covers creating the account, connecting GitHub and creating the dashboard. Nothing in this repository connects
 to Snowflake for you: you run the SQL files yourself, in Snowsight or from a command line.
 
 > **Verification status.** The SQL was tested locally (DuckDB as a stand-in engine and a syntax lint),

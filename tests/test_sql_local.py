@@ -625,9 +625,12 @@ class UseCaseViewTests(unittest.TestCase):
 
 @unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
 class DocumentedQueryTests(unittest.TestCase):
-    """Every SQL example in the README and the use-case guide runs and returns rows."""
+    """Every SQL example in the README, the use-case guide and the starter guide (SELECTs on the views) runs and returns rows."""
 
-    DOCUMENTS = ("README.md", "docs/USE_CASES.md")
+    DOCUMENTS = ("README.md", "docs/USE_CASES.md", "docs/STARTER_GUIDE.md")
+    # Documents that also contain statements meant for Snowflake only (Git setup, grants):
+    # only the SELECT statements on the ANALISIS views are executed from them.
+    SELECT_ONLY = ("docs/STARTER_GUIDE.md",)
 
     @classmethod
     def setUpClass(cls):
@@ -639,8 +642,11 @@ class DocumentedQueryTests(unittest.TestCase):
             for block in re.findall(r"```sql\n(.*?)```", text, re.DOTALL):
                 lines = [line for line in block.splitlines() if not line.strip().startswith("--")]
                 for statement in re.split(r";\s*(?:\n|$)", "\n".join(lines)):
-                    if statement.strip():
-                        yield name, statement.strip()
+                    if not statement.strip():
+                        continue
+                    if name in self.SELECT_ONLY and not (statement.strip().upper().startswith("SELECT") and ".ANALISIS." in statement):
+                        continue
+                    yield name, statement.strip()
 
     def test_there_are_examples_to_check(self):
         self.assertGreaterEqual(len(list(self.examples())), 12)

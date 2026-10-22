@@ -541,6 +541,9 @@ class UseCaseStoryTests(GeneratorTestCase):
         self.assertTrue(all(christmas[a] > christmas[b] for a, b in zip(range(2021, 2025), range(2022, 2026))))
 
 
+DOCUMENTS = [ROOT / "README.md", ROOT / "app" / "README.md"] + sorted((ROOT / "docs").glob("*.md"))
+
+
 class DocumentationTests(GeneratorTestCase):
     def test_er_diagrams_match_the_declared_foreign_keys(self):
         """Every foreign key is drawn, and every solid line is a real foreign key."""
@@ -561,12 +564,47 @@ class DocumentationTests(GeneratorTestCase):
             self.assertIn(f"`{t.name}`", text, t.name)
 
     def test_readme_links_point_at_existing_files(self):
-        for document in (ROOT / "README.md", ROOT / "docs" / "SETUP_SNOWFLAKE.md", ROOT / "docs" / "DATA_MODEL.md"):
+        for document in DOCUMENTS:
             text = document.read_text(encoding="utf-8")
             for target in re.findall(r"\]\(([^)#]+?)(?:#[^)]*)?\)", text):
                 if target.startswith(("http://", "https://", "mailto:")):
                     continue
                 self.assertTrue((document.parent / target).exists(), f"{document.name}: broken link {target}")
+
+
+    def test_starter_guide_runs_the_sql_steps_in_the_real_order_and_never_the_reset(self):
+        guide = (ROOT / "docs" / "STARTER_GUIDE.md").read_text(encoding="utf-8")
+        run_block = re.findall(r"EXECUTE IMMEDIATE FROM @\S+/branches/main/sql/(\S+\.sql);", guide)
+        steps = sorted(path.name for path in (ROOT / "sql").glob("*.sql")
+                       if path.name[:2] in {"01", "02", "03", "04", "05"})
+        self.assertEqual(run_block, steps)
+        self.assertNotIn("EXECUTE IMMEDIATE FROM @PUSAT_INFORMASI_PAROKI.PUBLIC.PARISH_REPO/branches/main/sql/99", guide)
+        self.assertNotIn("EXECUTE IMMEDIATE FROM @PUSAT_INFORMASI_PAROKI.PUBLIC.PARISH_REPO/branches/main/sql/full_setup", guide)
+
+    def test_starter_guide_names_every_step_file_and_the_dashboard_file(self):
+        guide = (ROOT / "docs" / "STARTER_GUIDE.md").read_text(encoding="utf-8")
+        for path in (ROOT / "sql").glob("*.sql"):
+            self.assertIn(f"sql/{path.name}", guide, path.name)
+        self.assertIn("app/streamlit_app.py", guide)
+
+    def test_starter_guide_counts_match_the_model(self):
+        guide = (ROOT / "docs" / "STARTER_GUIDE.md").read_text(encoding="utf-8")
+        schema = [t for t in self.tables]
+        master = sum(1 for t in schema if t.schema == "MASTER_DATA")
+        operational = sum(1 for t in schema if t.schema == "DATA_OPERASIONAL")
+        views = len(re.findall(r"^CREATE OR REPLACE VIEW ANALISIS\.", (ROOT / "sql" / "05_create_views.sql").read_text(encoding="utf-8"),
+                               re.MULTILINE))
+        self.assertIn(f"{len(schema)} tables", guide)
+        self.assertIn(f"{master} in `MASTER_DATA`, {operational} in `DATA_OPERASIONAL`", guide)
+        self.assertIn(f"{views} summary views", guide)
+        self.assertIn(f"lists {views} views", guide)
+
+    def test_guides_never_ask_for_a_real_credential_to_be_written_into_a_file(self):
+        for name in ("STARTER_GUIDE.md", "SETUP_SNOWFLAKE.md"):
+            text = (ROOT / "docs" / name).read_text(encoding="utf-8")
+            for line in text.splitlines():
+                if re.search(r"(?i)password\s*=\s*'", line):
+                    self.assertRegex(line, r"'<[^']+>'", f"{name}: a password value must be a placeholder: {line.strip()}")
 
 
 class CsvExportTests(GeneratorTestCase):
