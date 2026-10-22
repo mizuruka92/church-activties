@@ -7,11 +7,12 @@ Generated files (never edit by hand):
     sql/full_setup.sql               files 00-06 concatenated for a one-paste setup
     sql/99_reset_demo.sql            DESTRUCTIVE reset, every statement commented out
     docs/DATA_DICTIONARY.md          Bahasa Indonesia data dictionary
+    data/documents/laporan_kegiatan/*.pdf   one mock PDF post-event report per report row (see render_documents)
 """
 
 from pathlib import Path
 
-from . import config, dictionary, sqlwriter, validation
+from . import config, dictionary, documents, sqlwriter, validation
 from .build import build_all, load_tables
 from .checks import check_integrity, check_scenarios
 
@@ -133,6 +134,11 @@ def render_full_setup(files):
     for name, text in files:
         parts.append(f"{_RULE}\n-- >>> sql/{name}\n{_RULE}\n\n{text.rstrip()}\n")
     return "\n".join(parts)
+
+
+def render_documents(data):
+    """{relative path: PDF bytes}: the mock source documents of the post-event reports. Deterministic."""
+    return documents.build(data)
 
 
 def generate(root):
