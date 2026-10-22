@@ -8,11 +8,12 @@ All data is simulated. Every page shows a notice that says so.
 
 ## 1. Pages
 
-The sidebar menu has eight pages. The text on screen is Bahasa Indonesia; this document is English.
+The sidebar menu has nine pages. The text on screen is Bahasa Indonesia; this document is English.
 
 | Page | Question it answers | Views it reads |
 |---|---|---|
-| Ringkasan | How are we doing, and what needs attention? Eight headline figures, the income-versus-outcome chart with its trend, and a short list of things to watch. | `PEMASUKAN_PENGELUARAN_TAHUNAN`, `PROYEKSI_PEMASUKAN_PENGELUARAN`, `KEHADIRAN_MISA_BULANAN`, `TITIK_IMPAS_KAMPANYE`, `DAMPAK_PERISTIWA_LUAR_BIASA`, `KELENGKAPAN_LAPORAN_PER_SEKSI` |
+| Ringkasan | How are we doing, and what needs attention? Eight headline figures, the income-versus-outcome chart with its trend, the three nearest upcoming activities, and a short list of things to watch. | `PEMASUKAN_PENGELUARAN_TAHUNAN`, `PROYEKSI_PEMASUKAN_PENGELUARAN`, `KEGIATAN_MENDATANG`, `KEHADIRAN_MISA_BULANAN`, `TITIK_IMPAS_KAMPANYE`, `DAMPAK_PERISTIWA_LUAR_BIASA`, `KELENGKAPAN_LAPORAN_PER_SEKSI` |
+| Kegiatan mendatang | What is coming up, and what needs a decision? Tab 1: filter by horizon (30 days, 60 days, all) and section; four tiles; an agenda grouped by month; a timeline by section; an attention list (postponed activities with their reasons, the Christmas funding gap, activities close to their date that are still only a plan). Tab 2: the Masses scheduled after the data date, with their scheduled start times. | `KEGIATAN_MENDATANG`, `PELAKSANAAN_MISA` |
 | Pemasukan dan pengeluaran | Is the offertory still larger than programme spending, and when might that change? Yearly chart with straight-line projection, growth rates (raw and without event weeks), monthly chart with a year filter. | `PEMASUKAN_PENGELUARAN_TAHUNAN`, `PROYEKSI_PEMASUKAN_PENGELUARAN`, `PEMASUKAN_PENGELUARAN_BULANAN` |
 | Kolekte dan kehadiran | What moves the offertory? Filter by Mass session and years. Tabs: attendance per month, offertory by collection type with reconciliation status, offertory per attendee by day of the month (payday effect), weekly attendance versus offertory with a fitted line. | `KEHADIRAN_MISA_BULANAN`, `KOLEKTE_MISA_BULANAN`, `KOLEKTE_MINGGUAN_DAN_PERISTIWA`, `POLA_KOLEKTE_HARI_DALAM_BULAN`, `KORELASI_KOLEKTE_KEHADIRAN`, `TREN_KEHADIRAN_PERIODE` |
 | Peristiwa luar biasa | What did rain, haze, ash or a power cut do, and why would a forecast be off? Weekly line chart with event weeks marked, attendance and offertory against expectation per event, a detail card per event. | `KOLEKTE_MINGGUAN_DAN_PERISTIWA`, `DAMPAK_PERISTIWA_LUAR_BIASA` |
@@ -22,6 +23,12 @@ The sidebar menu has eight pages. The text on screen is Bahasa Indonesia; this d
 | Tentang data | What is this data and how far does it go? Purpose, privacy, how to read the projection, the list of views, the date of the latest held Mass. | `PELAKSANAAN_MISA` |
 
 The use cases behind the first five pages, with the figures they show, are in [USE_CASES.md](USE_CASES.md).
+
+**About "upcoming".** Everything on the page is relative to the data date (30 September 2026 in the demo), which the page states at the
+top, and never to the clock, so the demo shows the same thing whenever it is opened. A test fails if the app reads the current date.
+The three stages (*Sudah dijadwalkan*, *Masih rencana tahunan*, *Ditunda*) mirror the life of an activity: annual plan with budget, then a
+registered event with date, place and participant target, then the post-event report on the "Rencana, anggaran, kegiatan" page.
+The 45-day threshold for "close to its date but still only a plan" is the constant `PREPARATION_DAYS` in the app.
 
 Two `ANALISIS` views are deliberately not used: `STRUKTUR_WILAYAH` (no page needs the region tree) and
 `RINGKASAN_UMAT_PER_LINGKUNGAN` (household and people counts per community; leaving it out keeps the
@@ -33,7 +40,7 @@ parishioner data out of the dashboard entirely).
    least fragile way for a first-time user. It is also what a Git-based deployment points at. The price is a long file,
    organised in labelled sections (data access, formatting, charts, one function per page).
 2. **Only the `ANALISIS` views.** The app has exactly one query shape, `SELECT * FROM <database>.ANALISIS.<view>`, for a
-   fixed list of 20 views (`VIEWS`). Filtering and charting happen in pandas, because the views are small (the largest has
+   fixed list of 21 views (`VIEWS`). Filtering and charting happen in pandas, because the views are small (the largest has
    about 1,800 rows). This keeps SQL out of the app and means the app cannot read a detail table even by mistake.
    Tests check the query shape, that every listed view exists in `sql/05_create_views.sql`, and that each is used.
 3. **One function talks to Snowflake.** `run_query` uses the active Snowpark session when running inside Streamlit in

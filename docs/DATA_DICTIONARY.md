@@ -1151,6 +1151,7 @@ View hanya berisi data agregat atau ringkasan operasional. Tidak ada view yang m
 | `ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN` | Garis tren linear dari tahun-tahun lengkap dan proyeksinya ke depan, serta tahun ketika tren pengeluaran melampaui tren kolekte. Metode sederhana. Data simulasi. |
 | `ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN` | Sumbangan kampanye per lingkungan: total, rata-rata, median, dan per keluarga atau umat terdaftar, beserta kapasitas ekonomi lingkungan. Menggambarkan sebaran, bukan menilai iman atau kemurahan hati. Data simulasi. |
 | `ANALISIS.TITIK_IMPAS_KAMPANYE` | Sumbangan kampanye (Prapaskah, Adven, solidaritas) dibandingkan dengan biaya kegiatan besar yang didanainya, per tahun. Surplus menjadi pemasukan gereja, defisit ditutup gereja. Data simulasi. |
+| `ANALISIS.KEGIATAN_MENDATANG` | Kegiatan yang akan datang, satu baris per rencana yang belum terlaksana: sudah dijadwalkan sebagai kegiatan, masih berupa rencana tahunan, atau ditunda tahun ini dan perlu jadwal baru. Lengkap dengan tanggal, tempat, target peserta, anggaran, dan dana pendukung. Acuan waktu adalah tanggal data. Data simulasi. |
 
 ## Catatan kewajaran dan privasi
 

@@ -45,7 +45,7 @@ selects the database itself, so you can also use one worksheet per file.
 | 4d | `sql/04d_load_surveys.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.JAWABAN_SURVEI;` returns the number listed in the dictionary. |
 | 4e | `sql/04e_load_plans_and_events.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.RENCANA_KEGIATAN;` returns 179. |
 | 4f | `sql/04f_load_donations.sql` | Needs 4c and 4e. `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.KAMPANYE_SUMBANGAN;` returns 14. |
-| 5 | `sql/05_create_views.sql` | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 22 views. |
+| 5 | `sql/05_create_views.sql` | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 23 views. |
 | 6 | `sql/06_validate_data.sql` | The first two rows say `Checks with result FAIL = 0` and `Checks with result WARN = 1`, both `PASS`. |
 
 The `STRUCTURE` rows of the validation compare every table's row count with the bundled data

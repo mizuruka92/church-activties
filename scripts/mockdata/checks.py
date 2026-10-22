@@ -408,6 +408,16 @@ def check_scenarios(data):
     need(min(h["TAHUN_RENCANA"] for h in data["DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN"]) <= config.AS_OF.year - 5,
          "the plan history is shorter than five years")
 
+    open_plans = {r["ID_RENCANA"]: r for r in data["DATA_OPERASIONAL.RENCANA_KEGIATAN"] if r["STATUS_PELAKSANAAN"] == "Direncanakan"}
+    with_event = {e["ID_RENCANA"] for e in data["DATA_OPERASIONAL.KEGIATAN"]}
+    need(any(i in with_event for i in open_plans), "no upcoming activity that is already scheduled as an event")
+    need(any(i not in with_event for i in open_plans), "no upcoming activity that is still only a plan")
+    need(any(r["STATUS_PELAKSANAAN"] == "Ditunda" and r["TANGGAL_RENCANA"].year == config.AS_OF.year
+             for r in data["DATA_OPERASIONAL.RENCANA_KEGIATAN"]), "no activity postponed this year")
+    funded = {k["ID_RENCANA_PENGGUNAAN"] for k in data["DATA_OPERASIONAL.KAMPANYE_SUMBANGAN"] if k["ID_RENCANA_PENGGUNAAN"]}
+    need(any(i in funded for i in open_plans), "no upcoming activity funded by a campaign")
+    need(all(r["TANGGAL_RENCANA"] > config.AS_OF for r in open_plans.values()), "an open plan is dated before the snapshot date")
+
     survey_status = Counter(s["STATUS_SURVEI"] for s in data["MASTER_DATA.SURVEI"])
     for value in ("Direncanakan", "Sedang Berjalan", "Selesai"):
         need(survey_status[value] > 0, f"no survey with status {value}")

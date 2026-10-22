@@ -32,6 +32,7 @@ import streamlit as st
 DATABASE = "PUSAT_INFORMASI_PAROKI"
 SCHEMA = "ANALISIS"
 CACHE_SECONDS = 600
+PREPARATION_DAYS = 45  # an activity closer than this that is still only a plan needs a place and a target soon
 DATA_LABEL = "Data simulasi (fiktif)"
 
 # The only views this dashboard may read. A test checks that each one exists in sql/05.
@@ -41,6 +42,7 @@ VIEWS = (
     "DAMPAK_PERISTIWA_LUAR_BIASA",
     "HASIL_SURVEI",
     "KEGIATAN_DAN_LAPORAN",
+    "KEGIATAN_MENDATANG",
     "KEHADIRAN_MISA_BULANAN",
     "KELENGKAPAN_LAPORAN_PER_SEKSI",
     "KOLEKTE_MINGGUAN_DAN_PERISTIWA",
@@ -176,6 +178,27 @@ def text(value):
 
 def whole(value):
     return number(value, 0)
+
+
+def clock(value):
+    """Time of day as HH:MM from a time, a timedelta or text (Snowflake and DuckDB return different types)."""
+    if _missing(value):
+        return "-"
+    if isinstance(value, pd.Timedelta):
+        seconds = int(value.total_seconds())
+        return f"{seconds // 3600:02d}:{seconds % 3600 // 60:02d}"
+    if hasattr(value, "strftime"):
+        return value.strftime("%H:%M")
+    return str(value)[:5]
+
+
+def days_away(days):
+    if _missing(days):
+        return "-"
+    days = int(days)
+    if days == 0:
+        return "hari ini"
+    return f"{days} hari lagi" if days > 0 else f"{-days} hari lalu"
 
 
 def two_decimals(value):
@@ -382,6 +405,46 @@ def horizontal_bar_chart(frame, category, value, value_title, order, label_colum
 
 
 # --------------------------------------------------------------------------------------------
+# Upcoming activities (shared by the summary and the page "Kegiatan mendatang")
+# --------------------------------------------------------------------------------------------
+STAGE_SCHEDULED = "Sudah dijadwalkan"
+STAGE_PLAN = "Masih rencana tahunan"
+STAGE_POSTPONED = "Ditunda, perlu jadwal baru"
+STAGE_LABELS = {STAGE_SCHEDULED: "✅ Sudah dijadwalkan", STAGE_PLAN: "📝 Masih rencana tahunan", STAGE_POSTPONED: "⏸ Ditunda"}
+
+
+def split_upcoming(frame):
+    """(coming, postponed): activities still ahead of the data date, and those postponed this year."""
+    postponed = frame[frame["TAHAP"] == STAGE_POSTPONED].sort_values("TANGGAL_MULAI")
+    coming = frame[frame["TAHAP"] != STAGE_POSTPONED].sort_values(["TANGGAL_MULAI", "NAMA_PROGRAM"])
+    return coming.reset_index(drop=True), postponed.reset_index(drop=True)
+
+
+def with_stage_label(frame):
+    frame = frame.copy()
+    frame["Tahap"] = [STAGE_LABELS.get(t, t) for t in frame["TAHAP"]]
+    frame["Dalam"] = [days_away(d) for d in frame["HARI_DARI_TANGGAL_DATA"]]
+    return frame
+
+
+def upcoming_timeline_chart(frame):
+    """One dot per activity: date across, section down (alphabetical), colour by stage."""
+    data = frame.copy()
+    data["Tanggal"] = data["TANGGAL_MULAI"]
+    data["Tanggal lengkap"] = [long_date(d) for d in data["TANGGAL_MULAI"]]
+    data["Anggaran"] = [juta(v) for v in data["ANGGARAN_RENCANA"]]
+    stages = [STAGE_SCHEDULED, STAGE_PLAN]
+    chart = alt.Chart(data).mark_point(filled=True, size=130, opacity=1).encode(
+        x=alt.X("Tanggal:T", axis=alt.Axis(format="%d/%m", title="Tanggal (hari/bulan)", tickCount=8)),
+        y=alt.Y("NAMA_SEKSI:N", sort=sorted(data["NAMA_SEKSI"].unique()), axis=alt.Axis(title=None, labelLimit=260)),
+        color=alt.Color("TAHAP:N", scale=color_scale(stages), legend=alt.Legend(title=None)),
+        tooltip=[alt.Tooltip("NAMA_PROGRAM:N", title="Kegiatan"), alt.Tooltip("Tanggal lengkap:N", title="Tanggal"),
+                 alt.Tooltip("NAMA_SEKSI:N", title="Seksi"), alt.Tooltip("TAHAP:N", title="Tahap"),
+                 alt.Tooltip("Anggaran:N", title="Anggaran rencana")])
+    show_chart(chart, height=max(220, 32 * data["NAMA_SEKSI"].nunique() + 70))
+
+
+# --------------------------------------------------------------------------------------------
 # Page: Ringkasan
 # --------------------------------------------------------------------------------------------
 def last_complete_year(annual):
@@ -398,6 +461,7 @@ def page_summary():
     campaigns = get("TITIK_IMPAS_KAMPANYE")
     impact = get("DAMPAK_PERISTIWA_LUAR_BIASA")
     reports = get("KELENGKAPAN_LAPORAN_PER_SEKSI")
+    coming, postponed = split_upcoming(get("KEGIATAN_MENDATANG"))
 
     year = last_complete_year(annual)
     now = annual[annual["TAHUN"] == year].iloc[0]
@@ -447,8 +511,19 @@ def page_summary():
                    "sehingga tidak digambarkan sebagai titik aktual.")
     st.caption(projection["CATATAN_METODE"].iloc[0])
 
+    st.subheader("Kegiatan terdekat")
+    if coming.empty:
+        st.write("Tidak ada kegiatan yang akan datang.")
+    else:
+        nearest = with_stage_label(coming.head(3))
+        show_table(nearest, [("TANGGAL_MULAI", "Tanggal", long_date), ("Dalam", "Dalam", text), ("NAMA_PROGRAM", "Kegiatan", text),
+                             ("NAMA_SEKSI", "Seksi", text), ("Tahap", "Tahap", text)])
+        st.caption("Selengkapnya ada pada halaman Kegiatan mendatang.")
+
     st.subheader("Perlu perhatian")
     notes = []
+    if not postponed.empty:
+        notes.append(f"**{len(postponed)}** kegiatan ditunda tahun ini dan belum memiliki jadwal baru.")
     if not crossing.empty:
         notes.append(f"Jika pola lima tahun terakhir berlanjut, pengeluaran program diperkirakan melampaui kolekte pada tahun "
                      f"**{int(crossing.iloc[0])}**. Ini gambaran tren, bukan ramalan pasti.")
@@ -470,6 +545,115 @@ def page_summary():
         "Garis putus-putus adalah garis lurus yang ditarik dari tahun-tahun lengkap. Ini penyederhanaan untuk demonstrasi.",
         "Angka kolekte menggambarkan administrasi keuangan, bukan tingkat iman atau komitmen umat.",
     )
+
+
+# --------------------------------------------------------------------------------------------
+# Page: Kegiatan mendatang
+# --------------------------------------------------------------------------------------------
+HORIZONS = {"30 hari ke depan": 30, "60 hari ke depan": 60, "Semua yang akan datang": None}
+
+
+def page_upcoming():
+    st.title("Kegiatan mendatang")
+    banner()
+    data = get("KEGIATAN_MENDATANG")
+    masses = get("PELAKSANAAN_MISA")
+
+    tab_activities, tab_masses = st.tabs(["Kegiatan dan rencana", "Jadwal Misa"])
+
+    with tab_activities:
+        if data.empty:
+            st.info("Tidak ada kegiatan yang akan datang atau ditunda.")
+        else:
+            data_date = data["TANGGAL_DATA"].max()
+            st.write(f"Data per **{long_date(data_date)}**. \"Mendatang\" dihitung dari tanggal data ini, bukan dari tanggal hari ini, "
+                     "supaya contoh tetap sama kapan pun dibuka.")
+            coming, postponed = split_upcoming(data)
+
+            left, right = st.columns(2)
+            horizon = left.radio("Jangka waktu", list(HORIZONS), index=len(HORIZONS) - 1, horizontal=True, key="jangka_waktu")
+            sections = ["Semua seksi"] + sorted(data["NAMA_SEKSI"].unique())
+            section = right.selectbox("Seksi", sections, key="seksi_mendatang")
+
+            shown = coming
+            if HORIZONS[horizon] is not None:
+                shown = shown[shown["HARI_DARI_TANGGAL_DATA"] <= HORIZONS[horizon]]
+            if section != "Semua seksi":
+                shown = shown[shown["NAMA_SEKSI"] == section]
+
+            tiles = st.columns(4)
+            tiles[0].metric("Kegiatan mendatang", whole(len(shown)))
+            tiles[1].metric("Sudah dijadwalkan", whole((shown["TAHAP"] == STAGE_SCHEDULED).sum()),
+                            help="Sudah terdaftar sebagai kegiatan dengan tanggal, tempat, dan target peserta.")
+            tiles[2].metric("Masih rencana tahunan", whole((shown["TAHAP"] == STAGE_PLAN).sum()),
+                            help="Ada pada rencana kerja dan anggaran, tetapi belum punya tempat dan target peserta.")
+            tiles[3].metric("Anggaran rencana", juta(shown["ANGGARAN_RENCANA"].sum()))
+
+            st.subheader("Agenda")
+            if shown.empty:
+                st.info("Tidak ada kegiatan pada pilihan ini.")
+            else:
+                agenda = with_stage_label(shown)
+                agenda["Bulan"] = [f"{MONTHS[d.month - 1]} {d.year}" for d in agenda["TANGGAL_MULAI"]]
+                for month in dict.fromkeys(agenda["Bulan"]):
+                    st.markdown(f"**{month}**")
+                    show_table(agenda[agenda["Bulan"] == month], [
+                        ("TANGGAL_MULAI", "Tanggal", long_date), ("NAMA_PROGRAM", "Kegiatan", text),
+                        ("NAMA_SEKSI", "Seksi", text), ("Tahap", "Tahap", text), ("ANGGARAN_RENCANA", "Anggaran rencana", rupiah),
+                        ("LOKASI", "Tempat", text), ("TARGET_PESERTA", "Target peserta", whole)])
+
+                st.subheader("Peta waktu")
+                upcoming_timeline_chart(shown)
+                st.caption("Setiap titik adalah satu kegiatan. Biru sudah dijadwalkan, oranye masih berupa rencana tahunan.")
+
+            st.subheader("Perlu perhatian")
+            attention = False
+            if not postponed.empty:
+                attention = True
+                st.warning(f"**{len(postponed)} kegiatan ditunda** tahun ini dan belum memiliki jadwal baru:\n\n" + "\n".join(
+                    f"- **{r['NAMA_PROGRAM']}** ({r['NAMA_SEKSI']}), semula {long_date(r['TANGGAL_MULAI'])}. {text(r['CATATAN_KEGIATAN']).rstrip('.')}."
+                    for _, r in postponed.iterrows()))
+            for _, row in coming[coming["DIDANAI_KAMPANYE"].notna()].iterrows():
+                attention = True
+                gap = row["SELISIH_TARGET_DANA_VS_ANGGARAN"]
+                result = (f"masih kurang {juta(-gap)} dan harus ditutup dari dana gereja" if gap < 0
+                          else f"cukup, dengan kelebihan {juta(gap)}")
+                st.warning(f"**{row['NAMA_PROGRAM']}** ({long_date(row['TANGGAL_MULAI'])}, {days_away(row['HARI_DARI_TANGGAL_DATA'])}) "
+                           f"dianggarkan {juta(row['ANGGARAN_RENCANA'])}. Kampanye {row['DIDANAI_KAMPANYE']} menargetkan "
+                           f"{juta(row['TARGET_DANA_KAMPANYE'])}. Bila target tercapai, dana {result}.")
+            near = coming[(coming["TAHAP"] == STAGE_PLAN) & (coming["HARI_DARI_TANGGAL_DATA"] <= PREPARATION_DAYS)]
+            if not near.empty:
+                attention = True
+                st.warning(f"**{len(near)} kegiatan** kurang dari {PREPARATION_DAYS} hari lagi tetapi masih berupa rencana tahunan "
+                           "(belum punya tempat dan target peserta): " + "; ".join(
+                               f"{r['NAMA_PROGRAM']} ({long_date(r['TANGGAL_MULAI'])})" for _, r in near.iterrows()) + ".")
+            if not attention:
+                st.write("Tidak ada hal khusus.")
+
+            how_to_read(
+                "**Masih rencana tahunan**: kegiatan ada pada rencana kerja dan anggaran seksi, tetapi belum didaftarkan dengan tempat dan target peserta.",
+                "**Sudah dijadwalkan**: sudah terdaftar sebagai kegiatan dengan tanggal, tempat, dan target peserta.",
+                "**Ditunda**: pernah dijadwalkan, lalu diundur dan belum memiliki tanggal baru. Catatan menjelaskan alasannya.",
+                "Setelah terlaksana, kegiatan muncul pada halaman Rencana, anggaran, kegiatan lengkap dengan laporan pascakegiatan.",
+                "Dana pendukung berasal dari kampanye sumbangan yang ditujukan untuk kegiatan itu (misalnya Adven untuk Natal).",
+            )
+
+    with tab_masses:
+        planned = masses[masses["STATUS_PELAKSANAAN"] == "Terjadwal"].sort_values(["TANGGAL_MISA", "WAKTU_MULAI_JADWAL"])
+        if planned.empty:
+            st.info("Tidak ada Misa terjadwal pada data ini.")
+        else:
+            tiles = st.columns(3)
+            tiles[0].metric("Misa terjadwal", whole(len(planned)))
+            tiles[1].metric("Mulai", long_date(planned["TANGGAL_MISA"].min()))
+            tiles[2].metric("Sampai", long_date(planned["TANGGAL_MISA"].max()))
+            sessions = ["Semua sesi"] + sorted(planned["NAMA_MISA"].unique())
+            choice = st.selectbox("Sesi Misa", sessions, key="sesi_mendatang")
+            if choice != "Semua sesi":
+                planned = planned[planned["NAMA_MISA"] == choice]
+            show_table(planned, [("TANGGAL_MISA", "Tanggal", long_date), ("HARI", "Hari", text), ("NAMA_MISA", "Misa", text),
+                                 ("WAKTU_MULAI_JADWAL", "Jam mulai", clock), ("LOKASI", "Tempat", text), ("BAHASA_MISA", "Bahasa", text)])
+            st.caption("Jam yang ditampilkan adalah jam yang dijadwalkan. Jam sebenarnya baru tercatat setelah Misa berlangsung.")
 
 
 # --------------------------------------------------------------------------------------------
@@ -1145,6 +1329,7 @@ Peristiwa luar biasa tidak bisa diprediksi; karena itu dicatat agar penyimpangan
 # --------------------------------------------------------------------------------------------
 PAGES = {
     "Ringkasan": page_summary,
+    "Kegiatan mendatang": page_upcoming,
     "Pemasukan dan pengeluaran": page_income_outcome,
     "Kolekte dan kehadiran": page_offertory_attendance,
     "Peristiwa luar biasa": page_events,

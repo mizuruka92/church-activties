@@ -1,6 +1,6 @@
 # Use cases: income versus outcome, unforeseen events, community donations, Easter and Christmas
 
-This guide describes four analysis stories that the simulated data was shaped to support, the views
+This guide describes five analysis stories that the simulated data was shaped to support, the views
 that answer them, and what to look at. It exists so that the next phase (the Streamlit dashboard) can
 be built on questions that already have answers.
 
@@ -16,6 +16,7 @@ be built on questions that already have answers.
 | 2 | What moves the offertory from week to week? | `POLA_KOLEKTE_HARI_DALAM_BULAN`, `KORELASI_KOLEKTE_KEHADIRAN`, `KEHADIRAN_MISA_BULANAN`, `KOLEKTE_MISA_BULANAN` |
 | 3 | What did an unforeseen event (rain, haze, ash) do, and how does it bias a forecast? | `KOLEKTE_MINGGUAN_DAN_PERISTIWA`, `DAMPAK_PERISTIWA_LUAR_BIASA` |
 | 4 | How do Lent and Advent gifts differ between communities, and do they cover the Easter and Christmas celebrations? | `SUMBANGAN_KELUARGA_PER_LINGKUNGAN`, `TITIK_IMPAS_KAMPANYE` |
+| 5 | What is coming up, and which activities still need a date, a place or a decision? | `KEGIATAN_MENDATANG` |
 
 All views carry the column `SUMBER_DATA = 'Data simulasi (fiktif)'`. The queries below use fully
 qualified names, so they work in any worksheet once the setup has run.
@@ -304,6 +305,43 @@ How it reads:
 Regional summaries (`SUMBANGAN_KHUSUS_PER_WILAYAH`) are derived from the household gifts, so the
 totals match. The demo includes some regions whose summary is still waiting for validation, or marked
 for re-checking.
+
+## 5. Upcoming activities: the step between plan and report
+
+An activity has a life: it starts as a line in the **annual plan** with a budget, becomes a **scheduled event** with a date, a place and a
+participant target, and ends as a **held event with a report**. The first and the last step were already visible. `KEGIATAN_MENDATANG`
+shows the middle one: everything that has not been carried out yet.
+
+```sql
+SELECT TANGGAL_MULAI, NAMA_PROGRAM, NAMA_SEKSI, TAHAP, HARI_DARI_TANGGAL_DATA, LOKASI, TARGET_PESERTA, ANGGARAN_RENCANA,
+       DIDANAI_KAMPANYE, SELISIH_TARGET_DANA_VS_ANGGARAN, CATATAN_KEGIATAN
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.KEGIATAN_MENDATANG
+ORDER BY TANGGAL_MULAI;
+```
+
+Each row is one plan that has not been carried out. `TAHAP` has three values:
+
+| Stage | Meaning | In the demo (data date 30 September 2026) |
+|---|---|---:|
+| Sudah dijadwalkan | An event exists, with date, place and participant target | 3 (11, 17 and 24 October) |
+| Masih rencana tahunan | Only the annual plan and its budget exist | 8 (7 November to 24 December, including Christmas) |
+| Ditunda, perlu jadwal baru | Postponed this year and not yet rescheduled; `CATATAN_KEGIATAN` gives the reason | 4 (July to September) |
+
+What it shows:
+
+* The 11 activities still ahead carry Rp 85.7 M of planned budget. Only three of them are registered as events yet; the other eight
+  have no place and no participant target.
+* **Christmas is the activity to watch.** *Rangkaian Perayaan Natal* (24 December) is budgeted at Rp 29.1 M, while the Advent campaign that
+  pays for it targets Rp 18.0 M, so even a campaign that reaches its target leaves Rp 11.1 M to be covered from church funds
+  (`SELISIH_TARGET_DANA_VS_ANGGARAN`). This is the forward-looking side of use case 4.
+* Three activities fall within 45 days of the data date and are still only plans. The dashboard lists them so that someone fixes a place and a
+  target in time.
+* The four postponed activities each carry the reason recorded at the time (supplier quote pending, equipment not available, clash with school
+  exams, speaker unavailable).
+
+"Upcoming" is counted from the snapshot date in `MASTER_DATA.INFO_DATASET`, never from the clock, so the demo gives the same answer on any day. With
+real data that date would be replaced by `CURRENT_DATE`. The Masses scheduled after the snapshot are in `PELAKSANAAN_MISA` with the status
+*Terjadwal* (25 in October 2026) and appear on the second tab of the dashboard page.
 
 ## Judgement calls
 

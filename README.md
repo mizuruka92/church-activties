@@ -20,7 +20,8 @@ The data covers **five and three-quarter years** (January 2021 to a fixed snapsh
 2026), so it can show trends and forecasts. Four ready-made analysis stories are described in
 [docs/USE_CASES.md](docs/USE_CASES.md): income versus outcome with a three-year forecast, what moves the
 offertory, unforeseen events (rain, haze, ash) and forecast bias, and whether the Lent and Advent
-donations cover the Easter and Christmas celebrations.
+donations cover the Easter and Christmas celebrations. A fifth view, `KEGIATAN_MENDATANG`, looks forward:
+which activities are still only in the annual plan, which are scheduled as events, and which were postponed.
 
 ## What you get
 
@@ -28,10 +29,10 @@ donations cover the Easter and Christmas celebrations.
 |---|---|
 | Schemas | `MASTER_DATA`, `DATA_OPERASIONAL`, `ANALISIS` in database `PUSAT_INFORMASI_PAROKI` |
 | Tables | 38 (18 master and reference, 20 operational) |
-| Summary views | 22, aggregates only |
+| Summary views | 23, aggregates only |
 | Synthetic rows | about 13,900, six regions, 18 communities, nine parish sections, 227 households, 653 people |
 | Validation checks | 320 result rows, returned as one result table |
-| Dashboard | One Streamlit file, 8 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
+| Dashboard | One Streamlit file, 9 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
 
 The nine business domains and their tables are listed in
 [docs/DATA_MODEL.md](docs/DATA_MODEL.md). Column meanings, grain and allowed values are in the
@@ -84,7 +85,7 @@ them **in this order**:
 | 4d | [`sql/04d_load_surveys.sql`](sql/04d_load_surveys.sql) | Survey respondents, answers and aggregates. | yes (`MERGE`) |
 | 4e | [`sql/04e_load_plans_and_events.sql`](sql/04e_load_plans_and_events.sql) | Annual plans, budgets, expenditure, events, reports. | yes (`MERGE`) |
 | 4f | [`sql/04f_load_donations.sql`](sql/04f_load_donations.sql) | Donation campaigns, household gifts, regional summaries. Needs 4c and 4e. | yes (`MERGE`) |
-| 5 | [`sql/05_create_views.sql`](sql/05_create_views.sql) | Creates the 22 views in `ANALISIS`. | yes (`CREATE OR REPLACE VIEW`) |
+| 5 | [`sql/05_create_views.sql`](sql/05_create_views.sql) | Creates the 23 views in `ANALISIS`. | yes (`CREATE OR REPLACE VIEW`) |
 | 6 | [`sql/06_validate_data.sql`](sql/06_validate_data.sql) | Read-only checks. Run it whenever you like. | yes |
 | 99 | [`sql/99_reset_demo.sql`](sql/99_reset_demo.sql) | **Destructive.** Every statement is commented out. Not part of the setup. | n/a |
 
@@ -163,7 +164,7 @@ FROM PUSAT_INFORMASI_PAROKI.ANALISIS.TITIK_IMPAS_KAMPANYE
 ORDER BY TAHUN, NAMA_KESEMPATAN;
 ```
 
-All 22 views are described in the data dictionary. Every view has a `SUMBER_DATA` column that says
+All 23 views are described in the data dictionary. Every view has a `SUMBER_DATA` column that says
 `Data simulasi (fiktif)`. No view ranks regions, communities or Mass sessions.
 
 ## Reading the validation result
