@@ -22,20 +22,26 @@ The data covers **five and three-quarter years** (January 2021 to a fixed snapsh
 offertory, unforeseen events (rain, haze, ash) and forecast bias, and whether the Lent and Advent
 donations cover the Easter and Christmas celebrations. A fifth view, `KEGIATAN_MENDATANG`, looks forward:
 which activities are still only in the annual plan, which are scheduled as events, and which were postponed.
+Two later additions: a **shadow forecast** of the weekly offertory, stored as it was issued four weeks ahead
+and set against what was actually collected, with the unforeseen events that explain the misses, and
+**public service guides** (steps and requirements for adult and infant baptism, confirmation, marriage,
+registering in a neighbourhood community, and what to do when a parishioner dies) shown on the dashboard
+and available as PDFs.
 
 ## What you get
 
 | Item | Count |
 |---|---|
 | Schemas | `MASTER_DATA`, `DATA_OPERASIONAL`, `ANALISIS` in database `PUSAT_INFORMASI_PAROKI` |
-| Tables | 38 (18 master and reference, 20 operational) |
-| Summary views | 23, aggregates only |
-| Synthetic rows | about 13,900, six regions, 18 communities, nine parish sections, 227 households, 653 people |
-| Validation checks | 320 result rows, returned as one result table |
-| Dashboard | One Streamlit file, 9 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
+| Tables | 43 (22 master and reference, 21 operational) |
+| Summary views | 29, aggregates only |
+| Synthetic rows | about 14,300, six regions, 18 communities, nine parish sections, 227 households, 653 people |
+| Validation checks | 384 result rows, returned as one result table |
+| Dashboard | One Streamlit file, 11 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
 | Mock source documents | 132 PDF post-event reports, one per report row, as if the rows had been extracted from them ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
+| Public service guides | 6 PDF guides in `app/public_documents/`, generated from the same rows the dashboard page shows ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
 
-The nine business domains and their tables are listed in
+The nine business domains (plus one added domain for the public service guides) and their tables are listed in
 [docs/DATA_MODEL.md](docs/DATA_MODEL.md). Column meanings, grain and allowed values are in the
 Bahasa Indonesia [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md). The use-case guide
 [docs/USE_CASES.md](docs/USE_CASES.md) explains how the data was shaped and what each view shows.
@@ -78,7 +84,7 @@ them **in this order**:
 |---|---|---|---|
 | 0 | [`sql/00_setup.sql`](sql/00_setup.sql) | Shows your role and warehouse. Changes nothing. | yes |
 | 1 | [`sql/01_create_schemas.sql`](sql/01_create_schemas.sql) | Creates the database and three schemas. | yes |
-| 2 | [`sql/02_create_tables.sql`](sql/02_create_tables.sql) | Creates the 38 tables with keys and Bahasa Indonesia comments. | yes (`IF NOT EXISTS`) |
+| 2 | [`sql/02_create_tables.sql`](sql/02_create_tables.sql) | Creates the 43 tables with keys and Bahasa Indonesia comments. | yes (`IF NOT EXISTS`) |
 | 3 | [`sql/03_load_reference_data.sql`](sql/03_load_reference_data.sql) | Loads reference and master data (`MASTER_DATA`). | yes (`MERGE`) |
 | 4a | [`sql/04a_load_mass_history.sql`](sql/04a_load_mass_history.sql) | Unforeseen-event log, Mass occurrences, attendance. | yes (`MERGE`) |
 | 4b | [`sql/04b_load_offertory.sql`](sql/04b_load_offertory.sql) | Offertory collections. | yes (`MERGE`) |
@@ -86,16 +92,17 @@ them **in this order**:
 | 4d | [`sql/04d_load_surveys.sql`](sql/04d_load_surveys.sql) | Survey respondents, answers and aggregates. | yes (`MERGE`) |
 | 4e | [`sql/04e_load_plans_and_events.sql`](sql/04e_load_plans_and_events.sql) | Annual plans, budgets, expenditure, events, reports. | yes (`MERGE`) |
 | 4f | [`sql/04f_load_donations.sql`](sql/04f_load_donations.sql) | Donation campaigns, household gifts, regional summaries. Needs 4c and 4e. | yes (`MERGE`) |
-| 5 | [`sql/05_create_views.sql`](sql/05_create_views.sql) | Creates the 23 views in `ANALISIS`. | yes (`CREATE OR REPLACE VIEW`) |
+| 4g | [`sql/04g_load_forecast.sql`](sql/04g_load_forecast.sql) | The shadow forecast of the weekly offertory (stored as issued). Needs step 3 for the model. | yes (`MERGE`) |
+| 5 | [`sql/05_create_views.sql`](sql/05_create_views.sql) | Creates the 29 views in `ANALISIS`. | yes (`CREATE OR REPLACE VIEW`) |
 | 6 | [`sql/06_validate_data.sql`](sql/06_validate_data.sql) | Read-only checks. Run it whenever you like. | yes |
 | 99 | [`sql/99_reset_demo.sql`](sql/99_reset_demo.sql) | **Destructive.** Every statement is commented out. Not part of the setup. | n/a |
 
-Steps 3 and 4a to 4f use `MERGE` on the primary key, so running them again updates existing rows and
+Steps 3 and 4a to 4g use `MERGE` on the primary key, so running them again updates existing rows and
 adds missing ones. They never create duplicates and never delete anything. Run the 4 files in the
 order shown, since a later file refers to rows loaded by an earlier one. Run step 5 before step 6,
 because the validation also checks that every view works.
 
-The operational data is split into six files only to keep each one small enough to paste into a
+The operational data is split into seven files only to keep each one small enough to paste into a
 browser worksheet. The split follows the business areas; there is no other meaning in it.
 
 Prefer the command line? See [docs/SETUP_SNOWFLAKE.md](docs/SETUP_SNOWFLAKE.md) for Snowflake CLI
@@ -165,7 +172,7 @@ FROM PUSAT_INFORMASI_PAROKI.ANALISIS.TITIK_IMPAS_KAMPANYE
 ORDER BY TAHUN, NAMA_KESEMPATAN;
 ```
 
-All 23 views are described in the data dictionary. Every view has a `SUMBER_DATA` column that says
+All 29 views are described in the data dictionary. Every view has a `SUMBER_DATA` column that says
 `Data simulasi (fiktif)`. No view ranks regions, communities or Mass sessions.
 
 ## Reading the validation result
@@ -212,7 +219,7 @@ The committed SQL is generated by a Python script that needs **only the standard
 (Python 3.11 or newer; verified on 3.11, 3.12 and 3.13).
 
 ```bash
-python scripts/generate_mock_data.py            # rewrite sql/03, 04a-04f, 06, 99, full_setup.sql, the data dictionary and the report PDFs
+python scripts/generate_mock_data.py            # rewrite sql/03, 04a-04g, 06, 99, full_setup.sql, the data dictionary and the PDFs (reports and service guides)
 python scripts/generate_mock_data.py --check    # fail if a committed generated file is stale
 python scripts/generate_mock_data.py --csv-dir data/generated   # optional CSV export (ignored by Git)
 ```
@@ -238,7 +245,8 @@ What has been **tested locally**:
 
 * The generator is deterministic and its output is identical on Python 3.11, 3.12 and 3.13.
 * The automated tests pass. They cover the DDL, data integrity, privacy and language rules, and that the checks can actually fail.
-* The real SQL files (tables, loads, views, validation, and the all-in-one script) were executed against **DuckDB**, a different database engine used as a stand-in. Loading twice does not duplicate rows, the validation reports 0 FAIL and 1 WARN, and each of 34 deliberately corrupted copies of the data was detected.
+* The real SQL files (tables, loads, views, validation, and the all-in-one script) were executed against **DuckDB**, a different database engine used as a stand-in. Loading twice does not duplicate rows, the validation reports 0 FAIL and 1 WARN, and each of more than 40 deliberately corrupted copies of the data was detected.
+* The shadow forecast is tested for **no look-ahead** (changing every later week, or the later event log, leaves each forecast unchanged), for accuracy on ordinary weeks, and for missing by a wide margin where an unforeseen event struck. The service guides are tested by reading each committed PDF back and finding every step and requirement of the tables in it.
 * The analysis stories are tested as properties of the views (offertory growth slows, spending overtakes the offertory trend, payday and attendance effects, every event shows a dip, Christmas goes into deficit while Easter stays in surplus, mean differs from median in the large-donor communities). The figures in [docs/USE_CASES.md](docs/USE_CASES.md) come from that local run.
 * Every SQL file parses with the Snowflake grammar of `sqlglot` (a syntax lint, not Snowflake).
 * The dashboard was driven page by page with Streamlit's test runner against the same DuckDB stand-in, and viewed in a headless browser in light and dark themes. It was also run on an older stack (Python 3.11, Streamlit 1.35, Altair 4.2) and the current one (Streamlit 1.66). It reads only allowed views, and a test fails if a page shows ranking words.
@@ -248,7 +256,7 @@ was made while building this repository, so successful loading in your account h
 verified. Points most worth watching on the first real run:
 
 1. `COMMENT` placed after `NOT NULL` in column definitions (`sql/02`).
-2. The `MERGE ... USING (SELECT ... FROM (VALUES ...) AS v (...))` form (`sql/03`, `sql/04a`-`04f`), with up to 1,000 rows per statement.
+2. The `MERGE ... USING (SELECT ... FROM (VALUES ...) AS v (...))` form (`sql/03`, `sql/04a`-`04g`), with up to 1,000 rows per statement.
 3. Compile time of the single validation statement with about 300 `UNION ALL` branches (`sql/06`).
 4. Functions used by the new views that DuckDB implements slightly differently: `MEDIAN`, `CORR`, `REGR_SLOPE`, `REGR_INTERCEPT`, `REGR_R2`, `DATEADD`, `DATEDIFF`, `MOD`, `LEAST` (`sql/05`).
 5. Whether Snowsight accepts the 1.8 MB `full_setup.sql` in one paste. The step files are the fallback.
@@ -267,12 +275,13 @@ README.md                     This file
 sql/                          SQL steps 00-06, 99 (destructive) and full_setup.sql
   02_create_tables.sql        Hand-written DDL, the source of truth
   05_create_views.sql         Hand-written views
-  03, 04a-04f, 06, 99, full_setup  GENERATED, do not edit by hand
+  03, 04a-04g, 06, 99, full_setup  GENERATED, do not edit by hand
 scripts/
   generate_mock_data.py       Command line entry point
-  mockdata/                   Generator modules (reference, liturgy, peristiwa, parish, surveys, planning, donations, ...)
+  mockdata/                   Generator modules (reference, liturgy, peristiwa, parish, surveys, planning, donations, forecast, layanan, ...)
 app/                          The Streamlit dashboard (Phase 2)
   streamlit_app.py            The whole app in one file; reads only ANALISIS views
+  public_documents/           6 generated PDF service guides offered for download on the services page
   README.md                   Developer notes
   requirements.txt            Only for running it on your own computer
   .streamlit/secrets.toml.example   Template for local connection settings (the real file is ignored by Git)
@@ -280,7 +289,7 @@ tests/                        Unit tests; SQL and dashboard tests run on DuckDB
 docs/
   STARTER_GUIDE.md            From no account to a running dashboard, for people new to Snowflake
   DASHBOARD.md                Dashboard pages, views used, design decisions (English)
-  DOCUMENTS.md                The mock PDF reports: layout, field mapping, round-trip checks (English)
+  DOCUMENTS.md                The mock PDF reports and the public service guides: layout, field mapping, round-trip checks (English)
   DATA_MODEL.md               Relationships, grain, design decisions (English)
   USE_CASES.md                Analysis stories, expected results, judgement calls (English)
   DATA_DICTIONARY.md          Tables, columns, values (Bahasa Indonesia, generated)

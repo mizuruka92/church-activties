@@ -39,9 +39,9 @@ if HAVE_APP_STACK:
 
 NEEDS = "streamlit, altair, pandas or duckdb is not installed (pip install -r tests/requirements.txt)"
 
-PAGES = ["Ringkasan", "Kegiatan mendatang", "Pemasukan dan pengeluaran", "Kolekte dan kehadiran", "Peristiwa luar biasa", "Sumbangan khusus",
-         "Rencana, anggaran, kegiatan", "Survei umat", "Tentang data"]
-CHART_PAGES = [p for p in PAGES if p != "Tentang data"]
+PAGES = ["Ringkasan", "Kegiatan mendatang", "Pemasukan dan pengeluaran", "Kolekte dan kehadiran", "Perkiraan kolekte", "Peristiwa luar biasa",
+         "Sumbangan khusus", "Rencana, anggaran, kegiatan", "Survei umat", "Layanan dan prosedur", "Tentang data"]
+CHART_PAGES = [p for p in PAGES if p not in ("Tentang data", "Layanan dan prosedur")]
 RANKING_WORDS = ("peringkat", "terbaik", "terburuk", "dermawan", "juara")
 
 
@@ -104,6 +104,17 @@ class SourceRuleTests(unittest.TestCase):
         """'Upcoming' is relative to the data date, so the demo gives the same answer on any day."""
         for call in ("date.today(", "datetime.now(", "datetime.today(", "Timestamp.now(", "Timestamp.today(", "time.time("):
             self.assertNotIn(call, self.source, call)
+
+    def test_the_docs_state_the_real_number_of_views_and_pages(self):
+        words = {9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen"}
+        dashboard = (ROOT / "docs" / "DASHBOARD.md").read_text(encoding="utf-8")
+        self.assertIn(f"The sidebar menu has {words[len(app.PAGES)]} pages", dashboard)
+        self.assertIn(f"fixed list of {len(app.VIEWS)} views", dashboard)
+        self.assertIn(f"only the {len(app.VIEWS)} views of the `ANALISIS` schema", (ROOT / "app" / "README.md").read_text(encoding="utf-8"))
+        guide = (ROOT / "docs" / "STARTER_GUIDE.md").read_text(encoding="utf-8")
+        self.assertIn(f"A menu on the left with {words[len(app.PAGES)]} pages", guide)
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn(f"{len(app.PAGES)} pages in Bahasa Indonesia", readme)
 
     def test_every_page_function_is_reachable_from_the_menu(self):
         tree = ast.parse(self.source)
@@ -314,6 +325,88 @@ class PageTests(unittest.TestCase):
         unreported = table[table["Laporan"].isin(["Belum ada laporan", "Belum diperlukan"])]
         self.assertEqual(set(unreported["Berkas laporan"]), {"-"})
 
+    # --- shadow forecast page -----------------------------------------------------------------------------------------
+    def spec_datasets(self, chart):
+        spec = json.loads(chart.proto.spec)
+        return spec.get("datasets", {})
+
+    def percent_value(self, text):
+        return float(str(text).rstrip("%").replace(".", "").replace(",", "."))
+
+    def test_forecast_page_tells_the_two_stories_in_its_four_tiles(self):
+        at = self.pages["Perkiraan kolekte"]
+        values = {m.label: self.percent_value(m.value) for m in at.metric if m.label.endswith(("biasa", "rentang", "berperistiwa"))
+                  or "dalam rentang" in m.label}
+        self.assertLess(values["Galat pekan biasa"], 10)
+        self.assertGreater(values["Pekan biasa dalam rentang"], 72)
+        self.assertGreater(values["Galat pekan berperistiwa"], 25)
+        self.assertLess(values["Berperistiwa dalam rentang"], 35)
+
+    def test_forecast_page_draws_the_main_chart_the_event_chart_the_close_up_and_two_accuracy_charts(self):
+        at = self.pages["Perkiraan kolekte"]
+        self.assertEqual(len(charts(at)), 5)
+        text = page_text(at)
+        self.assertIn("empat pekan sebelum", text)
+        self.assertIn("Mengapa perkiraan meleset?", text)
+        self.assertIn("Seberapa tepat perkiraan ini?", text)
+
+    def test_forecast_chart_stops_the_actual_line_at_the_data_date_but_keeps_the_forecast_going(self):
+        frame = app._normalise(app_support.run_query(f"SELECT * FROM {app.DATABASE}.ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN"))
+        data, long, struck = app.forecast_frames(frame)
+        actual = long[long["Seri"] == app.SERIES_ACTUAL]
+        forecast = long[long["Seri"] == app.SERIES_FORECAST]
+        self.assertEqual(len(forecast) - len(actual), 5, "the week in progress and four weeks ahead have a forecast but no actual")
+        self.assertLess(actual["AWAL_PEKAN"].max(), pd.Timestamp("2026-09-28"))
+        self.assertGreaterEqual(forecast["AWAL_PEKAN"].max(), pd.Timestamp("2026-10-26"))
+        self.assertTrue(data.loc[data["KOLEKTE_AKTUAL"].isna(), "Teks sebenarnya"].eq("belum lengkap").all())
+        self.assertEqual(set(struck["ID_PERISTIWA"]), {f"PRS-{n:02d}" for n in range(2, 11)})
+        spec = charts(self.pages["Perkiraan kolekte"])[0].proto.spec
+        self.assertIn('"type": "rule"', spec, "the marker where the forecast goes on alone")
+        self.assertIn('"resolve"', spec)
+
+    def test_event_chart_lists_events_by_date_not_by_size(self):
+        at = self.pages["Perkiraan kolekte"]
+        frame = app._normalise(app_support.run_query(f"SELECT * FROM {app.DATABASE}.ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA"))
+        expected = list(frame.sort_values("TANGGAL_MULAI")["NAMA_PERISTIWA"])
+        by_size = list(frame.sort_values("SELISIH_PERSEN")["NAMA_PERISTIWA"])
+        self.assertNotEqual(expected, by_size, "the check is only meaningful if the two orders differ")
+        found = [json.loads(sort) for chart in charts(at) for sort in re.findall(r'"sort":\s*(\[[^\]]*\])', chart.proto.spec)]
+        self.assertIn(expected, found)
+
+    def test_forecast_page_explains_the_gap_with_the_event_log_and_admits_unexplained_misses(self):
+        text = page_text(self.pages["Perkiraan kolekte"])
+        self.assertIn("kali** galat biasa", text)
+        self.assertIn("tidak memiliki peristiwa tercatat", text)
+        self.assertIn("Perkiraan ini belum mengetahui peristiwa yang mungkin terjadi", text)
+
+    def test_forecast_page_says_that_the_offertory_is_not_a_measure_of_faith(self):
+        self.assertIn("bukan ukuran iman", page_text(self.pages["Perkiraan kolekte"]))
+
+    # --- public services page ---------------------------------------------------------------------------------------------
+    def test_services_page_lists_the_six_services_in_a_fixed_order_with_the_disclaimer(self):
+        at = self.pages["Layanan dan prosedur"]
+        options = list(at.selectbox[0].options)
+        self.assertEqual(options, ["Baptis Dewasa", "Baptis Batuta (Bayi dan Anak di Bawah 7 Tahun)", "Krisma", "Pernikahan",
+                                   "Pendaftaran Lingkungan", "Pelayanan Kematian (Tutup Usia)"])
+        self.assertTrue(any("bukan ketentuan resmi" in str(w.value) for w in at.warning))
+        self.assertIn("Persyaratan (9)", [t.label for t in at.tabs])
+        self.assertIn("Langkah-langkah (9)", [t.label for t in at.tabs])
+
+    def test_services_page_shows_requirements_and_steps_of_the_first_service(self):
+        text = page_text(self.pages["Layanan dan prosedur"])
+        for needle in ("Berusia 17 tahun ke atas", "Fotokopi kartu identitas", "Berkonsultasi di sekretariat", "Pelaku: Pastor paroki",
+                       "Catatan penting.", "Tidak ada tarif wajib"):
+            self.assertIn(needle, text)
+
+    def test_guide_reader_returns_the_committed_pdf_and_nothing_outside_the_guide_folder(self):
+        folder = ROOT / "app" / app.GUIDE_FOLDER
+        names = sorted(p.name for p in folder.glob("*.pdf"))
+        self.assertEqual(len(names), 6)
+        for name in names:
+            self.assertEqual(app.read_guide(name), (folder / name).read_bytes())
+        for bad in ("../streamlit_app.py", "../../README.md", "sub/LYN-01_Baptis_Dewasa.pdf", "LYN-99_tidak_ada.pdf", "README.md", "", None):
+            self.assertIsNone(app.read_guide(bad), bad)
+
     def test_survey_page_shows_aggregates_only(self):
         text = page_text(self.pages["Survei umat"])
         self.assertIn("responden", text)
@@ -378,6 +471,51 @@ class InteractionTests(unittest.TestCase):
             for question in list(at.selectbox[1].options):
                 at.selectbox[1].select(question).run()
                 self.assertEqual([str(e.value) for e in at.exception], [], question)
+
+    def test_every_event_can_be_opened_on_the_forecast_page_and_the_year_filter_changes_the_tiles(self):
+        at = open_page("Perkiraan kolekte")
+        events = list(at.selectbox[0].options)
+        self.assertEqual(len(events), 9)
+        for name in events:
+            at.selectbox[0].select(name).run()
+            self.assertEqual([str(e.value) for e in at.exception], [], name)
+            self.assertEqual(len(charts(at)), 5, name)
+        before = {m.label: str(m.value) for m in at.metric}
+        at.select_slider[0].set_range(2025, 2025).run()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        self.assertNotEqual({m.label: str(m.value) for m in at.metric}, before)
+        self.assertEqual(len(list(at.selectbox[0].options)), 2, "PRS-08 and PRS-09 started in 2025")
+
+    def test_a_year_without_events_shows_a_plain_message_on_the_forecast_page(self):
+        at = open_page("Perkiraan kolekte")
+        at.select_slider[0].set_range(2021, 2021).run()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        self.assertEqual(len(list(at.selectbox)), 1)
+
+    def test_every_service_can_be_opened_and_shows_its_own_steps_and_requirements(self):
+        at = open_page("Layanan dan prosedur")
+        expected = {
+            "Krisma": ("Sudah dibaptis Katolik dan menerima Komuni Pertama", "Menerima Sakramen Krisma"),
+            "Pernikahan": ("Kursus persiapan perkawinan", "Penyelidikan kanonik"),
+            "Pendaftaran Lingkungan": ("Fotokopi kartu keluarga", "Menyambut keluarga baru"),
+            "Pelayanan Kematian (Tutup Usia)": ("Surat keterangan kematian", "Memanggil imam saat sakit parah"),
+            "Baptis Batuta (Bayi dan Anak di Bawah 7 Tahun)": ("Wali baptis", "Merayakan Sakramen Baptis"),
+        }
+        for name in list(at.selectbox[0].options):
+            at.selectbox[0].select(name).run()
+            self.assertEqual([str(e.value) for e in at.exception], [], name)
+            text = page_text(at)
+            self.assertIn(name, text)
+            for needle in expected.get(name, ()):
+                self.assertIn(needle, text, name)
+            self.assertEqual(len(at.get("download_button")), 1, name)
+
+    def test_the_death_guide_starts_with_calling_the_priest_before_the_death(self):
+        at = open_page("Layanan dan prosedur")
+        at.selectbox[0].select("Pelayanan Kematian (Tutup Usia)").run()
+        text = page_text(at)
+        self.assertLess(text.index("Memanggil imam saat sakit parah"), text.index("Memberi kabar kepada ketua lingkungan"))
+        self.assertIn("Misa peringatan", text)
 
     def test_every_campaign_can_be_opened_on_the_donation_page(self):
         at = open_page("Sumbangan khusus")

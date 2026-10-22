@@ -52,6 +52,7 @@ KATEGORI_INFORMASI = [
     ("KIN-07", "Rencana dan Anggaran", "Rencana kerja tahunan, anggaran, dan realisasi pengeluaran.", KLS_INTERNAL, "SEK-09"),
     ("KIN-08", "Kegiatan dan Laporan", "Kegiatan seksi dan laporan pascakegiatan.", KLS_INTERNAL, "SEK-09"),
     ("KIN-09", "Wilayah dan Peta", "Struktur wilayah dan lingkungan serta geometri ilustratif.", KLS_PUBLIK, "SEK-09"),
+    ("KIN-10", "Layanan dan Prosedur", "Panduan langkah dan persyaratan layanan paroki untuk umum, misalnya baptis, krisma, dan pelayanan duka.", KLS_PUBLIK, "SEK-09"),
 ]
 
 JENIS_KOLEKTE = [

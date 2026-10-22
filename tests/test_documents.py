@@ -358,7 +358,7 @@ class GeneratorCheckTests(unittest.TestCase):
         script = str(ROOT / "scripts" / "generate_mock_data.py")
         clean = subprocess.run([sys.executable, script, "--check"], capture_output=True, text=True)
         self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
-        self.assertIn("132 report PDFs", clean.stdout)
+        self.assertIn(f"{len(FILES) + len(list((ROOT / 'app' / 'public_documents').glob('*.pdf')))} PDFs", clean.stdout)
         stray = FOLDER / "ZZZ_stray_report.pdf"
         try:
             stray.write_bytes(b"%PDF-1.4\n%%EOF\n")

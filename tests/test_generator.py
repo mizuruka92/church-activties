@@ -32,7 +32,7 @@ class GeneratorTestCase(unittest.TestCase):
 
 class DdlTests(GeneratorTestCase):
     def test_all_expected_tables_exist(self):
-        self.assertEqual(len(self.tables), 38)
+        self.assertEqual(len(self.tables), 43)
         schemas = {t.schema for t in self.tables}
         self.assertEqual(schemas, {"MASTER_DATA", "DATA_OPERASIONAL"})
 
@@ -598,6 +598,30 @@ class DocumentationTests(GeneratorTestCase):
         self.assertIn(f"{master} in `MASTER_DATA`, {operational} in `DATA_OPERASIONAL`", guide)
         self.assertIn(f"{views} summary views", guide)
         self.assertIn(f"lists {views} views", guide)
+
+    def test_readme_and_setup_guide_counts_match_the_model(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        setup = (ROOT / "docs" / "SETUP_SNOWFLAKE.md").read_text(encoding="utf-8")
+        master = sum(1 for t in self.tables if t.schema == "MASTER_DATA")
+        operational = sum(1 for t in self.tables if t.schema == "DATA_OPERASIONAL")
+        views = len(re.findall(r"^CREATE OR REPLACE VIEW ANALISIS\.", (ROOT / "sql" / "05_create_views.sql").read_text(encoding="utf-8"),
+                               re.MULTILINE))
+        self.assertIn(f"| Tables | {len(self.tables)} ({master} master and reference, {operational} operational) |", readme)
+        self.assertIn(f"| Summary views | {views}, aggregates only |", readme)
+        self.assertIn(f"Creates the {len(self.tables)} tables", readme)
+        self.assertIn(f"Creates the {views} views", readme)
+        self.assertIn(f"All {views} views are described", readme)
+        self.assertIn(f"lists {master} tables and the same command for `DATA_OPERASIONAL` lists {operational}", setup)
+        self.assertIn(f"lists {views} views", setup)
+        rows = sum(len(rows) for rows in self.data.values())
+        self.assertIn(f"about {round(rows, -2):,}", readme)
+
+    def test_every_sql_load_file_is_named_in_the_readme_and_the_setup_guide(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        setup = (ROOT / "docs" / "SETUP_SNOWFLAKE.md").read_text(encoding="utf-8")
+        for path in (ROOT / "sql").glob("04*.sql"):
+            self.assertIn(f"sql/{path.name}", readme, path.name)
+            self.assertIn(f"sql/{path.name}", setup, path.name)
 
     def test_guides_never_ask_for_a_real_credential_to_be_written_into_a_file(self):
         for name in ("STARTER_GUIDE.md", "SETUP_SNOWFLAKE.md"):

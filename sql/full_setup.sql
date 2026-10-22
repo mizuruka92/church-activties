@@ -293,6 +293,60 @@ CREATE TABLE IF NOT EXISTS MASTER_DATA.OPSI_JAWABAN_SURVEI (
     CONSTRAINT FK_OPSI_JAWABAN_PERTANYAAN FOREIGN KEY (ID_PERTANYAAN) REFERENCES MASTER_DATA.PERTANYAAN_SURVEI (ID_PERTANYAAN)
 ) COMMENT = 'Opsi jawaban yang tersedia untuk setiap pertanyaan | Granularitas: satu baris per opsi jawaban | Klasifikasi: Internal';
 
+CREATE TABLE IF NOT EXISTS MASTER_DATA.REFERENSI_MODEL_PERKIRAAN (
+    ID_MODEL VARCHAR(30) NOT NULL COMMENT 'Pengenal model perkiraan (contoh: MDL-01)',
+    NAMA_MODEL VARCHAR(150) NOT NULL COMMENT 'Nama model untuk tampilan',
+    DESKRIPSI_METODE VARCHAR(1000) NOT NULL COMMENT 'Penjelasan metode dalam bahasa awam, termasuk apa yang diketahui dan tidak diketahui model',
+    HORIZON_HARI NUMBER(3,0) NOT NULL COMMENT 'Berapa hari sebelum awal pekan sasaran perkiraan dibuat',
+    MINIMAL_RIWAYAT_MINGGU NUMBER(3,0) NOT NULL COMMENT 'Jumlah pekan riwayat minimal sebelum model mulai membuat perkiraan',
+    JENDELA_PELATIHAN_MINGGU NUMBER(3,0) NOT NULL COMMENT 'Jumlah pekan terakhir yang dipakai model untuk belajar',
+    LEBAR_RENTANG_PERSEN NUMBER(3,0) NOT NULL COMMENT 'Peluang yang diharapkan agar kolekte sebenarnya jatuh di dalam rentang perkiraan, dalam persen',
+    STATUS_AKTIF BOOLEAN NOT NULL COMMENT 'TRUE jika model masih dipakai membuat perkiraan baru',
+    CONSTRAINT PK_REFERENSI_MODEL_PERKIRAAN PRIMARY KEY (ID_MODEL)
+) COMMENT = 'Daftar model perkiraan kolekte beserta ketentuannya. Setiap perkiraan tersimpan menyebut model yang membuatnya | Granularitas: satu baris per model perkiraan | Klasifikasi: Publik';
+
+CREATE TABLE IF NOT EXISTS MASTER_DATA.LAYANAN_PAROKI (
+    ID_LAYANAN VARCHAR(30) NOT NULL COMMENT 'Pengenal layanan (contoh: LYN-01)',
+    NAMA_LAYANAN VARCHAR(150) NOT NULL COMMENT 'Nama layanan untuk umat, misalnya Baptis Dewasa',
+    KATEGORI_LAYANAN VARCHAR(100) NOT NULL COMMENT 'Kelompok layanan: Sakramen, Administrasi Umat, atau Pelayanan Duka',
+    RINGKASAN VARCHAR(500) NOT NULL COMMENT 'Untuk siapa layanan ini, dalam satu atau dua kalimat',
+    PERKIRAAN_WAKTU_PROSES VARCHAR(200) NOT NULL COMMENT 'Perkiraan lama proses dari pendaftaran sampai selesai',
+    CATATAN_PENTING VARCHAR(1000) NOT NULL COMMENT 'Hal yang perlu diketahui pemohon, misalnya biaya dan waktu pendaftaran',
+    ID_SEKSI_PENGELOLA VARCHAR(30) NOT NULL COMMENT 'Seksi yang bertanggung jawab atas layanan dan isi panduannya',
+    ID_KLASIFIKASI_DATA VARCHAR(30) NOT NULL COMMENT 'Klasifikasi informasi. Hanya klasifikasi yang boleh tampil publik muncul di dasbor umum',
+    NAMA_BERKAS_PANDUAN VARCHAR(200) NOT NULL COMMENT 'Nama berkas PDF panduan, tanpa folder dan diawali pengenal layanan',
+    TANGGAL_REVISI DATE NOT NULL COMMENT 'Tanggal terakhir isi panduan ditinjau',
+    CONSTRAINT PK_LAYANAN_PAROKI PRIMARY KEY (ID_LAYANAN),
+    CONSTRAINT UQ_LAYANAN_PAROKI_BERKAS UNIQUE (NAMA_BERKAS_PANDUAN),
+    CONSTRAINT FK_LAYANAN_PAROKI_SEKSI FOREIGN KEY (ID_SEKSI_PENGELOLA) REFERENCES MASTER_DATA.MASTER_SEKSI (ID_SEKSI),
+    CONSTRAINT FK_LAYANAN_PAROKI_KLASIFIKASI FOREIGN KEY (ID_KLASIFIKASI_DATA) REFERENCES MASTER_DATA.REFERENSI_KLASIFIKASI_DATA (ID_KLASIFIKASI_DATA)
+) COMMENT = 'Layanan paroki untuk umat beserta panduan PDF-nya. Isi panduan fiktif dan bukan ketentuan resmi | Granularitas: satu baris per layanan | Klasifikasi: Publik';
+
+CREATE TABLE IF NOT EXISTS MASTER_DATA.LANGKAH_LAYANAN (
+    ID_LANGKAH VARCHAR(30) NOT NULL COMMENT 'Pengenal langkah (contoh: LGK-0101)',
+    ID_LAYANAN VARCHAR(30) NOT NULL COMMENT 'Layanan pemilik langkah',
+    NOMOR_URUT NUMBER(2,0) NOT NULL COMMENT 'Urutan langkah dalam layanan, dimulai dari 1 tanpa lompatan',
+    JUDUL_LANGKAH VARCHAR(150) NOT NULL COMMENT 'Judul singkat langkah',
+    URAIAN VARCHAR(1000) NOT NULL COMMENT 'Penjelasan apa yang dilakukan pada langkah ini',
+    PELAKU VARCHAR(100) NOT NULL COMMENT 'Siapa yang melakukan langkah ini: pemohon, sekretariat, pastor, seksi, atau ketua lingkungan',
+    CONSTRAINT PK_LANGKAH_LAYANAN PRIMARY KEY (ID_LANGKAH),
+    CONSTRAINT UQ_LANGKAH_LAYANAN_URUT UNIQUE (ID_LAYANAN, NOMOR_URUT),
+    CONSTRAINT FK_LANGKAH_LAYANAN FOREIGN KEY (ID_LAYANAN) REFERENCES MASTER_DATA.LAYANAN_PAROKI (ID_LAYANAN)
+) COMMENT = 'Langkah-langkah berurutan untuk setiap layanan | Granularitas: satu baris per langkah dalam satu layanan | Klasifikasi: Publik';
+
+CREATE TABLE IF NOT EXISTS MASTER_DATA.PERSYARATAN_LAYANAN (
+    ID_PERSYARATAN VARCHAR(30) NOT NULL COMMENT 'Pengenal persyaratan (contoh: PSY-0101)',
+    ID_LAYANAN VARCHAR(30) NOT NULL COMMENT 'Layanan pemilik persyaratan',
+    NOMOR_URUT NUMBER(2,0) NOT NULL COMMENT 'Urutan persyaratan dalam layanan, dimulai dari 1 tanpa lompatan',
+    NAMA_PERSYARATAN VARCHAR(200) NOT NULL COMMENT 'Nama persyaratan, misalnya Fotokopi surat baptis',
+    JENIS_PERSYARATAN VARCHAR(50) NOT NULL COMMENT 'Jenis: Dokumen, Pembinaan, atau Ketentuan Umum',
+    WAJIB_DIPENUHI BOOLEAN NOT NULL COMMENT 'TRUE jika selalu wajib, FALSE jika hanya berlaku pada keadaan tertentu',
+    KETERANGAN VARCHAR(500) COMMENT 'Penjelasan tambahan, kosong jika tidak ada',
+    CONSTRAINT PK_PERSYARATAN_LAYANAN PRIMARY KEY (ID_PERSYARATAN),
+    CONSTRAINT UQ_PERSYARATAN_LAYANAN_URUT UNIQUE (ID_LAYANAN, NOMOR_URUT),
+    CONSTRAINT FK_PERSYARATAN_LAYANAN FOREIGN KEY (ID_LAYANAN) REFERENCES MASTER_DATA.LAYANAN_PAROKI (ID_LAYANAN)
+) COMMENT = 'Persyaratan untuk setiap layanan | Granularitas: satu baris per persyaratan dalam satu layanan | Klasifikasi: Publik';
+
 -- =============================================================================
 -- DATA_OPERASIONAL : operational records and transactions
 -- =============================================================================
@@ -350,6 +404,22 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.PENERIMAAN_KOLEKTE (
     CONSTRAINT FK_PENERIMAAN_KOLEKTE_KEJADIAN FOREIGN KEY (ID_KEJADIAN_MISA) REFERENCES DATA_OPERASIONAL.KEJADIAN_MISA (ID_KEJADIAN_MISA),
     CONSTRAINT FK_PENERIMAAN_KOLEKTE_JENIS FOREIGN KEY (ID_JENIS_KOLEKTE) REFERENCES MASTER_DATA.REFERENSI_JENIS_KOLEKTE (ID_JENIS_KOLEKTE)
 ) COMMENT = 'Ringkasan kolekte per Misa dan jenis kolekte, membedakan jumlah tercatat, hasil penghitungan, dan status rekonsiliasi. Bukan ukuran iman atau komitmen rohani | Granularitas: satu baris per kejadian Misa dan jenis kolekte | Klasifikasi: Internal';
+
+CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN (
+    ID_PERKIRAAN VARCHAR(30) NOT NULL COMMENT 'Pengenal perkiraan (contoh: PKR-0001)',
+    ID_MODEL VARCHAR(30) NOT NULL COMMENT 'Model yang membuat perkiraan',
+    AWAL_PEKAN_SASARAN DATE NOT NULL COMMENT 'Hari Senin awal pekan yang diperkirakan (pekan berjalan dari Senin sampai Minggu)',
+    TANGGAL_PERKIRAAN DATE NOT NULL COMMENT 'Tanggal perkiraan dibuat. Hanya data sebelum tanggal ini yang dipakai, sehingga peristiwa sesudahnya tidak diketahui',
+    JUMLAH_PEKAN_PELATIHAN NUMBER(3,0) NOT NULL COMMENT 'Jumlah pekan riwayat yang dipakai model untuk belajar, tidak termasuk pekan hari raya dan pekan terganggu peristiwa',
+    JUMLAH_PERKIRAAN NUMBER(18,0) NOT NULL COMMENT 'Perkiraan total kolekte pekan itu, dalam rupiah dan dibulatkan ke ribuan',
+    BATAS_BAWAH NUMBER(18,0) NOT NULL COMMENT 'Batas bawah rentang perkiraan, dalam rupiah',
+    BATAS_ATAS NUMBER(18,0) NOT NULL COMMENT 'Batas atas rentang perkiraan, dalam rupiah',
+    PENYESUAIAN_KALENDER NUMBER(6,3) NOT NULL COMMENT 'Pengali kalender liturgi untuk pekan sasaran, 1.000 berarti tanpa penyesuaian',
+    KETERANGAN VARCHAR(500) COMMENT 'Hari raya atau kolekte khusus yang dipertimbangkan, kosong jika tidak ada',
+    CONSTRAINT PK_PERKIRAAN_KOLEKTE_MINGGUAN PRIMARY KEY (ID_PERKIRAAN),
+    CONSTRAINT UQ_PERKIRAAN_KOLEKTE_MODEL_PEKAN UNIQUE (ID_MODEL, AWAL_PEKAN_SASARAN),
+    CONSTRAINT FK_PERKIRAAN_KOLEKTE_MODEL FOREIGN KEY (ID_MODEL) REFERENCES MASTER_DATA.REFERENSI_MODEL_PERKIRAAN (ID_MODEL)
+) COMMENT = 'Perkiraan bayangan kolekte mingguan, disimpan persis seperti dibuat empat pekan sebelumnya dan tidak pernah diperbarui sesudah kolekte sebenarnya diketahui. Dipakai untuk membandingkan perkiraan dengan kenyataan. Bukan ukuran iman atau komitmen rohani | Granularitas: satu baris per model dan pekan sasaran | Klasifikasi: Internal';
 
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KELUARGA (
     ID_KELUARGA VARCHAR(30) NOT NULL COMMENT 'Pengenal keluarga fiktif (contoh: KEL-0001)',
@@ -572,7 +642,7 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.LAPORAN_KEGIATAN (
 -- Step 3: Load reference and master data
 --
 -- GENERATED FILE. Do not edit by hand: run  python scripts/generate_mock_data.py
--- Content  : 18 tables, 421 rows in schema MASTER_DATA. All data is synthetic
+-- Content  : 22 tables, 534 rows in schema MASTER_DATA. All data is synthetic
 --            (fictional) and reproducible (seed 20260930, snapshot date 2026-09-30).
 -- Requires : step 2 (tables)
 -- Safe to re-run: yes. Every table is loaded with MERGE on its primary key, so existing
@@ -664,7 +734,7 @@ WHEN MATCHED THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT (ID_SEKSI, NAMA_SEKSI, DESKRIPSI, STATUS_AKTIF, TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU)
     VALUES (s.ID_SEKSI, s.NAMA_SEKSI, s.DESKRIPSI, s.STATUS_AKTIF, s.TANGGAL_MULAI_BERLAKU, s.TANGGAL_AKHIR_BERLAKU);
 
--- MASTER_DATA.REFERENSI_KATEGORI_INFORMASI: 9 rows
+-- MASTER_DATA.REFERENSI_KATEGORI_INFORMASI: 10 rows
 MERGE INTO MASTER_DATA.REFERENSI_KATEGORI_INFORMASI AS t
 USING (
     SELECT
@@ -682,7 +752,8 @@ USING (
             ('KIN-06', 'Survei', 'Definisi survei, pertanyaan, jawaban, dan hasil agregat.', 'KLS-02', 'SEK-06'),
             ('KIN-07', 'Rencana dan Anggaran', 'Rencana kerja tahunan, anggaran, dan realisasi pengeluaran.', 'KLS-02', 'SEK-09'),
             ('KIN-08', 'Kegiatan dan Laporan', 'Kegiatan seksi dan laporan pascakegiatan.', 'KLS-02', 'SEK-09'),
-            ('KIN-09', 'Wilayah dan Peta', 'Struktur wilayah dan lingkungan serta geometri ilustratif.', 'KLS-01', 'SEK-09')
+            ('KIN-09', 'Wilayah dan Peta', 'Struktur wilayah dan lingkungan serta geometri ilustratif.', 'KLS-01', 'SEK-09'),
+            ('KIN-10', 'Layanan dan Prosedur', 'Panduan langkah dan persyaratan layanan paroki untuk umum, misalnya baptis, krisma, dan pelayanan duka.', 'KLS-01', 'SEK-09')
     ) AS v (ID_KATEGORI_INFORMASI, NAMA_KATEGORI, DESKRIPSI, ID_KLASIFIKASI_DATA, ID_SEKSI_PENGELOLA)
 ) AS s
 ON t.ID_KATEGORI_INFORMASI = s.ID_KATEGORI_INFORMASI
@@ -694,7 +765,7 @@ WHEN MATCHED THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT (ID_KATEGORI_INFORMASI, NAMA_KATEGORI, DESKRIPSI, ID_KLASIFIKASI_DATA, ID_SEKSI_PENGELOLA)
     VALUES (s.ID_KATEGORI_INFORMASI, s.NAMA_KATEGORI, s.DESKRIPSI, s.ID_KLASIFIKASI_DATA, s.ID_SEKSI_PENGELOLA);
 
--- MASTER_DATA.REFERENSI_DAFTAR_NILAI: 82 rows
+-- MASTER_DATA.REFERENSI_DAFTAR_NILAI: 93 rows
 MERGE INTO MASTER_DATA.REFERENSI_DAFTAR_NILAI AS t
 USING (
     SELECT
@@ -777,6 +848,17 @@ USING (
             ('KATEGORI_EKONOMI', 'Menengah Bawah', 2, 'Kapasitas ekonomi umum lingkungan agak di bawah rata-rata paroki.'),
             ('KATEGORI_EKONOMI', 'Menengah Atas', 3, 'Kapasitas ekonomi umum lingkungan agak di atas rata-rata paroki.'),
             ('KATEGORI_EKONOMI', 'Tinggi', 4, 'Kapasitas ekonomi umum lingkungan di atas rata-rata paroki.'),
+            ('KATEGORI_LAYANAN', 'Sakramen', 1, 'Layanan sakramen: baptis, krisma, dan perkawinan.'),
+            ('KATEGORI_LAYANAN', 'Administrasi Umat', 2, 'Layanan pencatatan umat, misalnya pendaftaran ke lingkungan.'),
+            ('KATEGORI_LAYANAN', 'Pelayanan Duka', 3, 'Pendampingan keluarga yang kehilangan anggota keluarga.'),
+            ('JENIS_PERSYARATAN', 'Dokumen', 1, 'Berkas yang perlu diserahkan atau ditunjukkan.'),
+            ('JENIS_PERSYARATAN', 'Pembinaan', 2, 'Pertemuan, kursus, atau wawancara yang perlu diikuti.'),
+            ('JENIS_PERSYARATAN', 'Ketentuan Umum', 3, 'Ketentuan yang perlu dipenuhi, misalnya usia dan wali.'),
+            ('PELAKU_LANGKAH', 'Pemohon atau keluarga', 1, 'Orang yang mengajukan layanan atau keluarganya.'),
+            ('PELAKU_LANGKAH', 'Sekretariat paroki', 2, 'Petugas sekretariat dan administrasi paroki.'),
+            ('PELAKU_LANGKAH', 'Pastor paroki', 3, 'Pastor paroki atau imam yang ditugaskan.'),
+            ('PELAKU_LANGKAH', 'Seksi terkait', 4, 'Seksi paroki yang mengelola layanan itu.'),
+            ('PELAKU_LANGKAH', 'Ketua lingkungan', 5, 'Pengurus lingkungan tempat tinggal pemohon.'),
             ('KELOMPOK_PENGGUNA', 'Pastor Paroki dan Pengurus Harian', 1, 'Pimpinan paroki.'),
             ('KELOMPOK_PENGGUNA', 'Ketua Seksi', 2, 'Ketua seksi pelayanan.'),
             ('KELOMPOK_PENGGUNA', 'Ketua Wilayah dan Lingkungan', 3, 'Pengurus wilayah dan lingkungan.'),
@@ -1401,6 +1483,213 @@ WHEN MATCHED THEN UPDATE SET
     NILAI_SKOR = s.NILAI_SKOR
 WHEN NOT MATCHED THEN INSERT (ID_OPSI, ID_PERTANYAAN, NOMOR_URUT, KATEGORI_JAWABAN, NILAI_SKOR)
     VALUES (s.ID_OPSI, s.ID_PERTANYAAN, s.NOMOR_URUT, s.KATEGORI_JAWABAN, s.NILAI_SKOR);
+
+-- MASTER_DATA.REFERENSI_MODEL_PERKIRAAN: 1 rows
+MERGE INTO MASTER_DATA.REFERENSI_MODEL_PERKIRAAN AS t
+USING (
+    SELECT
+        v.ID_MODEL AS ID_MODEL,
+        v.NAMA_MODEL AS NAMA_MODEL,
+        v.DESKRIPSI_METODE AS DESKRIPSI_METODE,
+        CAST(v.HORIZON_HARI AS NUMBER(3,0)) AS HORIZON_HARI,
+        CAST(v.MINIMAL_RIWAYAT_MINGGU AS NUMBER(3,0)) AS MINIMAL_RIWAYAT_MINGGU,
+        CAST(v.JENDELA_PELATIHAN_MINGGU AS NUMBER(3,0)) AS JENDELA_PELATIHAN_MINGGU,
+        CAST(v.LEBAR_RENTANG_PERSEN AS NUMBER(3,0)) AS LEBAR_RENTANG_PERSEN,
+        CAST(v.STATUS_AKTIF AS BOOLEAN) AS STATUS_AKTIF
+    FROM (VALUES
+            ('MDL-01', 'Garis tren dengan kalender liturgi dan hari gajian', 'Perkiraan kolekte satu pekan (Senin sampai Minggu) yang dibuat empat pekan sebelum pekan itu dimulai. Dasarnya garis tren dari 52 pekan terakhir yang tidak terganggu, kenaikan pada pekan yang berakhir pada awal bulan (setelah hari gajian), dan penyesuaian untuk hari raya dan kolekte khusus menurut kalender liturgi. Pekan yang sudah tercatat terganggu peristiwa luar biasa tidak dipakai untuk belajar. Model tidak mengetahui peristiwa yang belum terjadi, sehingga peristiwa luar biasa tampak sebagai selisih besar antara perkiraan dan kolekte sebenarnya.', 28, 26, 52, 80, TRUE)
+    ) AS v (ID_MODEL, NAMA_MODEL, DESKRIPSI_METODE, HORIZON_HARI, MINIMAL_RIWAYAT_MINGGU, JENDELA_PELATIHAN_MINGGU, LEBAR_RENTANG_PERSEN, STATUS_AKTIF)
+) AS s
+ON t.ID_MODEL = s.ID_MODEL
+WHEN MATCHED THEN UPDATE SET
+    NAMA_MODEL = s.NAMA_MODEL,
+    DESKRIPSI_METODE = s.DESKRIPSI_METODE,
+    HORIZON_HARI = s.HORIZON_HARI,
+    MINIMAL_RIWAYAT_MINGGU = s.MINIMAL_RIWAYAT_MINGGU,
+    JENDELA_PELATIHAN_MINGGU = s.JENDELA_PELATIHAN_MINGGU,
+    LEBAR_RENTANG_PERSEN = s.LEBAR_RENTANG_PERSEN,
+    STATUS_AKTIF = s.STATUS_AKTIF
+WHEN NOT MATCHED THEN INSERT (ID_MODEL, NAMA_MODEL, DESKRIPSI_METODE, HORIZON_HARI, MINIMAL_RIWAYAT_MINGGU, JENDELA_PELATIHAN_MINGGU, LEBAR_RENTANG_PERSEN, STATUS_AKTIF)
+    VALUES (s.ID_MODEL, s.NAMA_MODEL, s.DESKRIPSI_METODE, s.HORIZON_HARI, s.MINIMAL_RIWAYAT_MINGGU, s.JENDELA_PELATIHAN_MINGGU, s.LEBAR_RENTANG_PERSEN, s.STATUS_AKTIF);
+
+-- MASTER_DATA.LAYANAN_PAROKI: 6 rows
+MERGE INTO MASTER_DATA.LAYANAN_PAROKI AS t
+USING (
+    SELECT
+        v.ID_LAYANAN AS ID_LAYANAN,
+        v.NAMA_LAYANAN AS NAMA_LAYANAN,
+        v.KATEGORI_LAYANAN AS KATEGORI_LAYANAN,
+        v.RINGKASAN AS RINGKASAN,
+        v.PERKIRAAN_WAKTU_PROSES AS PERKIRAAN_WAKTU_PROSES,
+        v.CATATAN_PENTING AS CATATAN_PENTING,
+        v.ID_SEKSI_PENGELOLA AS ID_SEKSI_PENGELOLA,
+        v.ID_KLASIFIKASI_DATA AS ID_KLASIFIKASI_DATA,
+        v.NAMA_BERKAS_PANDUAN AS NAMA_BERKAS_PANDUAN,
+        CAST(v.TANGGAL_REVISI AS DATE) AS TANGGAL_REVISI
+    FROM (VALUES
+            ('LYN-01', 'Baptis Dewasa', 'Sakramen', 'Untuk orang berusia 17 tahun ke atas yang ingin menjadi Katolik melalui Sakramen Baptis, setelah mengikuti masa pembinaan calon baptis.', 'Sekitar 9 sampai 12 bulan, dari pendaftaran sampai penerimaan Sakramen Baptis.', 'Pendaftaran dapat dilakukan sepanjang tahun dan pembinaan dimulai setiap awal semester. Baptis dewasa biasanya dirayakan pada Malam Paskah. Tidak ada tarif wajib, persembahan bersifat sukarela.', 'SEK-02', 'KLS-01', 'LYN-01_Baptis_Dewasa.pdf', '2026-02-10'),
+            ('LYN-02', 'Baptis Batuta (Bayi dan Anak di Bawah 7 Tahun)', 'Sakramen', 'Untuk orang tua yang ingin membaptis bayi atau anak di bawah tujuh tahun dalam iman Katolik.', 'Sekitar 3 sampai 6 minggu sejak pendaftaran.', 'Baptis bayi dan anak dirayakan bersama pada hari Minggu yang ditetapkan paroki. Daftarkan anak paling lambat satu bulan sebelum tanggal yang diinginkan. Tidak ada tarif wajib, persembahan bersifat sukarela.', 'SEK-03', 'KLS-01', 'LYN-02_Baptis_Batuta_Bayi_dan_Anak_di_Bawah_7_Tahun.pdf', '2026-03-02'),
+            ('LYN-03', 'Krisma', 'Sakramen', 'Untuk umat Katolik yang sudah dibaptis dan menerima Komuni Pertama dan ingin dikuatkan imannya melalui Sakramen Krisma.', 'Sekitar 4 sampai 6 bulan pembinaan, mengikuti jadwal kunjungan Uskup atau imam yang diberi wewenang.', 'Pendaftaran Krisma dibuka sekali setahun dan diumumkan di Misa serta papan pengumuman. Tidak ada tarif wajib, persembahan bersifat sukarela.', 'SEK-02', 'KLS-01', 'LYN-03_Krisma.pdf', '2026-01-15'),
+            ('LYN-04', 'Pernikahan', 'Sakramen', 'Untuk pasangan yang ingin menerima Sakramen Perkawinan di paroki ini.', 'Sekurang-kurangnya 3 bulan, dianjurkan 6 bulan sebelum tanggal pemberkatan.', 'Datanglah bersama sebelum menentukan tanggal dan tempat resepsi, agar jadwal gereja dan jadwal kursus persiapan dapat diatur lebih dulu. Pencatatan sipil dilakukan sesuai ketentuan pemerintah.', 'SEK-03', 'KLS-01', 'LYN-04_Pernikahan.pdf', '2026-04-20'),
+            ('LYN-05', 'Pendaftaran Lingkungan', 'Administrasi Umat', 'Untuk keluarga Katolik yang baru tinggal di wilayah paroki atau belum tercatat pada sebuah lingkungan.', 'Sekitar 3 sampai 5 hari kerja setelah berkas lengkap.', 'Tidak ada biaya pendaftaran. Data keluarga hanya dilihat petugas yang berwenang dan tidak ditampilkan di dasbor umum.', 'SEK-09', 'KLS-01', 'LYN-05_Pendaftaran_Lingkungan.pdf', '2026-05-12'),
+            ('LYN-06', 'Pelayanan Kematian (Tutup Usia)', 'Pelayanan Duka', 'Untuk keluarga yang kehilangan anggota keluarga Katolik. Memuat hal yang perlu dilakukan sejak masa sakit parah sampai peringatan sesudah pemakaman.', 'Dimulai segera. Perayaan pemakaman biasanya dalam 1 sampai 3 hari, sesuai kesiapan keluarga.', 'Pelayanan tidak dipungut tarif. Keluarga yang membutuhkan bantuan duka dapat menyampaikannya kepada ketua lingkungan. Hubungi pastor lebih dulu bila anggota keluarga sakit parah.', 'SEK-01', 'KLS-01', 'LYN-06_Pelayanan_Kematian_Tutup_Usia.pdf', '2026-06-08')
+    ) AS v (ID_LAYANAN, NAMA_LAYANAN, KATEGORI_LAYANAN, RINGKASAN, PERKIRAAN_WAKTU_PROSES, CATATAN_PENTING, ID_SEKSI_PENGELOLA, ID_KLASIFIKASI_DATA, NAMA_BERKAS_PANDUAN, TANGGAL_REVISI)
+) AS s
+ON t.ID_LAYANAN = s.ID_LAYANAN
+WHEN MATCHED THEN UPDATE SET
+    NAMA_LAYANAN = s.NAMA_LAYANAN,
+    KATEGORI_LAYANAN = s.KATEGORI_LAYANAN,
+    RINGKASAN = s.RINGKASAN,
+    PERKIRAAN_WAKTU_PROSES = s.PERKIRAAN_WAKTU_PROSES,
+    CATATAN_PENTING = s.CATATAN_PENTING,
+    ID_SEKSI_PENGELOLA = s.ID_SEKSI_PENGELOLA,
+    ID_KLASIFIKASI_DATA = s.ID_KLASIFIKASI_DATA,
+    NAMA_BERKAS_PANDUAN = s.NAMA_BERKAS_PANDUAN,
+    TANGGAL_REVISI = s.TANGGAL_REVISI
+WHEN NOT MATCHED THEN INSERT (ID_LAYANAN, NAMA_LAYANAN, KATEGORI_LAYANAN, RINGKASAN, PERKIRAAN_WAKTU_PROSES, CATATAN_PENTING, ID_SEKSI_PENGELOLA, ID_KLASIFIKASI_DATA, NAMA_BERKAS_PANDUAN, TANGGAL_REVISI)
+    VALUES (s.ID_LAYANAN, s.NAMA_LAYANAN, s.KATEGORI_LAYANAN, s.RINGKASAN, s.PERKIRAAN_WAKTU_PROSES, s.CATATAN_PENTING, s.ID_SEKSI_PENGELOLA, s.ID_KLASIFIKASI_DATA, s.NAMA_BERKAS_PANDUAN, s.TANGGAL_REVISI);
+
+-- MASTER_DATA.LANGKAH_LAYANAN: 46 rows
+MERGE INTO MASTER_DATA.LANGKAH_LAYANAN AS t
+USING (
+    SELECT
+        v.ID_LANGKAH AS ID_LANGKAH,
+        v.ID_LAYANAN AS ID_LAYANAN,
+        CAST(v.NOMOR_URUT AS NUMBER(2,0)) AS NOMOR_URUT,
+        v.JUDUL_LANGKAH AS JUDUL_LANGKAH,
+        v.URAIAN AS URAIAN,
+        v.PELAKU AS PELAKU
+    FROM (VALUES
+            ('LGK-0101', 'LYN-01', 1, 'Berkonsultasi di sekretariat', 'Datanglah ke Sekretariat Paroki pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00) untuk menyampaikan niat Anda dan mengambil formulir pendaftaran.', 'Pemohon atau keluarga'),
+            ('LGK-0102', 'LYN-01', 2, 'Mengisi formulir dan menyerahkan berkas', 'Lengkapi formulir dan serahkan berkas persyaratan. Sekretariat memeriksa kelengkapannya dan memberikan tanda terima.', 'Pemohon atau keluarga'),
+            ('LGK-0103', 'LYN-01', 3, 'Bertemu pastor', 'Pastor berbincang dengan calon tentang alasan dan kesiapannya, lalu menyetujui masuknya calon ke masa pembinaan.', 'Pastor paroki'),
+            ('LGK-0104', 'LYN-01', 4, 'Mengikuti pembinaan calon baptis', 'Pertemuan mingguan selama sekitar satu tahun yang dipandu Seksi Katekese. Calon didampingi seorang pendamping dari lingkungan tempat tinggalnya.', 'Seksi terkait'),
+            ('LGK-0105', 'LYN-01', 5, 'Ritus penerimaan calon baptis', 'Calon diterima secara resmi sebagai calon baptis dalam perayaan pada Misa hari Minggu, disaksikan umat dan keluarga.', 'Pastor paroki'),
+            ('LGK-0106', 'LYN-01', 6, 'Rekoleksi dan wawancara akhir', 'Menjelang perayaan, calon mengikuti rekoleksi satu hari dan wawancara terakhir dengan pastor.', 'Pastor paroki'),
+            ('LGK-0107', 'LYN-01', 7, 'Menerima Sakramen Baptis', 'Biasanya dirayakan pada Malam Paskah. Calon hadir bersama wali baptis dan keluarga sejak awal perayaan.', 'Pastor paroki'),
+            ('LGK-0108', 'LYN-01', 8, 'Pencatatan dan surat baptis', 'Nama baptisan baru dicatat di buku baptis. Surat baptis dapat diambil di Sekretariat sekitar dua minggu kemudian.', 'Sekretariat paroki'),
+            ('LGK-0109', 'LYN-01', 9, 'Pendampingan sesudah baptis', 'Selama beberapa bulan, baptisan baru didampingi agar mengenal kehidupan paroki dan bergabung dengan lingkungannya.', 'Seksi terkait'),
+            ('LGK-0201', 'LYN-02', 1, 'Mendaftar di sekretariat', 'Daftarkan anak paling lambat satu bulan sebelum tanggal yang diinginkan, pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00). Ambil formulir dan jadwal baptis bersama.', 'Pemohon atau keluarga'),
+            ('LGK-0202', 'LYN-02', 2, 'Melengkapi berkas', 'Serahkan berkas persyaratan dan surat pernyataan orang tua. Sekretariat memeriksa kelengkapannya dan memberikan tanda terima.', 'Pemohon atau keluarga'),
+            ('LGK-0203', 'LYN-02', 3, 'Mengikuti pembekalan orang tua dan wali baptis', 'Satu kali pertemuan sekitar dua jam yang dipandu Seksi Kerasulan Keluarga tentang arti baptis dan peran orang tua serta wali baptis.', 'Seksi terkait'),
+            ('LGK-0204', 'LYN-02', 4, 'Konfirmasi tanggal baptis', 'Sekretariat menetapkan tanggal pada hari Minggu yang disediakan paroki dan memberi tahu keluarga.', 'Sekretariat paroki'),
+            ('LGK-0205', 'LYN-02', 5, 'Merayakan Sakramen Baptis', 'Anak dibaptis dalam perayaan bersama. Orang tua dan wali baptis hadir sejak awal perayaan.', 'Pastor paroki'),
+            ('LGK-0206', 'LYN-02', 6, 'Pencatatan dan surat baptis', 'Nama anak dicatat di buku baptis. Surat baptis dapat diambil di Sekretariat sekitar dua minggu kemudian.', 'Sekretariat paroki'),
+            ('LGK-0207', 'LYN-02', 7, 'Menyambut anak di lingkungan', 'Ketua lingkungan menyambut anak yang baru dibaptis dan memastikan data keluarga pada lingkungan sudah benar.', 'Ketua lingkungan'),
+            ('LGK-0301', 'LYN-03', 1, 'Mendaftar pada masa pendaftaran', 'Pendaftaran dibuka sekali setahun dan diumumkan di Misa serta papan pengumuman. Daftar di Sekretariat pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00).', 'Pemohon atau keluarga'),
+            ('LGK-0302', 'LYN-03', 2, 'Menyerahkan berkas', 'Serahkan surat permohonan, fotokopi surat baptis, dan pas foto. Sekretariat memberikan tanda terima.', 'Pemohon atau keluarga'),
+            ('LGK-0303', 'LYN-03', 3, 'Mengikuti pembinaan Krisma', 'Sekitar sepuluh pertemuan yang dipandu Seksi Katekese. Kehadiran dicatat agar pendamping dapat membantu bila ada pertemuan yang terlewat.', 'Seksi terkait'),
+            ('LGK-0304', 'LYN-03', 4, 'Rekoleksi dan wawancara', 'Calon mengikuti rekoleksi satu hari dan bertemu pastor atau pendamping untuk wawancara singkat.', 'Pastor paroki'),
+            ('LGK-0305', 'LYN-03', 5, 'Menerima Sakramen Krisma', 'Dilayani oleh Uskup atau imam yang diberi wewenang, dalam Misa yang ditetapkan. Calon didampingi pendamping Krisma.', 'Pastor paroki'),
+            ('LGK-0306', 'LYN-03', 6, 'Pencatatan', 'Krisma dicatat pada buku baptis. Bila calon dibaptis di paroki lain, paroki itu diberi tahu agar catatannya diperbarui.', 'Sekretariat paroki'),
+            ('LGK-0401', 'LYN-04', 1, 'Konsultasi awal', 'Datanglah bersama ke Sekretariat pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00) untuk menyampaikan niat dan menjajaki tanggal pemberkatan.', 'Pemohon atau keluarga'),
+            ('LGK-0402', 'LYN-04', 2, 'Mendaftar dan menyerahkan berkas', 'Isi formulir pendaftaran dan serahkan berkas persyaratan. Sekretariat memeriksa kelengkapannya dan memberikan tanda terima.', 'Pemohon atau keluarga'),
+            ('LGK-0403', 'LYN-04', 3, 'Mengikuti kursus persiapan perkawinan', 'Beberapa pertemuan bersama pasangan lain yang dipandu Seksi Kerasulan Keluarga tentang hidup berkeluarga dan arti Sakramen Perkawinan.', 'Seksi terkait'),
+            ('LGK-0404', 'LYN-04', 4, 'Penyelidikan kanonik', 'Pastor atau petugas mewawancarai kedua calon secara terpisah untuk memastikan keduanya bebas dan siap menikah.', 'Pastor paroki'),
+            ('LGK-0405', 'LYN-04', 5, 'Pengumuman rencana perkawinan', 'Rencana perkawinan diumumkan di paroki selama beberapa hari Minggu agar umat dapat menyampaikan bila mengetahui adanya halangan.', 'Sekretariat paroki'),
+            ('LGK-0406', 'LYN-04', 6, 'Menyusun tata perayaan dan gladi', 'Memilih bacaan dan lagu, mengatur petugas bersama Seksi Liturgi, dan mengadakan gladi satu atau dua hari sebelum pemberkatan.', 'Seksi terkait'),
+            ('LGK-0407', 'LYN-04', 7, 'Merayakan Sakramen Perkawinan', 'Pemberkatan dilakukan di gereja dengan dua orang saksi. Pastor atau imam yang ditugaskan memimpin perayaan.', 'Pastor paroki'),
+            ('LGK-0408', 'LYN-04', 8, 'Pencatatan dan surat nikah gereja', 'Perkawinan dicatat di buku perkawinan dan paroki tempat kedua mempelai dibaptis diberi tahu. Surat nikah gereja dapat diambil sekitar dua minggu kemudian.', 'Sekretariat paroki'),
+            ('LGK-0409', 'LYN-04', 9, 'Mengurus pencatatan sipil', 'Pencatatan sipil dilakukan di kantor catatan sipil sesuai ketentuan pemerintah dan urutan yang disepakati dengan pastor.', 'Pemohon atau keluarga'),
+            ('LGK-0501', 'LYN-05', 1, 'Mencari lingkungan yang sesuai', 'Tanyakan lingkungan menurut alamat tinggal Anda di Sekretariat pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00) atau lihat daftar wilayah paroki.', 'Pemohon atau keluarga'),
+            ('LGK-0502', 'LYN-05', 2, 'Mengisi formulir dan menyerahkan berkas', 'Kepala keluarga mengisi formulir pendaftaran dan menyerahkan berkas persyaratan.', 'Pemohon atau keluarga'),
+            ('LGK-0503', 'LYN-05', 3, 'Memeriksa berkas', 'Sekretariat memeriksa kelengkapan berkas dan memberikan tanda terima.', 'Sekretariat paroki'),
+            ('LGK-0504', 'LYN-05', 4, 'Memberi tahu ketua lingkungan', 'Sekretariat menyampaikan kepada ketua lingkungan bahwa ada keluarga baru yang akan bergabung.', 'Sekretariat paroki'),
+            ('LGK-0505', 'LYN-05', 5, 'Menyambut keluarga baru', 'Ketua lingkungan menghubungi keluarga dan mengundangnya pada doa lingkungan terdekat.', 'Ketua lingkungan'),
+            ('LGK-0506', 'LYN-05', 6, 'Mencatat di data umat', 'Data keluarga dicatat dalam basis data paroki dengan akses terbatas. Pemberitahuan bahwa pendaftaran selesai disampaikan kepada keluarga.', 'Sekretariat paroki'),
+            ('LGK-0601', 'LYN-06', 1, 'Memanggil imam saat sakit parah', 'Bila anggota keluarga sakit parah atau mendekati ajal, segera hubungi pastor untuk Sakramen Pengurapan Orang Sakit dan Komuni bekal, sebaiknya selagi yang bersangkutan masih sadar.', 'Pemohon atau keluarga'),
+            ('LGK-0602', 'LYN-06', 2, 'Memberi kabar kepada ketua lingkungan dan sekretariat', 'Setelah meninggal dunia, segera kabari ketua lingkungan dan Sekretariat Paroki (jam layanan: Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00). Di luar jam layanan, kabari ketua lingkungan.', 'Pemohon atau keluarga'),
+            ('LGK-0603', 'LYN-06', 3, 'Mengurus surat keterangan kematian', 'Mintalah surat keterangan kematian dari dokter, rumah sakit, atau kelurahan. Surat ini diperlukan untuk pemakaman dan pencatatan.', 'Pemohon atau keluarga'),
+            ('LGK-0604', 'LYN-06', 4, 'Doa bersama di rumah duka', 'Ketua lingkungan mengoordinasi ibadat atau doa arwah bersama umat setempat, biasanya pada malam hari sampai hari pemakaman.', 'Ketua lingkungan'),
+            ('LGK-0605', 'LYN-06', 5, 'Menetapkan waktu Misa atau ibadat pemakaman', 'Sekretariat dan pastor menetapkan waktu bersama keluarga agar tidak bertabrakan dengan jadwal Misa lain.', 'Sekretariat paroki'),
+            ('LGK-0606', 'LYN-06', 6, 'Menyiapkan petugas liturgi', 'Seksi Liturgi menyiapkan lektor, pemazmur, dan pemimpin lagu, serta tata ibadat sesuai permintaan keluarga.', 'Seksi terkait'),
+            ('LGK-0607', 'LYN-06', 7, 'Merayakan pemakaman', 'Misa requiem atau ibadat sabda, ritus pelepasan jenazah, dan pemakaman.', 'Pastor paroki'),
+            ('LGK-0608', 'LYN-06', 8, 'Pencatatan di buku kematian', 'Kematian dicatat di buku kematian. Status keanggotaan umat diperbarui oleh petugas yang berwenang tanpa menampilkan data pribadi di dasbor umum.', 'Sekretariat paroki'),
+            ('LGK-0609', 'LYN-06', 9, 'Misa peringatan', 'Keluarga dapat mengajukan Misa peringatan melalui Sekretariat, misalnya pada hari ketiga, ketujuh, keempat puluh, keseratus, dan keseribu menurut kebiasaan setempat.', 'Pemohon atau keluarga')
+    ) AS v (ID_LANGKAH, ID_LAYANAN, NOMOR_URUT, JUDUL_LANGKAH, URAIAN, PELAKU)
+) AS s
+ON t.ID_LANGKAH = s.ID_LANGKAH
+WHEN MATCHED THEN UPDATE SET
+    ID_LAYANAN = s.ID_LAYANAN,
+    NOMOR_URUT = s.NOMOR_URUT,
+    JUDUL_LANGKAH = s.JUDUL_LANGKAH,
+    URAIAN = s.URAIAN,
+    PELAKU = s.PELAKU
+WHEN NOT MATCHED THEN INSERT (ID_LANGKAH, ID_LAYANAN, NOMOR_URUT, JUDUL_LANGKAH, URAIAN, PELAKU)
+    VALUES (s.ID_LANGKAH, s.ID_LAYANAN, s.NOMOR_URUT, s.JUDUL_LANGKAH, s.URAIAN, s.PELAKU);
+
+-- MASTER_DATA.PERSYARATAN_LAYANAN: 48 rows
+MERGE INTO MASTER_DATA.PERSYARATAN_LAYANAN AS t
+USING (
+    SELECT
+        v.ID_PERSYARATAN AS ID_PERSYARATAN,
+        v.ID_LAYANAN AS ID_LAYANAN,
+        CAST(v.NOMOR_URUT AS NUMBER(2,0)) AS NOMOR_URUT,
+        v.NAMA_PERSYARATAN AS NAMA_PERSYARATAN,
+        v.JENIS_PERSYARATAN AS JENIS_PERSYARATAN,
+        CAST(v.WAJIB_DIPENUHI AS BOOLEAN) AS WAJIB_DIPENUHI,
+        v.KETERANGAN AS KETERANGAN
+    FROM (VALUES
+            ('PSY-0101', 'LYN-01', 1, 'Berusia 17 tahun ke atas', 'Ketentuan Umum', TRUE, 'Calon yang belum berusia 17 tahun mengikuti pembinaan calon baptis remaja yang dilayani Seksi Katekese.'),
+            ('PSY-0102', 'LYN-01', 2, 'Permohonan atas kemauan sendiri', 'Ketentuan Umum', TRUE, 'Calon menulis surat permohonan baptis dengan tulisan tangan, tanpa paksaan dari pihak mana pun.'),
+            ('PSY-0103', 'LYN-01', 3, 'Fotokopi kartu identitas', 'Dokumen', TRUE, 'Satu lembar, dipakai hanya untuk pencatatan di buku baptis.'),
+            ('PSY-0104', 'LYN-01', 4, 'Fotokopi akta kelahiran atau dokumen pengganti', 'Dokumen', TRUE, 'Memuat nama lengkap dan tanggal lahir yang akan dicatat di buku baptis.'),
+            ('PSY-0105', 'LYN-01', 5, 'Pas foto berwarna ukuran 3x4', 'Dokumen', TRUE, 'Dua lembar.'),
+            ('PSY-0106', 'LYN-01', 6, 'Keterangan status perkawinan', 'Dokumen', FALSE, 'Hanya bagi calon yang sudah menikah. Status perkawinan dibicarakan dengan pastor sebelum pembinaan dimulai.'),
+            ('PSY-0107', 'LYN-01', 7, 'Wali baptis', 'Ketentuan Umum', TRUE, 'Satu umat Katolik yang sudah menerima Sakramen Baptis, Ekaristi, dan Krisma, berusia sekurang-kurangnya 16 tahun. Bila bukan umat paroki ini, wali membawa keterangan dari paroki asalnya.'),
+            ('PSY-0108', 'LYN-01', 8, 'Mengikuti pembinaan calon baptis', 'Pembinaan', TRUE, 'Pertemuan mingguan selama sekitar satu tahun yang dipandu Seksi Katekese.'),
+            ('PSY-0109', 'LYN-01', 9, 'Wawancara dengan pastor dan rekoleksi persiapan', 'Pembinaan', TRUE, 'Dilakukan menjelang perayaan untuk memastikan calon siap dan mantap.'),
+            ('PSY-0201', 'LYN-02', 1, 'Orang tua bersedia mendidik anak dalam iman Katolik', 'Ketentuan Umum', TRUE, 'Salah satu atau kedua orang tua menandatangani surat pernyataan kesediaan di sekretariat.'),
+            ('PSY-0202', 'LYN-02', 2, 'Fotokopi akta kelahiran anak', 'Dokumen', TRUE, 'Satu lembar.'),
+            ('PSY-0203', 'LYN-02', 3, 'Fotokopi surat nikah orang tua', 'Dokumen', TRUE, 'Surat nikah gereja bila ada. Bila tidak ada, sekretariat menjelaskan dokumen pengganti yang dapat diterima.'),
+            ('PSY-0204', 'LYN-02', 4, 'Fotokopi kartu keluarga', 'Dokumen', TRUE, 'Untuk mencatat lingkungan tempat tinggal dan mengaitkan anak dengan keluarganya.'),
+            ('PSY-0205', 'LYN-02', 5, 'Wali baptis', 'Ketentuan Umum', TRUE, 'Satu umat Katolik yang sudah menerima Sakramen Baptis, Ekaristi, dan Krisma, berusia sekurang-kurangnya 16 tahun, dan bukan ayah atau ibu anak.'),
+            ('PSY-0206', 'LYN-02', 6, 'Keterangan wali baptis dari paroki asal', 'Dokumen', FALSE, 'Hanya bila wali baptis bukan umat paroki ini.'),
+            ('PSY-0207', 'LYN-02', 7, 'Pembekalan orang tua dan wali baptis', 'Pembinaan', TRUE, 'Satu kali pertemuan sekitar dua jam yang dipandu Seksi Kerasulan Keluarga.'),
+            ('PSY-0208', 'LYN-02', 8, 'Nama baptis anak', 'Ketentuan Umum', FALSE, 'Orang tua dapat memilih nama baptis. Bila belum ada pilihan, nama pelindung dipilih bersama pastor.'),
+            ('PSY-0301', 'LYN-03', 1, 'Sudah dibaptis Katolik dan menerima Komuni Pertama', 'Ketentuan Umum', TRUE, 'Dibuktikan dengan surat baptis. Komuni Pertama dicatat oleh paroki asal.'),
+            ('PSY-0302', 'LYN-03', 2, 'Berusia sekurang-kurangnya 14 tahun', 'Ketentuan Umum', TRUE, 'Atau duduk di kelas 8. Calon dewasa mendaftar pada kelompok pembinaan dewasa.'),
+            ('PSY-0303', 'LYN-03', 3, 'Fotokopi surat baptis', 'Dokumen', TRUE, 'Dari paroki tempat dibaptis. Bila dibaptis di paroki lain, sekretariat dapat memintakan keterangan baptis.'),
+            ('PSY-0304', 'LYN-03', 4, 'Surat permohonan dan pas foto berwarna ukuran 3x4', 'Dokumen', TRUE, 'Surat ditulis tangan oleh calon, pas foto dua lembar.'),
+            ('PSY-0305', 'LYN-03', 5, 'Pendamping Krisma', 'Ketentuan Umum', TRUE, 'Satu umat Katolik yang sudah menerima Krisma dan menjalani hidup beriman dengan baik, yang menemani calon pada perayaan.'),
+            ('PSY-0306', 'LYN-03', 6, 'Mengikuti pembinaan Krisma', 'Pembinaan', TRUE, 'Sekitar sepuluh pertemuan dengan kehadiran sekurang-kurangnya 80 persen.'),
+            ('PSY-0307', 'LYN-03', 7, 'Mengikuti rekoleksi persiapan', 'Pembinaan', TRUE, 'Satu hari bersama, sebelum perayaan.'),
+            ('PSY-0308', 'LYN-03', 8, 'Nama Krisma', 'Ketentuan Umum', FALSE, 'Calon boleh memilih nama pelindung baru, boleh juga tetap memakai nama baptisnya.'),
+            ('PSY-0401', 'LYN-04', 1, 'Surat baptis terbaru kedua calon', 'Dokumen', TRUE, 'Diterbitkan paling lama enam bulan sebelum pendaftaran, dengan catatan Krisma bila sudah menerimanya.'),
+            ('PSY-0402', 'LYN-04', 2, 'Fotokopi kartu identitas dan kartu keluarga', 'Dokumen', TRUE, 'Masing-masing satu lembar untuk setiap calon.'),
+            ('PSY-0403', 'LYN-04', 3, 'Fotokopi akta kelahiran', 'Dokumen', TRUE, 'Masing-masing satu lembar untuk setiap calon.'),
+            ('PSY-0404', 'LYN-04', 4, 'Surat keterangan belum menikah', 'Dokumen', TRUE, 'Dari kelurahan atau surat pengantar lain sesuai ketentuan setempat.'),
+            ('PSY-0405', 'LYN-04', 5, 'Pas foto berdampingan ukuran 4x6', 'Dokumen', TRUE, 'Dua lembar.'),
+            ('PSY-0406', 'LYN-04', 6, 'Kursus persiapan perkawinan', 'Pembinaan', TRUE, 'Beberapa pertemuan bersama pasangan lain yang dipandu Seksi Kerasulan Keluarga.'),
+            ('PSY-0407', 'LYN-04', 7, 'Penyelidikan kanonik', 'Pembinaan', TRUE, 'Wawancara terpisah dengan pastor atau petugas untuk memastikan kedua calon bebas dan siap menikah.'),
+            ('PSY-0408', 'LYN-04', 8, 'Dua orang saksi', 'Ketentuan Umum', TRUE, 'Berusia dewasa dan membawa kartu identitas pada hari pemberkatan.'),
+            ('PSY-0409', 'LYN-04', 9, 'Izin atau dispensasi dari Keuskupan', 'Dokumen', FALSE, 'Hanya bila salah satu calon bukan Katolik atau ada halangan lain. Sekretariat membantu mengurusnya.'),
+            ('PSY-0410', 'LYN-04', 10, 'Pencatatan sipil', 'Ketentuan Umum', TRUE, 'Dilakukan di kantor catatan sipil sesuai ketentuan pemerintah.'),
+            ('PSY-0501', 'LYN-05', 1, 'Formulir pendaftaran keluarga', 'Dokumen', TRUE, 'Diisi kepala keluarga: nama anggota keluarga, hubungan keluarga, dan alamat tinggal sekarang.'),
+            ('PSY-0502', 'LYN-05', 2, 'Fotokopi kartu keluarga', 'Dokumen', TRUE, 'Untuk memastikan alamat tinggal berada di wilayah paroki.'),
+            ('PSY-0503', 'LYN-05', 3, 'Fotokopi surat baptis anggota keluarga yang Katolik', 'Dokumen', TRUE, 'Satu lembar untuk setiap anggota. Bila belum ada, cukup keterangan tempat dan tahun baptis.'),
+            ('PSY-0504', 'LYN-05', 4, 'Surat pindah dari paroki asal', 'Dokumen', FALSE, 'Hanya bila sebelumnya tercatat di paroki lain.'),
+            ('PSY-0505', 'LYN-05', 5, 'Persetujuan pengelolaan data keluarga', 'Ketentuan Umum', TRUE, 'Kepala keluarga menyetujui bahwa data keluarga dicatat dengan klasifikasi terbatas dan hanya dilihat petugas yang berwenang.'),
+            ('PSY-0506', 'LYN-05', 6, 'Tempat tinggal berada di wilayah paroki', 'Ketentuan Umum', TRUE, 'Lingkungan ditentukan menurut tempat tinggal. Sekretariat membantu mencari lingkungan yang sesuai.'),
+            ('PSY-0601', 'LYN-06', 1, 'Surat keterangan kematian', 'Dokumen', TRUE, 'Dari dokter, rumah sakit, atau kelurahan.'),
+            ('PSY-0602', 'LYN-06', 2, 'Fotokopi surat baptis almarhum atau almarhumah', 'Dokumen', FALSE, 'Untuk pencatatan di buku kematian. Bila tidak ada, cukup sebutkan nama baptis kepada sekretariat.'),
+            ('PSY-0603', 'LYN-06', 3, 'Fotokopi kartu identitas almarhum atau almarhumah', 'Dokumen', FALSE, 'Untuk melengkapi pencatatan.'),
+            ('PSY-0604', 'LYN-06', 4, 'Pemberitahuan kepada ketua lingkungan dan sekretariat', 'Ketentuan Umum', TRUE, 'Agar doa bersama dan jadwal pemakaman dapat diatur secepatnya.'),
+            ('PSY-0605', 'LYN-06', 5, 'Penghubung dari pihak keluarga', 'Ketentuan Umum', FALSE, 'Satu anggota keluarga menjadi penghubung dengan paroki dan lingkungan agar informasi tidak simpang siur.'),
+            ('PSY-0606', 'LYN-06', 6, 'Pilihan tempat dan waktu pemakaman', 'Ketentuan Umum', TRUE, 'Dibicarakan dengan sekretariat dan pastor agar tidak bertabrakan dengan jadwal Misa.'),
+            ('PSY-0607', 'LYN-06', 7, 'Permintaan bantuan duka', 'Ketentuan Umum', FALSE, 'Keluarga yang membutuhkan dapat menyampaikannya kepada ketua lingkungan untuk diteruskan ke Seksi Pengembangan Sosial Ekonomi.')
+    ) AS v (ID_PERSYARATAN, ID_LAYANAN, NOMOR_URUT, NAMA_PERSYARATAN, JENIS_PERSYARATAN, WAJIB_DIPENUHI, KETERANGAN)
+) AS s
+ON t.ID_PERSYARATAN = s.ID_PERSYARATAN
+WHEN MATCHED THEN UPDATE SET
+    ID_LAYANAN = s.ID_LAYANAN,
+    NOMOR_URUT = s.NOMOR_URUT,
+    NAMA_PERSYARATAN = s.NAMA_PERSYARATAN,
+    JENIS_PERSYARATAN = s.JENIS_PERSYARATAN,
+    WAJIB_DIPENUHI = s.WAJIB_DIPENUHI,
+    KETERANGAN = s.KETERANGAN
+WHEN NOT MATCHED THEN INSERT (ID_PERSYARATAN, ID_LAYANAN, NOMOR_URUT, NAMA_PERSYARATAN, JENIS_PERSYARATAN, WAJIB_DIPENUHI, KETERANGAN)
+    VALUES (s.ID_PERSYARATAN, s.ID_LAYANAN, s.NOMOR_URUT, s.NAMA_PERSYARATAN, s.JENIS_PERSYARATAN, s.WAJIB_DIPENUHI, s.KETERANGAN);
 
 -- =============================================================================
 -- >>> sql/04a_load_mass_history.sql
@@ -15670,6 +15959,330 @@ WHEN NOT MATCHED THEN INSERT (ID_SUMBANGAN_KELUARGA, ID_KAMPANYE, ID_KELUARGA, I
     VALUES (s.ID_SUMBANGAN_KELUARGA, s.ID_KAMPANYE, s.ID_KELUARGA, s.ID_LINGKUNGAN, s.JUMLAH_SUMBANGAN, s.TANGGAL_SUMBANGAN);
 
 -- =============================================================================
+-- >>> sql/04g_load_forecast.sql
+-- =============================================================================
+
+-- =============================================================================
+-- Step 4g: Load the shadow forecast of the weekly offertory
+--
+-- GENERATED FILE. Do not edit by hand: run  python scripts/generate_mock_data.py
+-- Content  : 1 tables, 274 rows in schema DATA_OPERASIONAL. All data is synthetic
+--            (fictional) and reproducible (seed 20260930, snapshot date 2026-09-30).
+-- Requires : steps 2 and 3 (includes the forecast model), and 4a and 4b to compare with the offertory
+-- Safe to re-run: yes. Every table is loaded with MERGE on its primary key, so existing
+--            rows are updated and new rows are inserted. Nothing is deleted and nothing
+--            is duplicated. Statements are ordered parents first.
+-- Warehouse: any running warehouse is enough (the data volume is small).
+-- =============================================================================
+
+USE DATABASE PUSAT_INFORMASI_PAROKI;
+
+-- DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN: 274 rows
+MERGE INTO DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN AS t
+USING (
+    SELECT
+        v.ID_PERKIRAAN AS ID_PERKIRAAN,
+        v.ID_MODEL AS ID_MODEL,
+        CAST(v.AWAL_PEKAN_SASARAN AS DATE) AS AWAL_PEKAN_SASARAN,
+        CAST(v.TANGGAL_PERKIRAAN AS DATE) AS TANGGAL_PERKIRAAN,
+        CAST(v.JUMLAH_PEKAN_PELATIHAN AS NUMBER(3,0)) AS JUMLAH_PEKAN_PELATIHAN,
+        CAST(v.JUMLAH_PERKIRAAN AS NUMBER(18,0)) AS JUMLAH_PERKIRAAN,
+        CAST(v.BATAS_BAWAH AS NUMBER(18,0)) AS BATAS_BAWAH,
+        CAST(v.BATAS_ATAS AS NUMBER(18,0)) AS BATAS_ATAS,
+        CAST(v.PENYESUAIAN_KALENDER AS NUMBER(6,3)) AS PENYESUAIAN_KALENDER,
+        v.KETERANGAN AS KETERANGAN
+    FROM (VALUES
+            ('PKR-0001', 'MDL-01', '2021-08-02', '2021-07-05', 18, 4845000, 4303000, 5386000, 1.000, NULL),
+            ('PKR-0002', 'MDL-01', '2021-08-09', '2021-07-12', 19, 4700000, 4058000, 5342000, 1.120, 'Disesuaikan menurut kalender liturgi: Hari Raya Santa Perawan Maria Diangkat ke Surga.'),
+            ('PKR-0003', 'MDL-01', '2021-08-16', '2021-07-19', 20, 3823000, 3313000, 4333000, 1.000, NULL),
+            ('PKR-0004', 'MDL-01', '2021-08-23', '2021-07-26', 21, 3611000, 3118000, 4103000, 1.000, NULL),
+            ('PKR-0005', 'MDL-01', '2021-08-30', '2021-08-02', 22, 4827000, 4174000, 5481000, 1.000, NULL),
+            ('PKR-0006', 'MDL-01', '2021-09-06', '2021-08-09', 23, 4515000, 3914000, 5116000, 1.000, NULL),
+            ('PKR-0007', 'MDL-01', '2021-09-13', '2021-08-16', 23, 4145000, 3593000, 4698000, 1.000, NULL),
+            ('PKR-0008', 'MDL-01', '2021-09-20', '2021-08-23', 24, 3827000, 3326000, 4327000, 1.000, NULL),
+            ('PKR-0009', 'MDL-01', '2021-09-27', '2021-08-30', 25, 4959000, 4316000, 5602000, 1.000, NULL),
+            ('PKR-0010', 'MDL-01', '2021-10-04', '2021-09-06', 25, 4587000, 3992000, 5181000, 1.000, NULL),
+            ('PKR-0011', 'MDL-01', '2021-10-11', '2021-09-13', 25, 5391000, 4692000, 6090000, 1.279, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Misi Sedunia.'),
+            ('PKR-0012', 'MDL-01', '2021-10-18', '2021-09-20', 25, 3841000, 3343000, 4339000, 1.000, NULL),
+            ('PKR-0013', 'MDL-01', '2021-10-25', '2021-09-27', 25, 3469000, 3019000, 3918000, 1.000, NULL),
+            ('PKR-0014', 'MDL-01', '2021-11-01', '2021-10-04', 26, 4980000, 4282000, 5679000, 1.000, NULL),
+            ('PKR-0015', 'MDL-01', '2021-11-08', '2021-10-11', 27, 4683000, 4018000, 5347000, 1.000, NULL),
+            ('PKR-0016', 'MDL-01', '2021-11-15', '2021-10-18', 27, 4266000, 3661000, 4872000, 1.000, NULL),
+            ('PKR-0017', 'MDL-01', '2021-11-22', '2021-10-25', 28, 3879000, 3338000, 4419000, 1.000, NULL),
+            ('PKR-0018', 'MDL-01', '2021-11-29', '2021-11-01', 29, 5228000, 4511000, 5945000, 1.000, NULL),
+            ('PKR-0019', 'MDL-01', '2021-12-06', '2021-11-08', 30, 4911000, 4232000, 5590000, 1.000, NULL),
+            ('PKR-0020', 'MDL-01', '2021-12-13', '2021-11-15', 31, 4533000, 3910000, 5157000, 1.000, NULL),
+            ('PKR-0021', 'MDL-01', '2021-12-20', '2021-11-22', 32, 4092000, 3537000, 4646000, 1.000, NULL),
+            ('PKR-0022', 'MDL-01', '2021-12-27', '2021-11-29', 33, 5599000, 4845000, 6353000, 1.000, NULL),
+            ('PKR-0023', 'MDL-01', '2022-01-03', '2021-12-06', 34, 5227000, 4528000, 5926000, 1.000, NULL),
+            ('PKR-0024', 'MDL-01', '2022-01-10', '2021-12-13', 35, 4753000, 4120000, 5386000, 1.000, NULL),
+            ('PKR-0025', 'MDL-01', '2022-01-17', '2021-12-20', 36, 4384000, 3798000, 4970000, 1.000, NULL),
+            ('PKR-0026', 'MDL-01', '2022-01-24', '2021-12-27', 37, 3985000, 3458000, 4511000, 1.000, NULL),
+            ('PKR-0027', 'MDL-01', '2022-01-31', '2022-01-03', 38, 5545000, 4800000, 6290000, 1.000, NULL),
+            ('PKR-0028', 'MDL-01', '2022-02-07', '2022-01-10', 38, 5167000, 4469000, 5864000, 1.000, NULL),
+            ('PKR-0029', 'MDL-01', '2022-02-14', '2022-01-17', 37, 4747000, 4096000, 5397000, 1.000, NULL),
+            ('PKR-0030', 'MDL-01', '2022-02-21', '2022-01-24', 36, 4336000, 3738000, 4933000, 1.000, NULL),
+            ('PKR-0031', 'MDL-01', '2022-02-28', '2022-01-31', 36, 5725000, 4939000, 6511000, 1.000, NULL),
+            ('PKR-0032', 'MDL-01', '2022-03-07', '2022-02-07', 36, 5255000, 4547000, 5963000, 1.000, NULL),
+            ('PKR-0033', 'MDL-01', '2022-03-14', '2022-02-14', 37, 4816000, 4175000, 5458000, 1.000, NULL),
+            ('PKR-0034', 'MDL-01', '2022-03-21', '2022-02-21', 38, 4223000, 3621000, 4825000, 1.000, NULL),
+            ('PKR-0035', 'MDL-01', '2022-03-28', '2022-02-28', 38, 5919000, 5087000, 6750000, 1.000, NULL),
+            ('PKR-0036', 'MDL-01', '2022-04-04', '2022-03-07', 38, 6338000, 5454000, 7221000, 1.160, 'Disesuaikan menurut kalender liturgi: Minggu Palma.'),
+            ('PKR-0037', 'MDL-01', '2022-04-11', '2022-03-14', 38, 8317000, 7159000, 9474000, 1.661, 'Disesuaikan menurut kalender liturgi: Malam Paskah (Sabtu Suci), Hari Raya Paskah.'),
+            ('PKR-0038', 'MDL-01', '2022-04-18', '2022-03-21', 38, 4530000, 3899000, 5160000, 1.000, NULL),
+            ('PKR-0039', 'MDL-01', '2022-04-25', '2022-03-28', 39, 6137000, 5290000, 6983000, 1.000, NULL),
+            ('PKR-0040', 'MDL-01', '2022-05-02', '2022-04-04', 40, 5597000, 4833000, 6361000, 1.000, NULL),
+            ('PKR-0041', 'MDL-01', '2022-05-09', '2022-04-11', 39, 6513000, 5640000, 7386000, 1.279, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Panggilan.'),
+            ('PKR-0042', 'MDL-01', '2022-05-16', '2022-04-18', 38, 4617000, 3990000, 5244000, 1.000, NULL),
+            ('PKR-0043', 'MDL-01', '2022-05-23', '2022-04-25', 38, 5429000, 4703000, 6154000, 1.278, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Komunikasi Sosial Sedunia.'),
+            ('PKR-0044', 'MDL-01', '2022-05-30', '2022-05-02', 39, 6252000, 5398000, 7105000, 1.080, 'Disesuaikan menurut kalender liturgi: Hari Raya Pentakosta.'),
+            ('PKR-0045', 'MDL-01', '2022-06-06', '2022-05-09', 39, 5337000, 4611000, 6063000, 1.000, NULL),
+            ('PKR-0046', 'MDL-01', '2022-06-13', '2022-05-16', 39, 5286000, 4567000, 6005000, 1.080, 'Disesuaikan menurut kalender liturgi: Hari Raya Tubuh dan Darah Kristus.'),
+            ('PKR-0047', 'MDL-01', '2022-06-20', '2022-05-23', 40, 4336000, 3721000, 4950000, 1.000, NULL),
+            ('PKR-0048', 'MDL-01', '2022-06-27', '2022-05-30', 39, 5950000, 5136000, 6764000, 1.000, NULL),
+            ('PKR-0049', 'MDL-01', '2022-07-04', '2022-06-06', 39, 5477000, 4728000, 6226000, 1.000, NULL),
+            ('PKR-0050', 'MDL-01', '2022-07-11', '2022-06-13', 39, 5060000, 4362000, 5758000, 1.000, NULL),
+            ('PKR-0051', 'MDL-01', '2022-07-18', '2022-06-20', 38, 4582000, 3942000, 5222000, 1.000, NULL),
+            ('PKR-0052', 'MDL-01', '2022-07-25', '2022-06-27', 38, 4063000, 3507000, 4619000, 1.000, NULL),
+            ('PKR-0053', 'MDL-01', '2022-08-01', '2022-07-04', 38, 5595000, 4807000, 6384000, 1.000, NULL),
+            ('PKR-0054', 'MDL-01', '2022-08-08', '2022-07-11', 38, 4980000, 4368000, 5592000, 1.000, NULL),
+            ('PKR-0055', 'MDL-01', '2022-08-15', '2022-07-18', 38, 4503000, 3965000, 5041000, 1.000, NULL),
+            ('PKR-0056', 'MDL-01', '2022-08-22', '2022-07-25', 38, 4051000, 3569000, 4534000, 1.000, NULL),
+            ('PKR-0057', 'MDL-01', '2022-08-29', '2022-08-01', 38, 5662000, 4993000, 6331000, 1.000, NULL),
+            ('PKR-0058', 'MDL-01', '2022-09-05', '2022-08-08', 38, 5194000, 4585000, 5804000, 1.000, NULL),
+            ('PKR-0059', 'MDL-01', '2022-09-12', '2022-08-15', 39, 4728000, 4179000, 5277000, 1.000, NULL),
+            ('PKR-0060', 'MDL-01', '2022-09-19', '2022-08-22', 39, 4276000, 3773000, 4779000, 1.000, NULL),
+            ('PKR-0061', 'MDL-01', '2022-09-26', '2022-08-29', 39, 5812000, 5139000, 6485000, 1.000, NULL),
+            ('PKR-0062', 'MDL-01', '2022-10-03', '2022-09-05', 40, 5331000, 4722000, 5940000, 1.000, NULL),
+            ('PKR-0063', 'MDL-01', '2022-10-10', '2022-09-12', 41, 6221000, 5519000, 6923000, 1.281, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Misi Sedunia.'),
+            ('PKR-0064', 'MDL-01', '2022-10-17', '2022-09-19', 42, 4271000, 3753000, 4789000, 1.000, NULL),
+            ('PKR-0065', 'MDL-01', '2022-10-24', '2022-09-26', 43, 3848000, 3374000, 4321000, 1.000, NULL),
+            ('PKR-0066', 'MDL-01', '2022-10-31', '2022-10-03', 43, 5545000, 4866000, 6224000, 1.000, NULL),
+            ('PKR-0067', 'MDL-01', '2022-11-07', '2022-10-10', 43, 5104000, 4477000, 5732000, 1.000, NULL),
+            ('PKR-0068', 'MDL-01', '2022-11-14', '2022-10-17', 43, 4620000, 4052000, 5187000, 1.000, NULL),
+            ('PKR-0069', 'MDL-01', '2022-11-21', '2022-10-24', 43, 4198000, 3673000, 4723000, 1.000, NULL),
+            ('PKR-0070', 'MDL-01', '2022-11-28', '2022-10-31', 43, 5743000, 5029000, 6457000, 1.000, NULL),
+            ('PKR-0071', 'MDL-01', '2022-12-05', '2022-11-07', 43, 5193000, 4520000, 5866000, 1.000, NULL),
+            ('PKR-0072', 'MDL-01', '2022-12-12', '2022-11-14', 42, 4754000, 4131000, 5377000, 1.000, NULL),
+            ('PKR-0073', 'MDL-01', '2022-12-19', '2022-11-21', 41, 4297000, 3731000, 4863000, 1.000, NULL),
+            ('PKR-0074', 'MDL-01', '2022-12-26', '2022-11-28', 40, 5822000, 5046000, 6598000, 1.000, NULL),
+            ('PKR-0075', 'MDL-01', '2023-01-02', '2022-12-05', 40, 5405000, 4685000, 6124000, 1.000, NULL),
+            ('PKR-0076', 'MDL-01', '2023-01-09', '2022-12-12', 40, 4869000, 4223000, 5514000, 1.000, NULL),
+            ('PKR-0077', 'MDL-01', '2023-01-16', '2022-12-19', 40, 4460000, 3871000, 5049000, 1.000, NULL),
+            ('PKR-0078', 'MDL-01', '2023-01-23', '2022-12-26', 40, 4035000, 3503000, 4568000, 1.000, NULL),
+            ('PKR-0079', 'MDL-01', '2023-01-30', '2023-01-02', 40, 5546000, 4825000, 6267000, 1.000, NULL),
+            ('PKR-0080', 'MDL-01', '2023-02-06', '2023-01-09', 40, 5180000, 4513000, 5846000, 1.000, NULL),
+            ('PKR-0081', 'MDL-01', '2023-02-13', '2023-01-16', 41, 4821000, 4199000, 5443000, 1.000, NULL),
+            ('PKR-0082', 'MDL-01', '2023-02-20', '2023-01-23', 42, 4411000, 3849000, 4973000, 1.000, NULL),
+            ('PKR-0083', 'MDL-01', '2023-02-27', '2023-01-30', 42, 5693000, 4967000, 6419000, 1.000, NULL),
+            ('PKR-0084', 'MDL-01', '2023-03-06', '2023-02-06', 42, 5328000, 4650000, 6005000, 1.000, NULL),
+            ('PKR-0085', 'MDL-01', '2023-03-13', '2023-02-13', 42, 4983000, 4354000, 5612000, 1.000, NULL),
+            ('PKR-0086', 'MDL-01', '2023-03-20', '2023-02-20', 42, 4486000, 3948000, 5025000, 1.000, NULL),
+            ('PKR-0087', 'MDL-01', '2023-03-27', '2023-02-27', 42, 6849000, 6025000, 7672000, 1.161, 'Disesuaikan menurut kalender liturgi: Minggu Palma.'),
+            ('PKR-0088', 'MDL-01', '2023-04-03', '2023-03-06', 41, 9186000, 8077000, 10295000, 1.665, 'Disesuaikan menurut kalender liturgi: Malam Paskah (Sabtu Suci), Hari Raya Paskah.'),
+            ('PKR-0089', 'MDL-01', '2023-04-10', '2023-03-13', 41, 5188000, 4557000, 5819000, 1.000, NULL),
+            ('PKR-0090', 'MDL-01', '2023-04-17', '2023-03-20', 41, 4772000, 4189000, 5355000, 1.000, NULL),
+            ('PKR-0091', 'MDL-01', '2023-04-24', '2023-03-27', 41, 4383000, 3847000, 4918000, 1.000, NULL),
+            ('PKR-0092', 'MDL-01', '2023-05-01', '2023-04-03', 40, 7311000, 6407000, 8215000, 1.282, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Panggilan.'),
+            ('PKR-0093', 'MDL-01', '2023-05-08', '2023-04-10', 40, 5310000, 4653000, 5967000, 1.000, NULL),
+            ('PKR-0094', 'MDL-01', '2023-05-15', '2023-04-17', 41, 6377000, 5585000, 7169000, 1.282, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Komunikasi Sosial Sedunia.'),
+            ('PKR-0095', 'MDL-01', '2023-05-22', '2023-04-24', 41, 4956000, 4373000, 5539000, 1.081, 'Disesuaikan menurut kalender liturgi: Hari Raya Pentakosta.'),
+            ('PKR-0096', 'MDL-01', '2023-05-29', '2023-05-01', 41, 6028000, 5332000, 6725000, 1.000, NULL),
+            ('PKR-0097', 'MDL-01', '2023-06-05', '2023-05-08', 40, 6058000, 5349000, 6766000, 1.080, 'Disesuaikan menurut kalender liturgi: Hari Raya Tubuh dan Darah Kristus.'),
+            ('PKR-0098', 'MDL-01', '2023-06-12', '2023-05-15', 41, 5142000, 4543000, 5742000, 1.000, NULL),
+            ('PKR-0099', 'MDL-01', '2023-06-19', '2023-05-22', 40, 4682000, 4155000, 5208000, 1.000, NULL),
+            ('PKR-0100', 'MDL-01', '2023-06-26', '2023-05-29', 40, 6072000, 5389000, 6754000, 1.000, NULL),
+            ('PKR-0101', 'MDL-01', '2023-07-03', '2023-06-05', 41, 5765000, 5112000, 6418000, 1.000, NULL),
+            ('PKR-0102', 'MDL-01', '2023-07-10', '2023-06-12', 40, 5391000, 4804000, 5978000, 1.000, NULL),
+            ('PKR-0103', 'MDL-01', '2023-07-17', '2023-06-19', 41, 5033000, 4481000, 5584000, 1.000, NULL),
+            ('PKR-0104', 'MDL-01', '2023-07-24', '2023-06-26', 41, 4447000, 3905000, 4988000, 1.000, NULL),
+            ('PKR-0105', 'MDL-01', '2023-07-31', '2023-07-03', 41, 5888000, 5171000, 6605000, 1.000, NULL),
+            ('PKR-0106', 'MDL-01', '2023-08-07', '2023-07-10', 41, 5376000, 4720000, 6032000, 1.000, NULL),
+            ('PKR-0107', 'MDL-01', '2023-08-14', '2023-07-17', 41, 4953000, 4351000, 5556000, 1.000, NULL),
+            ('PKR-0108', 'MDL-01', '2023-08-21', '2023-07-24', 41, 4552000, 3996000, 5108000, 1.000, NULL),
+            ('PKR-0109', 'MDL-01', '2023-08-28', '2023-07-31', 41, 6057000, 5316000, 6799000, 1.000, NULL),
+            ('PKR-0110', 'MDL-01', '2023-09-04', '2023-08-07', 41, 5671000, 4981000, 6360000, 1.000, NULL),
+            ('PKR-0111', 'MDL-01', '2023-09-11', '2023-08-14', 41, 5341000, 4681000, 6002000, 1.000, NULL),
+            ('PKR-0112', 'MDL-01', '2023-09-18', '2023-08-21', 41, 4950000, 4348000, 5552000, 1.000, NULL),
+            ('PKR-0113', 'MDL-01', '2023-09-25', '2023-08-28', 41, 6340000, 5582000, 7098000, 1.000, NULL),
+            ('PKR-0114', 'MDL-01', '2023-10-02', '2023-09-04', 41, 6027000, 5294000, 6760000, 1.000, NULL),
+            ('PKR-0115', 'MDL-01', '2023-10-09', '2023-09-11', 40, 7190000, 6305000, 8074000, 1.280, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Misi Sedunia.'),
+            ('PKR-0116', 'MDL-01', '2023-10-16', '2023-09-18', 39, 5144000, 4562000, 5727000, 1.000, NULL),
+            ('PKR-0117', 'MDL-01', '2023-10-23', '2023-09-25', 38, 4741000, 4205000, 5277000, 1.000, NULL),
+            ('PKR-0118', 'MDL-01', '2023-10-30', '2023-10-02', 37, 6268000, 5553000, 6983000, 1.003, 'Disesuaikan menurut kalender liturgi: Hari Raya Semua Orang Kudus.'),
+            ('PKR-0119', 'MDL-01', '2023-11-06', '2023-10-09', 36, 5873000, 5203000, 6543000, 1.000, NULL),
+            ('PKR-0120', 'MDL-01', '2023-11-13', '2023-10-16', 36, 5471000, 4847000, 6095000, 1.000, NULL),
+            ('PKR-0121', 'MDL-01', '2023-11-20', '2023-10-23', 35, 5107000, 4536000, 5679000, 1.000, NULL),
+            ('PKR-0122', 'MDL-01', '2023-11-27', '2023-10-30', 35, 6558000, 5827000, 7290000, 1.000, NULL),
+            ('PKR-0123', 'MDL-01', '2023-12-04', '2023-11-06', 34, 6093000, 5442000, 6744000, 1.000, NULL),
+            ('PKR-0124', 'MDL-01', '2023-12-11', '2023-11-13', 35, 5638000, 5043000, 6233000, 1.000, NULL),
+            ('PKR-0125', 'MDL-01', '2023-12-18', '2023-11-20', 36, 5105000, 4552000, 5658000, 1.000, NULL),
+            ('PKR-0126', 'MDL-01', '2023-12-25', '2023-11-27', 37, 4654000, 4156000, 5152000, 1.000, NULL),
+            ('PKR-0127', 'MDL-01', '2024-01-01', '2023-12-04', 37, 5823000, 5043000, 6603000, 1.000, NULL),
+            ('PKR-0128', 'MDL-01', '2024-01-08', '2023-12-11', 37, 5444000, 4734000, 6153000, 1.000, NULL),
+            ('PKR-0129', 'MDL-01', '2024-01-15', '2023-12-18', 37, 5106000, 4437000, 5775000, 1.000, NULL),
+            ('PKR-0130', 'MDL-01', '2024-01-22', '2023-12-25', 37, 4668000, 4051000, 5285000, 1.000, NULL),
+            ('PKR-0131', 'MDL-01', '2024-01-29', '2024-01-01', 37, 5997000, 5210000, 6785000, 1.000, NULL),
+            ('PKR-0132', 'MDL-01', '2024-02-05', '2024-01-08', 37, 5642000, 4900000, 6385000, 1.000, NULL),
+            ('PKR-0133', 'MDL-01', '2024-02-12', '2024-01-15', 37, 5275000, 4582000, 5968000, 1.000, NULL),
+            ('PKR-0134', 'MDL-01', '2024-02-19', '2024-01-22', 37, 4847000, 4212000, 5483000, 1.000, NULL),
+            ('PKR-0135', 'MDL-01', '2024-02-26', '2024-01-29', 37, 6179000, 5368000, 6989000, 1.000, NULL),
+            ('PKR-0136', 'MDL-01', '2024-03-04', '2024-02-05', 37, 5824000, 5057000, 6591000, 1.000, NULL),
+            ('PKR-0137', 'MDL-01', '2024-03-11', '2024-02-12', 36, 5407000, 4687000, 6127000, 1.000, NULL),
+            ('PKR-0138', 'MDL-01', '2024-03-18', '2024-02-19', 35, 5723000, 4970000, 6475000, 1.159, 'Disesuaikan menurut kalender liturgi: Minggu Palma.'),
+            ('PKR-0139', 'MDL-01', '2024-03-25', '2024-02-26', 35, 7520000, 6532000, 8509000, 1.661, 'Disesuaikan menurut kalender liturgi: Malam Paskah (Sabtu Suci), Hari Raya Paskah.'),
+            ('PKR-0140', 'MDL-01', '2024-04-01', '2024-03-04', 36, 6108000, 5309000, 6906000, 1.000, NULL),
+            ('PKR-0141', 'MDL-01', '2024-04-08', '2024-03-11', 36, 5676000, 4936000, 6415000, 1.000, NULL),
+            ('PKR-0142', 'MDL-01', '2024-04-15', '2024-03-18', 36, 5203000, 4529000, 5877000, 1.000, NULL),
+            ('PKR-0143', 'MDL-01', '2024-04-22', '2024-03-25', 35, 6086000, 5287000, 6886000, 1.278, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Panggilan.'),
+            ('PKR-0144', 'MDL-01', '2024-04-29', '2024-04-01', 35, 6237000, 5418000, 7056000, 1.000, NULL),
+            ('PKR-0145', 'MDL-01', '2024-05-06', '2024-04-08', 36, 7410000, 6450000, 8369000, 1.278, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Komunikasi Sosial Sedunia.'),
+            ('PKR-0146', 'MDL-01', '2024-05-13', '2024-04-15', 36, 5825000, 5080000, 6571000, 1.080, 'Disesuaikan menurut kalender liturgi: Hari Raya Pentakosta.'),
+            ('PKR-0147', 'MDL-01', '2024-05-20', '2024-04-22', 36, 4942000, 4310000, 5574000, 1.000, NULL),
+            ('PKR-0148', 'MDL-01', '2024-05-27', '2024-04-29', 35, 6982000, 6078000, 7887000, 1.079, 'Disesuaikan menurut kalender liturgi: Hari Raya Tubuh dan Darah Kristus.'),
+            ('PKR-0149', 'MDL-01', '2024-06-03', '2024-05-06', 36, 6043000, 5271000, 6815000, 1.000, NULL),
+            ('PKR-0150', 'MDL-01', '2024-06-10', '2024-05-13', 35, 5579000, 4864000, 6295000, 1.000, NULL),
+            ('PKR-0151', 'MDL-01', '2024-06-17', '2024-05-20', 35, 5138000, 4479000, 5796000, 1.000, NULL),
+            ('PKR-0152', 'MDL-01', '2024-06-24', '2024-05-27', 36, 4723000, 4125000, 5321000, 1.000, NULL),
+            ('PKR-0153', 'MDL-01', '2024-07-01', '2024-06-03', 35, 6210000, 5422000, 6998000, 1.000, NULL),
+            ('PKR-0154', 'MDL-01', '2024-07-08', '2024-06-10', 36, 5816000, 5087000, 6545000, 1.000, NULL),
+            ('PKR-0155', 'MDL-01', '2024-07-15', '2024-06-17', 36, 5441000, 4779000, 6104000, 1.000, NULL),
+            ('PKR-0156', 'MDL-01', '2024-07-22', '2024-06-24', 36, 4758000, 4140000, 5376000, 1.000, NULL),
+            ('PKR-0157', 'MDL-01', '2024-07-29', '2024-07-01', 36, 6205000, 5385000, 7024000, 1.000, NULL),
+            ('PKR-0158', 'MDL-01', '2024-08-05', '2024-07-08', 36, 5604000, 4882000, 6326000, 1.000, NULL),
+            ('PKR-0159', 'MDL-01', '2024-08-12', '2024-07-15', 36, 5030000, 4380000, 5679000, 1.000, NULL),
+            ('PKR-0160', 'MDL-01', '2024-08-19', '2024-07-22', 36, 4568000, 3974000, 5162000, 1.000, NULL),
+            ('PKR-0161', 'MDL-01', '2024-08-26', '2024-07-29', 36, 6276000, 5424000, 7129000, 1.000, NULL),
+            ('PKR-0162', 'MDL-01', '2024-09-02', '2024-08-05', 36, 5883000, 5078000, 6687000, 1.000, NULL),
+            ('PKR-0163', 'MDL-01', '2024-09-09', '2024-08-12', 36, 5454000, 4709000, 6198000, 1.000, NULL),
+            ('PKR-0164', 'MDL-01', '2024-09-16', '2024-08-19', 36, 4935000, 4259000, 5610000, 1.000, NULL),
+            ('PKR-0165', 'MDL-01', '2024-09-23', '2024-08-26', 36, 4508000, 3885000, 5132000, 1.000, NULL),
+            ('PKR-0166', 'MDL-01', '2024-09-30', '2024-09-02', 36, 6111000, 5270000, 6951000, 1.000, NULL),
+            ('PKR-0167', 'MDL-01', '2024-10-07', '2024-09-09', 37, 5721000, 4930000, 6511000, 1.000, NULL),
+            ('PKR-0168', 'MDL-01', '2024-10-14', '2024-09-16', 38, 6765000, 5836000, 7694000, 1.278, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Misi Sedunia.'),
+            ('PKR-0169', 'MDL-01', '2024-10-21', '2024-09-23', 39, 4815000, 4162000, 5468000, 1.000, NULL),
+            ('PKR-0170', 'MDL-01', '2024-10-28', '2024-09-30', 40, 6430000, 5559000, 7301000, 1.000, NULL),
+            ('PKR-0171', 'MDL-01', '2024-11-04', '2024-10-07', 41, 6003000, 5192000, 6814000, 1.000, NULL),
+            ('PKR-0172', 'MDL-01', '2024-11-11', '2024-10-14', 42, 5543000, 4798000, 6288000, 1.000, NULL),
+            ('PKR-0173', 'MDL-01', '2024-11-18', '2024-10-21', 42, 5049000, 4370000, 5727000, 1.000, NULL),
+            ('PKR-0174', 'MDL-01', '2024-11-25', '2024-10-28', 42, 6745000, 5852000, 7638000, 1.000, NULL),
+            ('PKR-0175', 'MDL-01', '2024-12-02', '2024-11-04', 43, 6215000, 5401000, 7028000, 1.000, NULL),
+            ('PKR-0176', 'MDL-01', '2024-12-09', '2024-11-11', 43, 5746000, 4989000, 6503000, 1.000, NULL),
+            ('PKR-0177', 'MDL-01', '2024-12-16', '2024-11-18', 43, 5244000, 4555000, 5932000, 1.000, NULL),
+            ('PKR-0178', 'MDL-01', '2024-12-23', '2024-11-25', 43, 4721000, 4104000, 5339000, 1.000, NULL),
+            ('PKR-0179', 'MDL-01', '2024-12-30', '2024-12-02', 43, 6468000, 5787000, 7150000, 1.000, NULL),
+            ('PKR-0180', 'MDL-01', '2025-01-06', '2024-12-09', 43, 5890000, 5270000, 6510000, 1.000, NULL),
+            ('PKR-0181', 'MDL-01', '2025-01-13', '2024-12-16', 43, 5329000, 4773000, 5886000, 1.000, NULL),
+            ('PKR-0182', 'MDL-01', '2025-01-20', '2024-12-23', 43, 4812000, 4302000, 5323000, 1.000, NULL),
+            ('PKR-0183', 'MDL-01', '2025-01-27', '2024-12-30', 43, 6747000, 6031000, 7463000, 1.000, NULL),
+            ('PKR-0184', 'MDL-01', '2025-02-03', '2025-01-06', 43, 6170000, 5514000, 6826000, 1.000, NULL),
+            ('PKR-0185', 'MDL-01', '2025-02-10', '2025-01-13', 43, 5642000, 5043000, 6241000, 1.000, NULL),
+            ('PKR-0186', 'MDL-01', '2025-02-17', '2025-01-20', 43, 5125000, 4577000, 5674000, 1.000, NULL),
+            ('PKR-0187', 'MDL-01', '2025-02-24', '2025-01-27', 43, 6815000, 6085000, 7544000, 1.000, NULL),
+            ('PKR-0188', 'MDL-01', '2025-03-03', '2025-02-03', 43, 6219000, 5550000, 6889000, 1.000, NULL),
+            ('PKR-0189', 'MDL-01', '2025-03-10', '2025-02-10', 44, 5716000, 5102000, 6330000, 1.000, NULL),
+            ('PKR-0190', 'MDL-01', '2025-03-17', '2025-02-17', 45, 5110000, 4553000, 5668000, 1.000, NULL),
+            ('PKR-0191', 'MDL-01', '2025-03-24', '2025-02-24', 45, 4515000, 4019000, 5012000, 1.000, NULL),
+            ('PKR-0192', 'MDL-01', '2025-03-31', '2025-03-03', 45, 6318000, 5574000, 7062000, 1.000, NULL),
+            ('PKR-0193', 'MDL-01', '2025-04-07', '2025-03-10', 45, 6793000, 5978000, 7609000, 1.159, 'Disesuaikan menurut kalender liturgi: Minggu Palma.'),
+            ('PKR-0194', 'MDL-01', '2025-04-14', '2025-03-17', 45, 8867000, 7802000, 9932000, 1.663, 'Disesuaikan menurut kalender liturgi: Malam Paskah (Sabtu Suci), Hari Raya Paskah.'),
+            ('PKR-0195', 'MDL-01', '2025-04-21', '2025-03-24', 46, 4807000, 4236000, 5378000, 1.000, NULL),
+            ('PKR-0196', 'MDL-01', '2025-04-28', '2025-03-31', 47, 6538000, 5761000, 7314000, 1.000, NULL),
+            ('PKR-0197', 'MDL-01', '2025-05-05', '2025-04-07', 47, 6051000, 5326000, 6775000, 1.000, NULL),
+            ('PKR-0198', 'MDL-01', '2025-05-12', '2025-04-14', 46, 7049000, 6196000, 7902000, 1.278, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Panggilan.'),
+            ('PKR-0199', 'MDL-01', '2025-05-19', '2025-04-21', 45, 4978000, 4370000, 5587000, 1.000, NULL),
+            ('PKR-0200', 'MDL-01', '2025-05-26', '2025-04-28', 46, 8777000, 7716000, 9839000, 1.279, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Komunikasi Sosial Sedunia.'),
+            ('PKR-0201', 'MDL-01', '2025-06-02', '2025-05-05', 46, 6724000, 5891000, 7557000, 1.080, 'Disesuaikan menurut kalender liturgi: Hari Raya Pentakosta.'),
+            ('PKR-0202', 'MDL-01', '2025-06-09', '2025-05-12', 47, 5691000, 4993000, 6388000, 1.000, NULL),
+            ('PKR-0203', 'MDL-01', '2025-06-16', '2025-05-19', 47, 5566000, 4884000, 6248000, 1.079, 'Disesuaikan menurut kalender liturgi: Hari Raya Tubuh dan Darah Kristus.'),
+            ('PKR-0204', 'MDL-01', '2025-06-23', '2025-05-26', 47, 4704000, 4126000, 5281000, 1.000, NULL),
+            ('PKR-0205', 'MDL-01', '2025-06-30', '2025-06-02', 47, 6468000, 5674000, 7262000, 1.000, NULL),
+            ('PKR-0206', 'MDL-01', '2025-07-07', '2025-06-09', 46, 5957000, 5220000, 6693000, 1.000, NULL),
+            ('PKR-0207', 'MDL-01', '2025-07-14', '2025-06-16', 45, 5453000, 4774000, 6131000, 1.000, NULL),
+            ('PKR-0208', 'MDL-01', '2025-07-21', '2025-06-23', 44, 4871000, 4320000, 5421000, 1.000, NULL),
+            ('PKR-0209', 'MDL-01', '2025-07-28', '2025-06-30', 43, 6542000, 5838000, 7247000, 1.000, NULL),
+            ('PKR-0210', 'MDL-01', '2025-08-04', '2025-07-07', 42, 5996000, 5371000, 6621000, 1.000, NULL),
+            ('PKR-0211', 'MDL-01', '2025-08-11', '2025-07-14', 42, 5356000, 4822000, 5891000, 1.000, NULL),
+            ('PKR-0212', 'MDL-01', '2025-08-18', '2025-07-21', 42, 4871000, 4385000, 5357000, 1.000, NULL),
+            ('PKR-0213', 'MDL-01', '2025-08-25', '2025-07-28', 42, 4410000, 3974000, 4846000, 1.000, NULL),
+            ('PKR-0214', 'MDL-01', '2025-09-01', '2025-08-04', 42, 6114000, 5507000, 6721000, 1.000, NULL),
+            ('PKR-0215', 'MDL-01', '2025-09-08', '2025-08-11', 42, 5607000, 5050000, 6165000, 1.000, NULL),
+            ('PKR-0216', 'MDL-01', '2025-09-15', '2025-08-18', 42, 5151000, 4638000, 5664000, 1.000, NULL),
+            ('PKR-0217', 'MDL-01', '2025-09-22', '2025-08-25', 42, 4634000, 4173000, 5096000, 1.000, NULL),
+            ('PKR-0218', 'MDL-01', '2025-09-29', '2025-09-01', 42, 6257000, 5646000, 6868000, 1.000, NULL),
+            ('PKR-0219', 'MDL-01', '2025-10-06', '2025-09-08', 42, 5853000, 5275000, 6431000, 1.000, NULL),
+            ('PKR-0220', 'MDL-01', '2025-10-13', '2025-09-15', 42, 6762000, 6080000, 7444000, 1.278, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Misi Sedunia.'),
+            ('PKR-0221', 'MDL-01', '2025-10-20', '2025-09-22', 42, 4714000, 4229000, 5199000, 1.000, NULL),
+            ('PKR-0222', 'MDL-01', '2025-10-27', '2025-09-29', 42, 6542000, 5885000, 7198000, 1.018, 'Disesuaikan menurut kalender liturgi: Hari Raya Semua Orang Kudus.'),
+            ('PKR-0223', 'MDL-01', '2025-11-03', '2025-10-06', 42, 5877000, 5281000, 6473000, 1.000, NULL),
+            ('PKR-0224', 'MDL-01', '2025-11-10', '2025-10-13', 42, 5398000, 4854000, 5943000, 1.000, NULL),
+            ('PKR-0225', 'MDL-01', '2025-11-17', '2025-10-20', 42, 4909000, 4414000, 5404000, 1.000, NULL),
+            ('PKR-0226', 'MDL-01', '2025-11-24', '2025-10-27', 42, 4489000, 4030000, 4948000, 1.000, NULL),
+            ('PKR-0227', 'MDL-01', '2025-12-01', '2025-11-03', 41, 6009000, 5388000, 6630000, 1.000, NULL),
+            ('PKR-0228', 'MDL-01', '2025-12-08', '2025-11-10', 41, 5544000, 4975000, 6113000, 1.000, NULL),
+            ('PKR-0229', 'MDL-01', '2025-12-15', '2025-11-17', 41, 5089000, 4569000, 5609000, 1.000, NULL),
+            ('PKR-0230', 'MDL-01', '2025-12-22', '2025-11-24', 41, 4664000, 4183000, 5146000, 1.000, NULL),
+            ('PKR-0231', 'MDL-01', '2025-12-29', '2025-12-01', 41, 6198000, 5538000, 6857000, 1.000, NULL),
+            ('PKR-0232', 'MDL-01', '2026-01-05', '2025-12-08', 41, 5777000, 5158000, 6397000, 1.000, NULL),
+            ('PKR-0233', 'MDL-01', '2026-01-12', '2025-12-15', 40, 5290000, 4716000, 5864000, 1.000, NULL),
+            ('PKR-0234', 'MDL-01', '2026-01-19', '2025-12-22', 39, 4823000, 4302000, 5344000, 1.000, NULL),
+            ('PKR-0235', 'MDL-01', '2026-01-26', '2025-12-29', 39, 6507000, 5779000, 7235000, 1.000, NULL),
+            ('PKR-0236', 'MDL-01', '2026-02-02', '2026-01-05', 39, 6033000, 5357000, 6708000, 1.000, NULL),
+            ('PKR-0237', 'MDL-01', '2026-02-09', '2026-01-12', 39, 5604000, 4979000, 6230000, 1.000, NULL),
+            ('PKR-0238', 'MDL-01', '2026-02-16', '2026-01-19', 39, 5207000, 4627000, 5786000, 1.000, NULL),
+            ('PKR-0239', 'MDL-01', '2026-02-23', '2026-01-26', 39, 6636000, 5896000, 7376000, 1.000, NULL),
+            ('PKR-0240', 'MDL-01', '2026-03-02', '2026-02-02', 39, 6074000, 5378000, 6770000, 1.000, NULL),
+            ('PKR-0241', 'MDL-01', '2026-03-09', '2026-02-09', 39, 5637000, 5007000, 6267000, 1.000, NULL),
+            ('PKR-0242', 'MDL-01', '2026-03-16', '2026-02-16', 39, 5149000, 4573000, 5724000, 1.000, NULL),
+            ('PKR-0243', 'MDL-01', '2026-03-23', '2026-02-23', 39, 5397000, 4793000, 6001000, 1.159, 'Disesuaikan menurut kalender liturgi: Minggu Palma.'),
+            ('PKR-0244', 'MDL-01', '2026-03-30', '2026-03-02', 39, 10129000, 9070000, 11189000, 1.662, 'Disesuaikan menurut kalender liturgi: Malam Paskah (Sabtu Suci), Hari Raya Paskah.'),
+            ('PKR-0245', 'MDL-01', '2026-04-06', '2026-03-09', 39, 5600000, 5012000, 6188000, 1.000, NULL),
+            ('PKR-0246', 'MDL-01', '2026-04-13', '2026-03-16', 39, 5103000, 4550000, 5656000, 1.000, NULL),
+            ('PKR-0247', 'MDL-01', '2026-04-20', '2026-03-23', 39, 4657000, 4153000, 5162000, 1.000, NULL),
+            ('PKR-0248', 'MDL-01', '2026-04-27', '2026-03-30', 38, 7700000, 6892000, 8508000, 1.281, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Panggilan.'),
+            ('PKR-0249', 'MDL-01', '2026-05-04', '2026-04-06', 37, 5631000, 5052000, 6211000, 1.000, NULL),
+            ('PKR-0250', 'MDL-01', '2026-05-11', '2026-04-13', 38, 6766000, 6067000, 7465000, 1.281, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Komunikasi Sosial Sedunia.'),
+            ('PKR-0251', 'MDL-01', '2026-05-18', '2026-04-20', 39, 5242000, 4705000, 5778000, 1.080, 'Disesuaikan menurut kalender liturgi: Hari Raya Pentakosta.'),
+            ('PKR-0252', 'MDL-01', '2026-05-25', '2026-04-27', 39, 4388000, 3938000, 4839000, 1.000, NULL),
+            ('PKR-0253', 'MDL-01', '2026-06-01', '2026-05-04', 38, 6212000, 5579000, 6845000, 1.080, 'Disesuaikan menurut kalender liturgi: Hari Raya Tubuh dan Darah Kristus.'),
+            ('PKR-0254', 'MDL-01', '2026-06-08', '2026-05-11', 38, 5457000, 4849000, 6064000, 1.000, NULL),
+            ('PKR-0255', 'MDL-01', '2026-06-15', '2026-05-18', 38, 5019000, 4460000, 5578000, 1.000, NULL),
+            ('PKR-0256', 'MDL-01', '2026-06-22', '2026-05-25', 37, 4609000, 4098000, 5120000, 1.000, NULL),
+            ('PKR-0257', 'MDL-01', '2026-06-29', '2026-06-01', 38, 5982000, 5277000, 6688000, 1.000, NULL),
+            ('PKR-0258', 'MDL-01', '2026-07-06', '2026-06-08', 38, 5506000, 4857000, 6156000, 1.000, NULL),
+            ('PKR-0259', 'MDL-01', '2026-07-13', '2026-06-15', 39, 4941000, 4348000, 5535000, 1.000, NULL),
+            ('PKR-0260', 'MDL-01', '2026-07-20', '2026-06-22', 40, 4395000, 3864000, 4927000, 1.000, NULL),
+            ('PKR-0261', 'MDL-01', '2026-07-27', '2026-06-29', 41, 5976000, 5249000, 6703000, 1.000, NULL),
+            ('PKR-0262', 'MDL-01', '2026-08-03', '2026-07-06', 41, 5481000, 4814000, 6147000, 1.000, NULL),
+            ('PKR-0263', 'MDL-01', '2026-08-10', '2026-07-13', 40, 5078000, 4464000, 5692000, 1.025, 'Disesuaikan menurut kalender liturgi: Hari Raya Santa Perawan Maria Diangkat ke Surga.'),
+            ('PKR-0264', 'MDL-01', '2026-08-17', '2026-07-20', 40, 4573000, 3988000, 5157000, 1.000, NULL),
+            ('PKR-0265', 'MDL-01', '2026-08-24', '2026-07-27', 40, 4077000, 3556000, 4598000, 1.000, NULL),
+            ('PKR-0266', 'MDL-01', '2026-08-31', '2026-08-03', 40, 5834000, 5085000, 6583000, 1.000, NULL),
+            ('PKR-0267', 'MDL-01', '2026-09-07', '2026-08-10', 40, 5362000, 4669000, 6056000, 1.000, NULL),
+            ('PKR-0268', 'MDL-01', '2026-09-14', '2026-08-17', 39, 4861000, 4231000, 5492000, 1.000, NULL),
+            ('PKR-0269', 'MDL-01', '2026-09-21', '2026-08-24', 39, 4396000, 3817000, 4975000, 1.000, NULL),
+            ('PKR-0270', 'MDL-01', '2026-09-28', '2026-08-31', 39, 6094000, 5289000, 6899000, 1.000, NULL),
+            ('PKR-0271', 'MDL-01', '2026-10-05', '2026-09-07', 39, 5530000, 4804000, 6257000, 1.000, NULL),
+            ('PKR-0272', 'MDL-01', '2026-10-12', '2026-09-14', 39, 6497000, 5641000, 7353000, 1.278, 'Disesuaikan menurut kalender liturgi: Kolekte khusus Hari Minggu Misi Sedunia.'),
+            ('PKR-0273', 'MDL-01', '2026-10-19', '2026-09-21', 39, 4656000, 4031000, 5281000, 1.000, NULL),
+            ('PKR-0274', 'MDL-01', '2026-10-26', '2026-09-28', 39, 6809000, 5892000, 7725000, 1.079, 'Disesuaikan menurut kalender liturgi: Hari Raya Semua Orang Kudus.')
+    ) AS v (ID_PERKIRAAN, ID_MODEL, AWAL_PEKAN_SASARAN, TANGGAL_PERKIRAAN, JUMLAH_PEKAN_PELATIHAN, JUMLAH_PERKIRAAN, BATAS_BAWAH, BATAS_ATAS, PENYESUAIAN_KALENDER, KETERANGAN)
+) AS s
+ON t.ID_PERKIRAAN = s.ID_PERKIRAAN
+WHEN MATCHED THEN UPDATE SET
+    ID_MODEL = s.ID_MODEL,
+    AWAL_PEKAN_SASARAN = s.AWAL_PEKAN_SASARAN,
+    TANGGAL_PERKIRAAN = s.TANGGAL_PERKIRAAN,
+    JUMLAH_PEKAN_PELATIHAN = s.JUMLAH_PEKAN_PELATIHAN,
+    JUMLAH_PERKIRAAN = s.JUMLAH_PERKIRAAN,
+    BATAS_BAWAH = s.BATAS_BAWAH,
+    BATAS_ATAS = s.BATAS_ATAS,
+    PENYESUAIAN_KALENDER = s.PENYESUAIAN_KALENDER,
+    KETERANGAN = s.KETERANGAN
+WHEN NOT MATCHED THEN INSERT (ID_PERKIRAAN, ID_MODEL, AWAL_PEKAN_SASARAN, TANGGAL_PERKIRAAN, JUMLAH_PEKAN_PELATIHAN, JUMLAH_PERKIRAAN, BATAS_BAWAH, BATAS_ATAS, PENYESUAIAN_KALENDER, KETERANGAN)
+    VALUES (s.ID_PERKIRAAN, s.ID_MODEL, s.AWAL_PEKAN_SASARAN, s.TANGGAL_PERKIRAAN, s.JUMLAH_PEKAN_PELATIHAN, s.JUMLAH_PERKIRAAN, s.BATAS_BAWAH, s.BATAS_ATAS, s.PENYESUAIAN_KALENDER, s.KETERANGAN);
+
+-- =============================================================================
 -- >>> sql/05_create_views.sql
 -- =============================================================================
 
@@ -15694,7 +16307,8 @@ WHEN NOT MATCHED THEN INSERT (ID_SUMBANGAN_KELUARGA, ID_KAMPANYE, ID_KELUARGA, I
 --     depend on a session setting. Years count as complete only when the snapshot date in
 --     MASTER_DATA.INFO_DATASET has passed 31 December.
 --   * Views are listed in dependency order: a view only reads views defined above it
---     (views 8 and 9 read view 7, view 10 reads view 9, view 12 reads view 11, view 23 reads view 7).
+--     (views 8 and 9 read view 7, view 10 reads view 9, view 12 reads view 11, view 23 reads view 7,
+--     view 24 reads view 14, views 25 and 26 read view 24, views 28 and 29 read view 27).
 --   * "Upcoming" is always relative to the snapshot date in MASTER_DATA.INFO_DATASET, never to the
 --     clock, so the demo gives the same answer on any day. With real data, replace it by CURRENT_DATE.
 -- =============================================================================
@@ -16677,6 +17291,236 @@ WHERE p.STATUS_PELAKSANAAN = 'Direncanakan'
    OR (p.STATUS_PELAKSANAAN = 'Ditunda' AND p.TAHUN_RENCANA = EXTRACT(YEAR FROM i.TANGGAL_SNAPSHOT));
 
 -- =============================================================================
+-- Shadow forecast of the weekly offertory: forecast against actual, with the events that explain the gap
+-- =============================================================================
+
+-- 24. Weekly offertory against the shadow forecast ---------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN
+    COMMENT = 'Kolekte mingguan sebenarnya dibandingkan dengan perkiraan bayangan yang dibuat empat pekan sebelumnya, lengkap dengan rentang perkiraan, selisih, dan peristiwa luar biasa yang menjelaskan selisih besar. Hanya pekan yang sudah lengkap pada tanggal data yang dibandingkan. Data simulasi.'
+AS
+WITH DASAR AS (
+    SELECT
+        p.ID_MODEL,
+        p.AWAL_PEKAN_SASARAN,
+        p.TANGGAL_PERKIRAAN,
+        p.JUMLAH_PEKAN_PELATIHAN,
+        p.JUMLAH_PERKIRAAN,
+        p.BATAS_BAWAH,
+        p.BATAS_ATAS,
+        p.PENYESUAIAN_KALENDER,
+        p.KETERANGAN,
+        CASE WHEN DATEADD('day', 6, p.AWAL_PEKAN_SASARAN) <= i.TANGGAL_SNAPSHOT THEN 'Lengkap'
+             WHEN p.AWAL_PEKAN_SASARAN <= i.TANGGAL_SNAPSHOT THEN 'Sedang berjalan'
+             ELSE 'Mendatang'
+        END AS STATUS_PEKAN
+    FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN p
+    CROSS JOIN MASTER_DATA.INFO_DATASET i
+),
+DENGAN_AKTUAL AS (
+    SELECT
+        d.*,
+        CASE WHEN d.STATUS_PEKAN = 'Lengkap' THEN COALESCE(w.TOTAL_KOLEKTE, 0) END AS KOLEKTE_AKTUAL,
+        w.ID_PERISTIWA,
+        w.JENIS_PERISTIWA,
+        w.NAMA_PERISTIWA,
+        w.TINGKAT_GANGGUAN
+    FROM DASAR d
+    LEFT JOIN ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA w
+        ON w.AWAL_PEKAN = d.AWAL_PEKAN_SASARAN
+)
+SELECT
+    a.AWAL_PEKAN_SASARAN AS AWAL_PEKAN,
+    EXTRACT(YEAR FROM a.AWAL_PEKAN_SASARAN) AS TAHUN,
+    a.ID_MODEL,
+    m.NAMA_MODEL,
+    m.LEBAR_RENTANG_PERSEN,
+    a.TANGGAL_PERKIRAAN,
+    a.STATUS_PEKAN,
+    a.JUMLAH_PERKIRAAN,
+    a.BATAS_BAWAH,
+    a.BATAS_ATAS,
+    a.KOLEKTE_AKTUAL,
+    a.KOLEKTE_AKTUAL - a.JUMLAH_PERKIRAAN AS SELISIH,
+    ROUND(100.0 * (a.KOLEKTE_AKTUAL - a.JUMLAH_PERKIRAAN) / NULLIF(a.JUMLAH_PERKIRAAN, 0), 1) AS SELISIH_PERSEN,
+    CASE WHEN a.KOLEKTE_AKTUAL IS NULL THEN NULL
+         WHEN a.KOLEKTE_AKTUAL < a.BATAS_BAWAH THEN 'Di bawah rentang'
+         WHEN a.KOLEKTE_AKTUAL > a.BATAS_ATAS THEN 'Di atas rentang'
+         ELSE 'Dalam rentang'
+    END AS POSISI_TERHADAP_RENTANG,
+    CASE WHEN a.ID_PERISTIWA IS NOT NULL THEN 'Peristiwa luar biasa'
+         WHEN a.KETERANGAN IS NOT NULL THEN 'Hari raya atau kolekte khusus'
+         ELSE 'Pekan biasa'
+    END AS JENIS_PEKAN,
+    CASE WHEN a.KOLEKTE_AKTUAL IS NULL THEN NULL
+         WHEN a.KOLEKTE_AKTUAL BETWEEN a.BATAS_BAWAH AND a.BATAS_ATAS THEN 'Dalam rentang perkiraan'
+         WHEN a.ID_PERISTIWA IS NOT NULL THEN 'Di luar rentang, dijelaskan peristiwa luar biasa'
+         ELSE 'Di luar rentang, tanpa peristiwa tercatat'
+    END AS PENJELASAN_SELISIH,
+    a.PENYESUAIAN_KALENDER,
+    a.KETERANGAN AS CATATAN_KALENDER,
+    a.JUMLAH_PEKAN_PELATIHAN,
+    a.ID_PERISTIWA,
+    a.JENIS_PERISTIWA,
+    a.NAMA_PERISTIWA,
+    a.TINGKAT_GANGGUAN,
+    'Selisih = kolekte sebenarnya dikurangi perkiraan. Negatif berarti kolekte lebih rendah dari perkiraan.' AS CATATAN_METODE,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM DENGAN_AKTUAL a
+JOIN MASTER_DATA.REFERENSI_MODEL_PERKIRAAN m
+    ON m.ID_MODEL = a.ID_MODEL;
+
+-- 25. Gap between forecast and actual for each unforeseen event ----------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA
+    COMMENT = 'Untuk setiap peristiwa luar biasa: seberapa jauh kolekte sebenarnya menyimpang dari perkiraan bayangan selama pekan-pekan peristiwa, dibandingkan dengan galat biasa pada pekan tanpa peristiwa. Menjelaskan mengapa perkiraan meleset. Data simulasi.'
+AS
+WITH GALAT_BIASA AS (
+    SELECT ID_MODEL,
+           AVG(100.0 * ABS(KOLEKTE_AKTUAL - JUMLAH_PERKIRAAN) / NULLIF(JUMLAH_PERKIRAAN, 0)) AS GALAT_PERSEN
+    FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN
+    WHERE STATUS_PEKAN = 'Lengkap' AND JENIS_PEKAN = 'Pekan biasa'
+    GROUP BY ID_MODEL
+),
+PER_PERISTIWA AS (
+    SELECT
+        v.ID_MODEL,
+        v.ID_PERISTIWA,
+        COUNT(*) AS JUMLAH_PEKAN_TERDAMPAK,
+        MIN(v.AWAL_PEKAN) AS PEKAN_PERTAMA,
+        MAX(v.AWAL_PEKAN) AS PEKAN_TERAKHIR,
+        SUM(v.JUMLAH_PERKIRAAN) AS PERKIRAAN_TOTAL,
+        SUM(v.KOLEKTE_AKTUAL) AS KOLEKTE_AKTUAL_TOTAL,
+        SUM(CASE WHEN v.POSISI_TERHADAP_RENTANG <> 'Dalam rentang' THEN 1 ELSE 0 END) AS JUMLAH_PEKAN_DI_LUAR_RENTANG,
+        MIN(v.SELISIH_PERSEN) AS SELISIH_PERSEN_TERBESAR_NEGATIF
+    FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN v
+    WHERE v.STATUS_PEKAN = 'Lengkap' AND v.ID_PERISTIWA IS NOT NULL
+    GROUP BY v.ID_MODEL, v.ID_PERISTIWA
+)
+SELECT
+    e.ID_PERISTIWA,
+    e.JENIS_PERISTIWA,
+    e.NAMA_PERISTIWA,
+    e.TANGGAL_MULAI,
+    e.TANGGAL_SELESAI,
+    e.TINGKAT_GANGGUAN,
+    e.DESKRIPSI,
+    g.ID_MODEL,
+    g.JUMLAH_PEKAN_TERDAMPAK,
+    g.PEKAN_PERTAMA,
+    g.PEKAN_TERAKHIR,
+    g.PERKIRAAN_TOTAL,
+    g.KOLEKTE_AKTUAL_TOTAL,
+    g.KOLEKTE_AKTUAL_TOTAL - g.PERKIRAAN_TOTAL AS SELISIH_TOTAL,
+    ROUND(100.0 * (g.KOLEKTE_AKTUAL_TOTAL - g.PERKIRAAN_TOTAL) / NULLIF(g.PERKIRAAN_TOTAL, 0), 1) AS SELISIH_PERSEN,
+    g.SELISIH_PERSEN_TERBESAR_NEGATIF,
+    g.JUMLAH_PEKAN_DI_LUAR_RENTANG,
+    ROUND(b.GALAT_PERSEN, 1) AS GALAT_PEKAN_BIASA_PERSEN,
+    ROUND(ABS(100.0 * (g.KOLEKTE_AKTUAL_TOTAL - g.PERKIRAAN_TOTAL) / NULLIF(g.PERKIRAAN_TOTAL, 0)) / NULLIF(b.GALAT_PERSEN, 0), 1) AS KELIPATAN_GALAT_BIASA,
+    'Pekan tanpa peristiwa dan tanpa hari raya dipakai sebagai ukuran galat biasa. Peristiwa sebelum perkiraan pertama (Agustus 2021) tidak tercantum.' AS CATATAN_METODE,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM PER_PERISTIWA g
+JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA e
+    ON e.ID_PERISTIWA = g.ID_PERISTIWA
+LEFT JOIN GALAT_BIASA b
+    ON b.ID_MODEL = g.ID_MODEL;
+
+-- 26. Forecast accuracy per year and kind of week --------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.AKURASI_PERKIRAAN_TAHUNAN
+    COMMENT = 'Ketepatan perkiraan bayangan per tahun dan jenis pekan (pekan biasa, hari raya atau kolekte khusus, peristiwa luar biasa): galat rata-rata, selisih rata-rata, dan persentase pekan yang jatuh di dalam rentang perkiraan. Data simulasi.'
+AS
+SELECT
+    v.TAHUN,
+    v.JENIS_PEKAN,
+    v.ID_MODEL,
+    v.LEBAR_RENTANG_PERSEN,
+    COUNT(*) AS JUMLAH_PEKAN,
+    ROUND(AVG(100.0 * ABS(v.KOLEKTE_AKTUAL - v.JUMLAH_PERKIRAAN) / NULLIF(v.JUMLAH_PERKIRAAN, 0)), 1) AS GALAT_RATA_RATA_PERSEN,
+    ROUND(AVG(100.0 * (v.KOLEKTE_AKTUAL - v.JUMLAH_PERKIRAAN) / NULLIF(v.JUMLAH_PERKIRAAN, 0)), 1) AS SELISIH_RATA_RATA_PERSEN,
+    SUM(CASE WHEN v.POSISI_TERHADAP_RENTANG = 'Dalam rentang' THEN 1 ELSE 0 END) AS JUMLAH_DALAM_RENTANG,
+    ROUND(100.0 * SUM(CASE WHEN v.POSISI_TERHADAP_RENTANG = 'Dalam rentang' THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_DALAM_RENTANG,
+    'Galat = rata-rata selisih mutlak terhadap perkiraan. Selisih rata-rata negatif berarti kolekte lebih rendah dari perkiraan.' AS CATATAN_METODE,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN v
+WHERE v.STATUS_PEKAN = 'Lengkap'
+GROUP BY v.TAHUN, v.JENIS_PEKAN, v.ID_MODEL, v.LEBAR_RENTANG_PERSEN;
+
+-- =============================================================================
+-- Public service guides: what a parishioner may read without logging in
+-- =============================================================================
+
+-- 27. Public services -------------------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.LAYANAN_PUBLIK
+    COMMENT = 'Layanan paroki yang boleh dibaca umum (klasifikasi yang dapat tampil publik): ringkasan, waktu proses, seksi pengelola, nama berkas PDF panduan, dan jumlah langkah serta persyaratan. Isi panduan fiktif dan bukan ketentuan resmi. Data simulasi.'
+AS
+SELECT
+    l.ID_LAYANAN,
+    l.NAMA_LAYANAN,
+    l.KATEGORI_LAYANAN,
+    l.RINGKASAN,
+    l.PERKIRAAN_WAKTU_PROSES,
+    l.CATATAN_PENTING,
+    s.NAMA_SEKSI AS SEKSI_PENGELOLA,
+    l.NAMA_BERKAS_PANDUAN,
+    l.TANGGAL_REVISI,
+    COALESCE(g.JUMLAH_LANGKAH, 0) AS JUMLAH_LANGKAH,
+    COALESCE(p.JUMLAH_PERSYARATAN, 0) AS JUMLAH_PERSYARATAN,
+    COALESCE(p.JUMLAH_WAJIB, 0) AS JUMLAH_PERSYARATAN_WAJIB,
+    'Panduan contoh untuk demonstrasi, bukan ketentuan resmi gereja, keuskupan, atau paroki mana pun.' AS CATATAN_PENGGUNAAN,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM MASTER_DATA.LAYANAN_PAROKI l
+JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA k
+    ON k.ID_KLASIFIKASI_DATA = l.ID_KLASIFIKASI_DATA
+   AND k.DAPAT_DITAMPILKAN_PUBLIK = TRUE
+JOIN MASTER_DATA.MASTER_SEKSI s
+    ON s.ID_SEKSI = l.ID_SEKSI_PENGELOLA
+LEFT JOIN (
+    SELECT ID_LAYANAN, COUNT(*) AS JUMLAH_LANGKAH
+    FROM MASTER_DATA.LANGKAH_LAYANAN
+    GROUP BY ID_LAYANAN
+) g ON g.ID_LAYANAN = l.ID_LAYANAN
+LEFT JOIN (
+    SELECT ID_LAYANAN,
+           COUNT(*) AS JUMLAH_PERSYARATAN,
+           SUM(CASE WHEN WAJIB_DIPENUHI THEN 1 ELSE 0 END) AS JUMLAH_WAJIB
+    FROM MASTER_DATA.PERSYARATAN_LAYANAN
+    GROUP BY ID_LAYANAN
+) p ON p.ID_LAYANAN = l.ID_LAYANAN;
+
+-- 28. Steps of the public services -------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.LANGKAH_LAYANAN_PUBLIK
+    COMMENT = 'Langkah berurutan setiap layanan publik, dengan pelaku langkah (pemohon, sekretariat, pastor, seksi, atau ketua lingkungan). Hanya layanan yang boleh dibaca umum. Data simulasi.'
+AS
+SELECT
+    g.ID_LAYANAN,
+    l.NAMA_LAYANAN,
+    l.KATEGORI_LAYANAN,
+    g.NOMOR_URUT,
+    g.JUDUL_LANGKAH,
+    g.URAIAN,
+    g.PELAKU,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM MASTER_DATA.LANGKAH_LAYANAN g
+JOIN ANALISIS.LAYANAN_PUBLIK l
+    ON l.ID_LAYANAN = g.ID_LAYANAN;
+
+-- 29. Requirements of the public services --------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.PERSYARATAN_LAYANAN_PUBLIK
+    COMMENT = 'Persyaratan setiap layanan publik: dokumen, pembinaan, dan ketentuan umum, ditandai wajib atau hanya jika berlaku. Hanya layanan yang boleh dibaca umum. Data simulasi.'
+AS
+SELECT
+    r.ID_LAYANAN,
+    l.NAMA_LAYANAN,
+    l.KATEGORI_LAYANAN,
+    r.NOMOR_URUT,
+    r.NAMA_PERSYARATAN,
+    r.JENIS_PERSYARATAN,
+    CASE WHEN r.WAJIB_DIPENUHI THEN 'Wajib' ELSE 'Jika berlaku' END AS STATUS_PERSYARATAN,
+    r.KETERANGAN,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM MASTER_DATA.PERSYARATAN_LAYANAN r
+JOIN ANALISIS.LAYANAN_PUBLIK l
+    ON l.ID_LAYANAN = r.ID_LAYANAN;
+
+-- =============================================================================
 -- >>> sql/06_validate_data.sql
 -- =============================================================================
 
@@ -16723,13 +17567,13 @@ WITH CHECKS AS (
     SELECT 40 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KATEGORI_INFORMASI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KATEGORI_INFORMASI) AS FOUND_COUNT,
-           9 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
+           10 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
     SELECT 50 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_DAFTAR_NILAI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_DAFTAR_NILAI) AS FOUND_COUNT,
-           82 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
+           93 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
     SELECT 60 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
@@ -16811,1856 +17655,2186 @@ WITH CHECKS AS (
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
     SELECT 190 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+           'MASTER_DATA.REFERENSI_MODEL_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_MODEL_PERKIRAAN) AS FOUND_COUNT,
+           1 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
+           'Row count of the bundled demo data.' AS NOTE
+    UNION ALL
+    SELECT 200 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI) AS FOUND_COUNT,
+           6 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
+           'Row count of the bundled demo data.' AS NOTE
+    UNION ALL
+    SELECT 210 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+           'MASTER_DATA.LANGKAH_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LANGKAH_LAYANAN) AS FOUND_COUNT,
+           46 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
+           'Row count of the bundled demo data.' AS NOTE
+    UNION ALL
+    SELECT 220 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+           'MASTER_DATA.PERSYARATAN_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.PERSYARATAN_LAYANAN) AS FOUND_COUNT,
+           48 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
+           'Row count of the bundled demo data.' AS NOTE
+    UNION ALL
+    SELECT 230 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA) AS FOUND_COUNT,
            1825 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 200 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 240 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA) AS FOUND_COUNT,
            10 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 210 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 250 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA) AS FOUND_COUNT,
            1734 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 220 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 260 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE) AS FOUND_COUNT,
            3263 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 230 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 270 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN) AS FOUND_COUNT,
+           274 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
+           'Row count of the bundled demo data.' AS NOTE
+    UNION ALL
+    SELECT 280 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA) AS FOUND_COUNT,
            227 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 240 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 290 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT) AS FOUND_COUNT,
            653 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 250 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 300 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA) AS FOUND_COUNT,
            659 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 260 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 310 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN) AS FOUND_COUNT,
            237 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 270 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 320 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI) AS FOUND_COUNT,
            214 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 280 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 330 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI) AS FOUND_COUNT,
            1040 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 290 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 340 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT) AS FOUND_COUNT,
            76 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 300 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 350 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN) AS FOUND_COUNT,
            54 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 310 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 360 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN) AS FOUND_COUNT,
            179 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 320 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 370 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN) AS FOUND_COUNT,
            14 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 330 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 380 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS) AS FOUND_COUNT,
            78 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 340 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 390 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA) AS FOUND_COUNT,
            1695 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 350 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 400 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN) AS FOUND_COUNT,
            521 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 360 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 410 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN) AS FOUND_COUNT,
            698 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 370 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 420 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN) AS FOUND_COUNT,
            169 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 380 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
+    SELECT 430 AS SORT_ORDER, 'STRUCTURE' AS CHECK_GROUP, 'Row count' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN) AS FOUND_COUNT,
            132 AS EXPECTED_COUNT, 'ROWS' AS RULE_TYPE,
            'Row count of the bundled demo data.' AS NOTE
     UNION ALL
-    SELECT 390 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 440 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.INFO_DATASET' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_DATASET FROM MASTER_DATA.INFO_DATASET WHERE ID_DATASET IS NOT NULL GROUP BY ID_DATASET HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_DATASET).' AS NOTE
     UNION ALL
-    SELECT 400 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 450 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KLASIFIKASI_DATA FROM MASTER_DATA.REFERENSI_KLASIFIKASI_DATA WHERE ID_KLASIFIKASI_DATA IS NOT NULL GROUP BY ID_KLASIFIKASI_DATA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KLASIFIKASI_DATA).' AS NOTE
     UNION ALL
-    SELECT 410 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 460 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_SEKSI FROM MASTER_DATA.MASTER_SEKSI WHERE ID_SEKSI IS NOT NULL GROUP BY ID_SEKSI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_SEKSI).' AS NOTE
     UNION ALL
-    SELECT 420 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 470 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KATEGORI_INFORMASI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KATEGORI_INFORMASI FROM MASTER_DATA.REFERENSI_KATEGORI_INFORMASI WHERE ID_KATEGORI_INFORMASI IS NOT NULL GROUP BY ID_KATEGORI_INFORMASI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KATEGORI_INFORMASI).' AS NOTE
     UNION ALL
-    SELECT 430 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 480 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_DAFTAR_NILAI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT KELOMPOK_NILAI, NILAI FROM MASTER_DATA.REFERENSI_DAFTAR_NILAI WHERE KELOMPOK_NILAI IS NOT NULL AND NILAI IS NOT NULL GROUP BY KELOMPOK_NILAI, NILAI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (KELOMPOK_NILAI, NILAI).' AS NOTE
     UNION ALL
-    SELECT 440 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 490 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_JENIS_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_JENIS_KOLEKTE FROM MASTER_DATA.REFERENSI_JENIS_KOLEKTE WHERE ID_JENIS_KOLEKTE IS NOT NULL GROUP BY ID_JENIS_KOLEKTE HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_JENIS_KOLEKTE).' AS NOTE
     UNION ALL
-    SELECT 450 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 500 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KESEMPATAN FROM MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS WHERE ID_KESEMPATAN IS NOT NULL GROUP BY ID_KESEMPATAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KESEMPATAN).' AS NOTE
     UNION ALL
-    SELECT 460 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 510 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KATEGORI_BIAYA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KATEGORI_BIAYA FROM MASTER_DATA.REFERENSI_KATEGORI_BIAYA WHERE ID_KATEGORI_BIAYA IS NOT NULL GROUP BY ID_KATEGORI_BIAYA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KATEGORI_BIAYA).' AS NOTE
     UNION ALL
-    SELECT 470 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 520 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_PERIODE_PELAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PERIODE_PELAPORAN FROM MASTER_DATA.REFERENSI_PERIODE_PELAPORAN WHERE ID_PERIODE_PELAPORAN IS NOT NULL GROUP BY ID_PERIODE_PELAPORAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_PERIODE_PELAPORAN).' AS NOTE
     UNION ALL
-    SELECT 480 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 530 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.KEBIJAKAN_AKSES_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KLASIFIKASI_DATA, KELOMPOK_PENGGUNA FROM MASTER_DATA.KEBIJAKAN_AKSES_DATA WHERE ID_KLASIFIKASI_DATA IS NOT NULL AND KELOMPOK_PENGGUNA IS NOT NULL GROUP BY ID_KLASIFIKASI_DATA, KELOMPOK_PENGGUNA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KLASIFIKASI_DATA, KELOMPOK_PENGGUNA).' AS NOTE
     UNION ALL
-    SELECT 490 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 540 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_WILAYAH FROM MASTER_DATA.MASTER_WILAYAH WHERE ID_WILAYAH IS NOT NULL GROUP BY ID_WILAYAH HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_WILAYAH).' AS NOTE
     UNION ALL
-    SELECT 500 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 550 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_LINGKUNGAN FROM MASTER_DATA.MASTER_LINGKUNGAN WHERE ID_LINGKUNGAN IS NOT NULL GROUP BY ID_LINGKUNGAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_LINGKUNGAN).' AS NOTE
     UNION ALL
-    SELECT 510 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 560 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PROFIL FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN WHERE ID_PROFIL IS NOT NULL GROUP BY ID_PROFIL HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_PROFIL).' AS NOTE
     UNION ALL
-    SELECT 520 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_PROFIL_EKONOMI_LINGKUNGAN' AS CHECK_NAME,
+    SELECT 570 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_PROFIL_EKONOMI_LINGKUNGAN' AS CHECK_NAME,
            'MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_LINGKUNGAN FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN WHERE ID_LINGKUNGAN IS NOT NULL GROUP BY ID_LINGKUNGAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_LINGKUNGAN).' AS NOTE
     UNION ALL
-    SELECT 530 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 580 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_GEOMETRI FROM MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN WHERE ID_GEOMETRI IS NOT NULL GROUP BY ID_GEOMETRI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_GEOMETRI).' AS NOTE
     UNION ALL
-    SELECT 540 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_GEOMETRI_LINGKUNGAN' AS CHECK_NAME,
+    SELECT 590 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_GEOMETRI_LINGKUNGAN' AS CHECK_NAME,
            'MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_LINGKUNGAN FROM MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN WHERE ID_LINGKUNGAN IS NOT NULL GROUP BY ID_LINGKUNGAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_LINGKUNGAN).' AS NOTE
     UNION ALL
-    SELECT 550 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 600 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_JADWAL_MISA FROM MASTER_DATA.JADWAL_MISA WHERE ID_JADWAL_MISA IS NOT NULL GROUP BY ID_JADWAL_MISA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_JADWAL_MISA).' AS NOTE
     UNION ALL
-    SELECT 560 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 610 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_SURVEI FROM MASTER_DATA.SURVEI WHERE ID_SURVEI IS NOT NULL GROUP BY ID_SURVEI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_SURVEI).' AS NOTE
     UNION ALL
-    SELECT 570 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 620 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PERTANYAAN FROM MASTER_DATA.PERTANYAAN_SURVEI WHERE ID_PERTANYAAN IS NOT NULL GROUP BY ID_PERTANYAAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_PERTANYAAN).' AS NOTE
     UNION ALL
-    SELECT 580 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_PERTANYAAN_SURVEI_URUT' AS CHECK_NAME,
+    SELECT 630 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_PERTANYAAN_SURVEI_URUT' AS CHECK_NAME,
            'MASTER_DATA.PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_SURVEI, NOMOR_URUT FROM MASTER_DATA.PERTANYAAN_SURVEI WHERE ID_SURVEI IS NOT NULL AND NOMOR_URUT IS NOT NULL GROUP BY ID_SURVEI, NOMOR_URUT HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_SURVEI, NOMOR_URUT).' AS NOTE
     UNION ALL
-    SELECT 590 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 640 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'MASTER_DATA.OPSI_JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_OPSI FROM MASTER_DATA.OPSI_JAWABAN_SURVEI WHERE ID_OPSI IS NOT NULL GROUP BY ID_OPSI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_OPSI).' AS NOTE
     UNION ALL
-    SELECT 600 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_OPSI_JAWABAN_URUT' AS CHECK_NAME,
+    SELECT 650 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_OPSI_JAWABAN_URUT' AS CHECK_NAME,
            'MASTER_DATA.OPSI_JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PERTANYAAN, NOMOR_URUT FROM MASTER_DATA.OPSI_JAWABAN_SURVEI WHERE ID_PERTANYAAN IS NOT NULL AND NOMOR_URUT IS NOT NULL GROUP BY ID_PERTANYAAN, NOMOR_URUT HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_PERTANYAAN, NOMOR_URUT).' AS NOTE
     UNION ALL
-    SELECT 610 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 660 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+           'MASTER_DATA.REFERENSI_MODEL_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_MODEL FROM MASTER_DATA.REFERENSI_MODEL_PERKIRAAN WHERE ID_MODEL IS NOT NULL GROUP BY ID_MODEL HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (ID_MODEL).' AS NOTE
+    UNION ALL
+    SELECT 670 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_LAYANAN FROM MASTER_DATA.LAYANAN_PAROKI WHERE ID_LAYANAN IS NOT NULL GROUP BY ID_LAYANAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (ID_LAYANAN).' AS NOTE
+    UNION ALL
+    SELECT 680 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_LAYANAN_PAROKI_BERKAS' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT NAMA_BERKAS_PANDUAN FROM MASTER_DATA.LAYANAN_PAROKI WHERE NAMA_BERKAS_PANDUAN IS NOT NULL GROUP BY NAMA_BERKAS_PANDUAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (NAMA_BERKAS_PANDUAN).' AS NOTE
+    UNION ALL
+    SELECT 690 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+           'MASTER_DATA.LANGKAH_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_LANGKAH FROM MASTER_DATA.LANGKAH_LAYANAN WHERE ID_LANGKAH IS NOT NULL GROUP BY ID_LANGKAH HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (ID_LANGKAH).' AS NOTE
+    UNION ALL
+    SELECT 700 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_LANGKAH_LAYANAN_URUT' AS CHECK_NAME,
+           'MASTER_DATA.LANGKAH_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_LAYANAN, NOMOR_URUT FROM MASTER_DATA.LANGKAH_LAYANAN WHERE ID_LAYANAN IS NOT NULL AND NOMOR_URUT IS NOT NULL GROUP BY ID_LAYANAN, NOMOR_URUT HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (ID_LAYANAN, NOMOR_URUT).' AS NOTE
+    UNION ALL
+    SELECT 710 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+           'MASTER_DATA.PERSYARATAN_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_PERSYARATAN FROM MASTER_DATA.PERSYARATAN_LAYANAN WHERE ID_PERSYARATAN IS NOT NULL GROUP BY ID_PERSYARATAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (ID_PERSYARATAN).' AS NOTE
+    UNION ALL
+    SELECT 720 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_PERSYARATAN_LAYANAN_URUT' AS CHECK_NAME,
+           'MASTER_DATA.PERSYARATAN_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_LAYANAN, NOMOR_URUT FROM MASTER_DATA.PERSYARATAN_LAYANAN WHERE ID_LAYANAN IS NOT NULL AND NOMOR_URUT IS NOT NULL GROUP BY ID_LAYANAN, NOMOR_URUT HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (ID_LAYANAN, NOMOR_URUT).' AS NOTE
+    UNION ALL
+    SELECT 730 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KEJADIAN_MISA FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE ID_KEJADIAN_MISA IS NOT NULL GROUP BY ID_KEJADIAN_MISA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KEJADIAN_MISA).' AS NOTE
     UNION ALL
-    SELECT 620 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_KEJADIAN_MISA_JADWAL_TANGGAL' AS CHECK_NAME,
+    SELECT 740 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_KEJADIAN_MISA_JADWAL_TANGGAL' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_JADWAL_MISA, TANGGAL_MISA FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE ID_JADWAL_MISA IS NOT NULL AND TANGGAL_MISA IS NOT NULL GROUP BY ID_JADWAL_MISA, TANGGAL_MISA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_JADWAL_MISA, TANGGAL_MISA).' AS NOTE
     UNION ALL
-    SELECT 630 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 750 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PERISTIWA FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA WHERE ID_PERISTIWA IS NOT NULL GROUP BY ID_PERISTIWA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_PERISTIWA).' AS NOTE
     UNION ALL
-    SELECT 640 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 760 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KEHADIRAN FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE ID_KEHADIRAN IS NOT NULL GROUP BY ID_KEHADIRAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KEHADIRAN).' AS NOTE
     UNION ALL
-    SELECT 650 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_KEHADIRAN_MISA_KEJADIAN' AS CHECK_NAME,
+    SELECT 770 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_KEHADIRAN_MISA_KEJADIAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KEJADIAN_MISA FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE ID_KEJADIAN_MISA IS NOT NULL GROUP BY ID_KEJADIAN_MISA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KEJADIAN_MISA).' AS NOTE
     UNION ALL
-    SELECT 660 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 780 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KOLEKTE FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE ID_KOLEKTE IS NOT NULL GROUP BY ID_KOLEKTE HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KOLEKTE).' AS NOTE
     UNION ALL
-    SELECT 670 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_PENERIMAAN_KOLEKTE_KEJADIAN_JENIS' AS CHECK_NAME,
+    SELECT 790 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_PENERIMAAN_KOLEKTE_KEJADIAN_JENIS' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KEJADIAN_MISA, ID_JENIS_KOLEKTE FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE ID_KEJADIAN_MISA IS NOT NULL AND ID_JENIS_KOLEKTE IS NOT NULL GROUP BY ID_KEJADIAN_MISA, ID_JENIS_KOLEKTE HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KEJADIAN_MISA, ID_JENIS_KOLEKTE).' AS NOTE
     UNION ALL
-    SELECT 680 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 800 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_PERKIRAAN FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE ID_PERKIRAAN IS NOT NULL GROUP BY ID_PERKIRAAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (ID_PERKIRAAN).' AS NOTE
+    UNION ALL
+    SELECT 810 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_PERKIRAAN_KOLEKTE_MODEL_PEKAN' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_MODEL, AWAL_PEKAN_SASARAN FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE ID_MODEL IS NOT NULL AND AWAL_PEKAN_SASARAN IS NOT NULL GROUP BY ID_MODEL, AWAL_PEKAN_SASARAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Number of key values that occur more than once (ID_MODEL, AWAL_PEKAN_SASARAN).' AS NOTE
+    UNION ALL
+    SELECT 820 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KELUARGA FROM DATA_OPERASIONAL.KELUARGA WHERE ID_KELUARGA IS NOT NULL GROUP BY ID_KELUARGA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KELUARGA).' AS NOTE
     UNION ALL
-    SELECT 690 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 830 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_UMAT FROM DATA_OPERASIONAL.UMAT WHERE ID_UMAT IS NOT NULL GROUP BY ID_UMAT HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_UMAT).' AS NOTE
     UNION ALL
-    SELECT 700 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 840 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PENUGASAN_KELUARGA FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA WHERE ID_PENUGASAN_KELUARGA IS NOT NULL GROUP BY ID_PENUGASAN_KELUARGA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_PENUGASAN_KELUARGA).' AS NOTE
     UNION ALL
-    SELECT 710 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 850 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PENUGASAN_LINGKUNGAN FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN WHERE ID_PENUGASAN_LINGKUNGAN IS NOT NULL GROUP BY ID_PENUGASAN_LINGKUNGAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_PENUGASAN_LINGKUNGAN).' AS NOTE
     UNION ALL
-    SELECT 720 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 860 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_RESPONDEN FROM DATA_OPERASIONAL.RESPONDEN_SURVEI WHERE ID_RESPONDEN IS NOT NULL GROUP BY ID_RESPONDEN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_RESPONDEN).' AS NOTE
     UNION ALL
-    SELECT 730 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 870 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_JAWABAN FROM DATA_OPERASIONAL.JAWABAN_SURVEI WHERE ID_JAWABAN IS NOT NULL GROUP BY ID_JAWABAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_JAWABAN).' AS NOTE
     UNION ALL
-    SELECT 740 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_JAWABAN_RESPONDEN_PERTANYAAN' AS CHECK_NAME,
+    SELECT 880 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_JAWABAN_RESPONDEN_PERTANYAAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_RESPONDEN, ID_PERTANYAAN FROM DATA_OPERASIONAL.JAWABAN_SURVEI WHERE ID_RESPONDEN IS NOT NULL AND ID_PERTANYAAN IS NOT NULL GROUP BY ID_RESPONDEN, ID_PERTANYAAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_RESPONDEN, ID_PERTANYAAN).' AS NOTE
     UNION ALL
-    SELECT 750 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 890 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_HASIL FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE ID_HASIL IS NOT NULL GROUP BY ID_HASIL HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_HASIL).' AS NOTE
     UNION ALL
-    SELECT 760 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_HASIL_SURVEI_OPSI' AS CHECK_NAME,
+    SELECT 900 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_HASIL_SURVEI_OPSI' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_OPSI FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE ID_OPSI IS NOT NULL GROUP BY ID_OPSI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_OPSI).' AS NOTE
     UNION ALL
-    SELECT 770 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 910 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_RENCANA_KERJA FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN WHERE ID_RENCANA_KERJA IS NOT NULL GROUP BY ID_RENCANA_KERJA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_RENCANA_KERJA).' AS NOTE
     UNION ALL
-    SELECT 780 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_RENCANA_KERJA_SEKSI_TAHUN' AS CHECK_NAME,
+    SELECT 920 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_RENCANA_KERJA_SEKSI_TAHUN' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_SEKSI, TAHUN_RENCANA FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN WHERE ID_SEKSI IS NOT NULL AND TAHUN_RENCANA IS NOT NULL GROUP BY ID_SEKSI, TAHUN_RENCANA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_SEKSI, TAHUN_RENCANA).' AS NOTE
     UNION ALL
-    SELECT 790 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 930 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_RENCANA FROM DATA_OPERASIONAL.RENCANA_KEGIATAN WHERE ID_RENCANA IS NOT NULL GROUP BY ID_RENCANA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_RENCANA).' AS NOTE
     UNION ALL
-    SELECT 800 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 940 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KAMPANYE FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE ID_KAMPANYE IS NOT NULL GROUP BY ID_KAMPANYE HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KAMPANYE).' AS NOTE
     UNION ALL
-    SELECT 810 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_KAMPANYE_KESEMPATAN_PERIODE' AS CHECK_NAME,
+    SELECT 950 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_KAMPANYE_KESEMPATAN_PERIODE' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KESEMPATAN, PERIODE_MULAI FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE ID_KESEMPATAN IS NOT NULL AND PERIODE_MULAI IS NOT NULL GROUP BY ID_KESEMPATAN, PERIODE_MULAI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KESEMPATAN, PERIODE_MULAI).' AS NOTE
     UNION ALL
-    SELECT 820 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 960 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_SUMBANGAN FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE ID_SUMBANGAN IS NOT NULL GROUP BY ID_SUMBANGAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_SUMBANGAN).' AS NOTE
     UNION ALL
-    SELECT 830 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_SUMBANGAN_KAMPANYE_WILAYAH' AS CHECK_NAME,
+    SELECT 970 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_SUMBANGAN_KAMPANYE_WILAYAH' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KAMPANYE, ID_WILAYAH FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE ID_KAMPANYE IS NOT NULL AND ID_WILAYAH IS NOT NULL GROUP BY ID_KAMPANYE, ID_WILAYAH HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KAMPANYE, ID_WILAYAH).' AS NOTE
     UNION ALL
-    SELECT 840 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 980 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_SUMBANGAN_KELUARGA FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA WHERE ID_SUMBANGAN_KELUARGA IS NOT NULL GROUP BY ID_SUMBANGAN_KELUARGA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_SUMBANGAN_KELUARGA).' AS NOTE
     UNION ALL
-    SELECT 850 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_SUMBANGAN_KELUARGA_KAMPANYE' AS CHECK_NAME,
+    SELECT 990 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_SUMBANGAN_KELUARGA_KAMPANYE' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KAMPANYE, ID_KELUARGA FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA WHERE ID_KAMPANYE IS NOT NULL AND ID_KELUARGA IS NOT NULL GROUP BY ID_KAMPANYE, ID_KELUARGA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KAMPANYE, ID_KELUARGA).' AS NOTE
     UNION ALL
-    SELECT 860 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 1000 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_ALOKASI FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN WHERE ID_ALOKASI IS NOT NULL GROUP BY ID_ALOKASI HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_ALOKASI).' AS NOTE
     UNION ALL
-    SELECT 870 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_ALOKASI_RENCANA_KATEGORI' AS CHECK_NAME,
+    SELECT 1010 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_ALOKASI_RENCANA_KATEGORI' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_RENCANA, ID_KATEGORI_BIAYA FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN WHERE ID_RENCANA IS NOT NULL AND ID_KATEGORI_BIAYA IS NOT NULL GROUP BY ID_RENCANA, ID_KATEGORI_BIAYA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_RENCANA, ID_KATEGORI_BIAYA).' AS NOTE
     UNION ALL
-    SELECT 880 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 1020 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PENGELUARAN FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN WHERE ID_PENGELUARAN IS NOT NULL GROUP BY ID_PENGELUARAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_PENGELUARAN).' AS NOTE
     UNION ALL
-    SELECT 890 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 1030 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KEGIATAN FROM DATA_OPERASIONAL.KEGIATAN WHERE ID_KEGIATAN IS NOT NULL GROUP BY ID_KEGIATAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KEGIATAN).' AS NOTE
     UNION ALL
-    SELECT 900 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_KEGIATAN_RENCANA' AS CHECK_NAME,
+    SELECT 1040 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_KEGIATAN_RENCANA' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_RENCANA FROM DATA_OPERASIONAL.KEGIATAN WHERE ID_RENCANA IS NOT NULL GROUP BY ID_RENCANA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_RENCANA).' AS NOTE
     UNION ALL
-    SELECT 910 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
+    SELECT 1050 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate primary key' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_LAPORAN FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE ID_LAPORAN IS NOT NULL GROUP BY ID_LAPORAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_LAPORAN).' AS NOTE
     UNION ALL
-    SELECT 920 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_LAPORAN_KEGIATAN' AS CHECK_NAME,
+    SELECT 1060 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_LAPORAN_KEGIATAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KEGIATAN FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE ID_KEGIATAN IS NOT NULL GROUP BY ID_KEGIATAN HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (ID_KEGIATAN).' AS NOTE
     UNION ALL
-    SELECT 930 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_LAPORAN_KEGIATAN_BERKAS' AS CHECK_NAME,
+    SELECT 1070 AS SORT_ORDER, 'KEYS' AS CHECK_GROUP, 'Duplicate unique key UQ_LAPORAN_KEGIATAN_BERKAS' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT NAMA_BERKAS_SUMBER FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE NAMA_BERKAS_SUMBER IS NOT NULL GROUP BY NAMA_BERKAS_SUMBER HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Number of key values that occur more than once (NAMA_BERKAS_SUMBER).' AS NOTE
     UNION ALL
-    SELECT 940 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1080 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KATEGORI_INFORMASI.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KATEGORI_INFORMASI c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 950 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1090 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KATEGORI_INFORMASI.ID_SEKSI_PENGELOLA -> MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KATEGORI_INFORMASI c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI_PENGELOLA = p.ID_SEKSI WHERE c.ID_SEKSI_PENGELOLA IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 960 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1100 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.KEBIJAKAN_AKSES_DATA.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.KEBIJAKAN_AKSES_DATA c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 970 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1110 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN.ID_WILAYAH -> MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN c LEFT JOIN MASTER_DATA.MASTER_WILAYAH p ON c.ID_WILAYAH = p.ID_WILAYAH WHERE c.ID_WILAYAH IS NOT NULL AND p.ID_WILAYAH IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 980 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1120 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN.ID_LINGKUNGAN -> MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN c LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN p ON c.ID_LINGKUNGAN = p.ID_LINGKUNGAN WHERE c.ID_LINGKUNGAN IS NOT NULL AND p.ID_LINGKUNGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 990 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1130 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN.ID_LINGKUNGAN -> MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN c LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN p ON c.ID_LINGKUNGAN = p.ID_LINGKUNGAN WHERE c.ID_LINGKUNGAN IS NOT NULL AND p.ID_LINGKUNGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1000 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1140 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.SURVEI.ID_SEKSI -> MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI = p.ID_SEKSI WHERE c.ID_SEKSI IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1010 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1150 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.SURVEI.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1020 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1160 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.PERTANYAAN_SURVEI.ID_SURVEI -> SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PERTANYAAN_SURVEI c LEFT JOIN MASTER_DATA.SURVEI p ON c.ID_SURVEI = p.ID_SURVEI WHERE c.ID_SURVEI IS NOT NULL AND p.ID_SURVEI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1030 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1170 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'MASTER_DATA.OPSI_JAWABAN_SURVEI.ID_PERTANYAAN -> PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.OPSI_JAWABAN_SURVEI c LEFT JOIN MASTER_DATA.PERTANYAAN_SURVEI p ON c.ID_PERTANYAAN = p.ID_PERTANYAAN WHERE c.ID_PERTANYAAN IS NOT NULL AND p.ID_PERTANYAAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1040 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1180 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI.ID_SEKSI_PENGELOLA -> MASTER_SEKSI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI_PENGELOLA = p.ID_SEKSI WHERE c.ID_SEKSI_PENGELOLA IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Child rows whose parent row does not exist.' AS NOTE
+    UNION ALL
+    SELECT 1190 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Child rows whose parent row does not exist.' AS NOTE
+    UNION ALL
+    SELECT 1200 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+           'MASTER_DATA.LANGKAH_LAYANAN.ID_LAYANAN -> LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LANGKAH_LAYANAN c LEFT JOIN MASTER_DATA.LAYANAN_PAROKI p ON c.ID_LAYANAN = p.ID_LAYANAN WHERE c.ID_LAYANAN IS NOT NULL AND p.ID_LAYANAN IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Child rows whose parent row does not exist.' AS NOTE
+    UNION ALL
+    SELECT 1210 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+           'MASTER_DATA.PERSYARATAN_LAYANAN.ID_LAYANAN -> LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.PERSYARATAN_LAYANAN c LEFT JOIN MASTER_DATA.LAYANAN_PAROKI p ON c.ID_LAYANAN = p.ID_LAYANAN WHERE c.ID_LAYANAN IS NOT NULL AND p.ID_LAYANAN IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Child rows whose parent row does not exist.' AS NOTE
+    UNION ALL
+    SELECT 1220 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA.ID_JADWAL_MISA -> JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA c LEFT JOIN MASTER_DATA.JADWAL_MISA p ON c.ID_JADWAL_MISA = p.ID_JADWAL_MISA WHERE c.ID_JADWAL_MISA IS NOT NULL AND p.ID_JADWAL_MISA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1050 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1230 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA.ID_KEJADIAN_MISA -> KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA c LEFT JOIN DATA_OPERASIONAL.KEJADIAN_MISA p ON c.ID_KEJADIAN_MISA = p.ID_KEJADIAN_MISA WHERE c.ID_KEJADIAN_MISA IS NOT NULL AND p.ID_KEJADIAN_MISA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1060 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1240 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA.ID_PERISTIWA -> PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA c LEFT JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA p ON c.ID_PERISTIWA = p.ID_PERISTIWA WHERE c.ID_PERISTIWA IS NOT NULL AND p.ID_PERISTIWA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1070 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1250 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE.ID_KEJADIAN_MISA -> KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE c LEFT JOIN DATA_OPERASIONAL.KEJADIAN_MISA p ON c.ID_KEJADIAN_MISA = p.ID_KEJADIAN_MISA WHERE c.ID_KEJADIAN_MISA IS NOT NULL AND p.ID_KEJADIAN_MISA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1080 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1260 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE.ID_JENIS_KOLEKTE -> REFERENSI_JENIS_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE c LEFT JOIN MASTER_DATA.REFERENSI_JENIS_KOLEKTE p ON c.ID_JENIS_KOLEKTE = p.ID_JENIS_KOLEKTE WHERE c.ID_JENIS_KOLEKTE IS NOT NULL AND p.ID_JENIS_KOLEKTE IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1090 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1270 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN.ID_MODEL -> REFERENSI_MODEL_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN c LEFT JOIN MASTER_DATA.REFERENSI_MODEL_PERKIRAAN p ON c.ID_MODEL = p.ID_MODEL WHERE c.ID_MODEL IS NOT NULL AND p.ID_MODEL IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Child rows whose parent row does not exist.' AS NOTE
+    UNION ALL
+    SELECT 1280 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1100 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1290 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT.ID_KLASIFIKASI_DATA -> REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT c LEFT JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA p ON c.ID_KLASIFIKASI_DATA = p.ID_KLASIFIKASI_DATA WHERE c.ID_KLASIFIKASI_DATA IS NOT NULL AND p.ID_KLASIFIKASI_DATA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1110 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1300 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA.ID_UMAT -> UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA c LEFT JOIN DATA_OPERASIONAL.UMAT p ON c.ID_UMAT = p.ID_UMAT WHERE c.ID_UMAT IS NOT NULL AND p.ID_UMAT IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1120 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1310 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA.ID_KELUARGA -> KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA c LEFT JOIN DATA_OPERASIONAL.KELUARGA p ON c.ID_KELUARGA = p.ID_KELUARGA WHERE c.ID_KELUARGA IS NOT NULL AND p.ID_KELUARGA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1130 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1320 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN.ID_KELUARGA -> KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN c LEFT JOIN DATA_OPERASIONAL.KELUARGA p ON c.ID_KELUARGA = p.ID_KELUARGA WHERE c.ID_KELUARGA IS NOT NULL AND p.ID_KELUARGA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1140 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1330 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN.ID_LINGKUNGAN -> MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN c LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN p ON c.ID_LINGKUNGAN = p.ID_LINGKUNGAN WHERE c.ID_LINGKUNGAN IS NOT NULL AND p.ID_LINGKUNGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1150 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1340 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI.ID_SURVEI -> SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI c LEFT JOIN MASTER_DATA.SURVEI p ON c.ID_SURVEI = p.ID_SURVEI WHERE c.ID_SURVEI IS NOT NULL AND p.ID_SURVEI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1160 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1350 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI.ID_WILAYAH -> MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI c LEFT JOIN MASTER_DATA.MASTER_WILAYAH p ON c.ID_WILAYAH = p.ID_WILAYAH WHERE c.ID_WILAYAH IS NOT NULL AND p.ID_WILAYAH IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1170 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1360 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI.ID_RESPONDEN -> RESPONDEN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI c LEFT JOIN DATA_OPERASIONAL.RESPONDEN_SURVEI p ON c.ID_RESPONDEN = p.ID_RESPONDEN WHERE c.ID_RESPONDEN IS NOT NULL AND p.ID_RESPONDEN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1180 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1370 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI.ID_PERTANYAAN -> PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI c LEFT JOIN MASTER_DATA.PERTANYAAN_SURVEI p ON c.ID_PERTANYAAN = p.ID_PERTANYAAN WHERE c.ID_PERTANYAAN IS NOT NULL AND p.ID_PERTANYAAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1190 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1380 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI.ID_OPSI -> OPSI_JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI c LEFT JOIN MASTER_DATA.OPSI_JAWABAN_SURVEI p ON c.ID_OPSI = p.ID_OPSI WHERE c.ID_OPSI IS NOT NULL AND p.ID_OPSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1200 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1390 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT.ID_SURVEI -> SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT c LEFT JOIN MASTER_DATA.SURVEI p ON c.ID_SURVEI = p.ID_SURVEI WHERE c.ID_SURVEI IS NOT NULL AND p.ID_SURVEI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1210 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1400 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT.ID_PERTANYAAN -> PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT c LEFT JOIN MASTER_DATA.PERTANYAAN_SURVEI p ON c.ID_PERTANYAAN = p.ID_PERTANYAAN WHERE c.ID_PERTANYAAN IS NOT NULL AND p.ID_PERTANYAAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1220 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1410 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT.ID_OPSI -> OPSI_JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT c LEFT JOIN MASTER_DATA.OPSI_JAWABAN_SURVEI p ON c.ID_OPSI = p.ID_OPSI WHERE c.ID_OPSI IS NOT NULL AND p.ID_OPSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1230 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1420 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN.ID_SEKSI -> MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI = p.ID_SEKSI WHERE c.ID_SEKSI IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1240 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1430 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN.ID_RENCANA_KERJA -> RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN c LEFT JOIN DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN p ON c.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE c.ID_RENCANA_KERJA IS NOT NULL AND p.ID_RENCANA_KERJA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1250 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1440 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN.ID_KESEMPATAN -> REFERENSI_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN c LEFT JOIN MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS p ON c.ID_KESEMPATAN = p.ID_KESEMPATAN WHERE c.ID_KESEMPATAN IS NOT NULL AND p.ID_KESEMPATAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1260 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1450 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN.ID_RENCANA_PENGGUNAAN -> RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN c LEFT JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON c.ID_RENCANA_PENGGUNAAN = p.ID_RENCANA WHERE c.ID_RENCANA_PENGGUNAAN IS NOT NULL AND p.ID_RENCANA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1270 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1460 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS.ID_KAMPANYE -> KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS c LEFT JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN p ON c.ID_KAMPANYE = p.ID_KAMPANYE WHERE c.ID_KAMPANYE IS NOT NULL AND p.ID_KAMPANYE IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1280 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1470 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS.ID_WILAYAH -> MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS c LEFT JOIN MASTER_DATA.MASTER_WILAYAH p ON c.ID_WILAYAH = p.ID_WILAYAH WHERE c.ID_WILAYAH IS NOT NULL AND p.ID_WILAYAH IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1290 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1480 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA.ID_KAMPANYE -> KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA c LEFT JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN p ON c.ID_KAMPANYE = p.ID_KAMPANYE WHERE c.ID_KAMPANYE IS NOT NULL AND p.ID_KAMPANYE IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1300 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1490 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA.ID_KELUARGA -> KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA c LEFT JOIN DATA_OPERASIONAL.KELUARGA p ON c.ID_KELUARGA = p.ID_KELUARGA WHERE c.ID_KELUARGA IS NOT NULL AND p.ID_KELUARGA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1310 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1500 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA.ID_LINGKUNGAN -> MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA c LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN p ON c.ID_LINGKUNGAN = p.ID_LINGKUNGAN WHERE c.ID_LINGKUNGAN IS NOT NULL AND p.ID_LINGKUNGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1320 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1510 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN.ID_RENCANA -> RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN c LEFT JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON c.ID_RENCANA = p.ID_RENCANA WHERE c.ID_RENCANA IS NOT NULL AND p.ID_RENCANA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1330 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1520 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN.ID_KATEGORI_BIAYA -> REFERENSI_KATEGORI_BIAYA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN c LEFT JOIN MASTER_DATA.REFERENSI_KATEGORI_BIAYA p ON c.ID_KATEGORI_BIAYA = p.ID_KATEGORI_BIAYA WHERE c.ID_KATEGORI_BIAYA IS NOT NULL AND p.ID_KATEGORI_BIAYA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1340 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1530 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN.ID_ALOKASI -> ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN c LEFT JOIN DATA_OPERASIONAL.ALOKASI_ANGGARAN p ON c.ID_ALOKASI = p.ID_ALOKASI WHERE c.ID_ALOKASI IS NOT NULL AND p.ID_ALOKASI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1350 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1540 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN.ID_RENCANA -> RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN c LEFT JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON c.ID_RENCANA = p.ID_RENCANA WHERE c.ID_RENCANA IS NOT NULL AND p.ID_RENCANA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1360 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1550 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN.ID_SEKSI -> MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN c LEFT JOIN MASTER_DATA.MASTER_SEKSI p ON c.ID_SEKSI = p.ID_SEKSI WHERE c.ID_SEKSI IS NOT NULL AND p.ID_SEKSI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1370 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
+    SELECT 1560 AS SORT_ORDER, 'REFERENCES' AS CHECK_GROUP, 'Orphaned reference' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN.ID_KEGIATAN -> KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN c LEFT JOIN DATA_OPERASIONAL.KEGIATAN p ON c.ID_KEGIATAN = p.ID_KEGIATAN WHERE c.ID_KEGIATAN IS NOT NULL AND p.ID_KEGIATAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Child rows whose parent row does not exist.' AS NOTE
     UNION ALL
-    SELECT 1380 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list HARI' AS CHECK_NAME,
+    SELECT 1570 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list HARI' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA.HARI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'HARI' AND v.NILAI = x.HARI WHERE x.HARI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1390 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list BAHASA_MISA' AS CHECK_NAME,
+    SELECT 1580 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list BAHASA_MISA' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA.BAHASA_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'BAHASA_MISA' AND v.NILAI = x.BAHASA_MISA WHERE x.BAHASA_MISA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1400 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list MUSIM_LITURGI' AS CHECK_NAME,
+    SELECT 1590 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list MUSIM_LITURGI' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS.MUSIM_LITURGI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'MUSIM_LITURGI' AND v.NILAI = x.MUSIM_LITURGI WHERE x.MUSIM_LITURGI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1410 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KELOMPOK_PENGGUNA' AS CHECK_NAME,
+    SELECT 1600 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KELOMPOK_PENGGUNA' AS CHECK_NAME,
            'MASTER_DATA.KEBIJAKAN_AKSES_DATA.KELOMPOK_PENGGUNA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.KEBIJAKAN_AKSES_DATA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'KELOMPOK_PENGGUNA' AND v.NILAI = x.KELOMPOK_PENGGUNA WHERE x.KELOMPOK_PENGGUNA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1420 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list TINGKAT_AKSES' AS CHECK_NAME,
+    SELECT 1610 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list TINGKAT_AKSES' AS CHECK_NAME,
            'MASTER_DATA.KEBIJAKAN_AKSES_DATA.TINGKAT_AKSES' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.KEBIJAKAN_AKSES_DATA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'TINGKAT_AKSES' AND v.NILAI = x.TINGKAT_AKSES WHERE x.TINGKAT_AKSES IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1430 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_SURVEI' AS CHECK_NAME,
+    SELECT 1620 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_SURVEI' AS CHECK_NAME,
            'MASTER_DATA.SURVEI.STATUS_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_SURVEI' AND v.NILAI = x.STATUS_SURVEI WHERE x.STATUS_SURVEI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1440 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_JAWABAN' AS CHECK_NAME,
+    SELECT 1630 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_JAWABAN' AS CHECK_NAME,
            'MASTER_DATA.PERTANYAAN_SURVEI.JENIS_JAWABAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PERTANYAAN_SURVEI x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'JENIS_JAWABAN' AND v.NILAI = x.JENIS_JAWABAN WHERE x.JENIS_JAWABAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1450 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PELAKSANAAN_MISA' AS CHECK_NAME,
+    SELECT 1640 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PELAKSANAAN_MISA' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA.STATUS_PELAKSANAAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_PELAKSANAAN_MISA' AND v.NILAI = x.STATUS_PELAKSANAAN WHERE x.STATUS_PELAKSANAAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1460 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list METODE_PENGHITUNGAN' AS CHECK_NAME,
+    SELECT 1650 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list METODE_PENGHITUNGAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA.METODE_PENGHITUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'METODE_PENGHITUNGAN' AND v.NILAI = x.METODE_PENGHITUNGAN WHERE x.METODE_PENGHITUNGAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1470 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_VALIDASI' AS CHECK_NAME,
+    SELECT 1660 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_VALIDASI' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA.STATUS_VALIDASI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_VALIDASI' AND v.NILAI = x.STATUS_VALIDASI WHERE x.STATUS_VALIDASI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1480 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_REKONSILIASI' AS CHECK_NAME,
+    SELECT 1670 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_REKONSILIASI' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE.STATUS_REKONSILIASI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_REKONSILIASI' AND v.NILAI = x.STATUS_REKONSILIASI WHERE x.STATUS_REKONSILIASI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1490 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_VALIDASI' AS CHECK_NAME,
+    SELECT 1680 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_VALIDASI' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS.STATUS_VALIDASI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_VALIDASI' AND v.NILAI = x.STATUS_VALIDASI WHERE x.STATUS_VALIDASI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1500 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KELUARGA' AS CHECK_NAME,
+    SELECT 1690 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KELUARGA' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA.STATUS_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_KELUARGA' AND v.NILAI = x.STATUS_KELUARGA WHERE x.STATUS_KELUARGA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1510 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_KELAMIN' AS CHECK_NAME,
+    SELECT 1700 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_KELAMIN' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT.JENIS_KELAMIN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'JENIS_KELAMIN' AND v.NILAI = x.JENIS_KELAMIN WHERE x.JENIS_KELAMIN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1520 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KEANGGOTAAN' AS CHECK_NAME,
+    SELECT 1710 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KEANGGOTAAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT.STATUS_KEANGGOTAAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_KEANGGOTAAN' AND v.NILAI = x.STATUS_KEANGGOTAAN WHERE x.STATUS_KEANGGOTAAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1530 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list PERAN_DALAM_KELUARGA' AS CHECK_NAME,
+    SELECT 1720 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list PERAN_DALAM_KELUARGA' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA.PERAN_DALAM_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'PERAN_DALAM_KELUARGA' AND v.NILAI = x.PERAN_DALAM_KELUARGA WHERE x.PERAN_DALAM_KELUARGA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1540 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KELOMPOK_USIA' AS CHECK_NAME,
+    SELECT 1730 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KELOMPOK_USIA' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI.KELOMPOK_USIA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'KELOMPOK_USIA' AND v.NILAI = x.KELOMPOK_USIA WHERE x.KELOMPOK_USIA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1550 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PENGESAHAN' AS CHECK_NAME,
+    SELECT 1740 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PENGESAHAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN.STATUS_PENGESAHAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_PENGESAHAN' AND v.NILAI = x.STATUS_PENGESAHAN WHERE x.STATUS_PENGESAHAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1560 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PELAKSANAAN_RENCANA' AS CHECK_NAME,
+    SELECT 1750 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_PELAKSANAAN_RENCANA' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN.STATUS_PELAKSANAAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_PELAKSANAAN_RENCANA' AND v.NILAI = x.STATUS_PELAKSANAAN WHERE x.STATUS_PELAKSANAAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1570 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KEGIATAN' AS CHECK_NAME,
+    SELECT 1760 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KEGIATAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN.STATUS_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_KEGIATAN' AND v.NILAI = x.STATUS_KEGIATAN WHERE x.STATUS_KEGIATAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1580 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_LAPORAN' AS CHECK_NAME,
+    SELECT 1770 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_LAPORAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN.STATUS_LAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_LAPORAN' AND v.NILAI = x.STATUS_LAPORAN WHERE x.STATUS_LAPORAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1590 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KAMPANYE' AS CHECK_NAME,
+    SELECT 1780 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list STATUS_KAMPANYE' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN.STATUS_KAMPANYE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'STATUS_KAMPANYE' AND v.NILAI = x.STATUS_KAMPANYE WHERE x.STATUS_KAMPANYE IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1600 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_PERISTIWA' AS CHECK_NAME,
+    SELECT 1790 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_PERISTIWA' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA.JENIS_PERISTIWA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'JENIS_PERISTIWA' AND v.NILAI = x.JENIS_PERISTIWA WHERE x.JENIS_PERISTIWA IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1610 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list TINGKAT_GANGGUAN' AS CHECK_NAME,
+    SELECT 1800 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list TINGKAT_GANGGUAN' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA.TINGKAT_GANGGUAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'TINGKAT_GANGGUAN' AND v.NILAI = x.TINGKAT_GANGGUAN WHERE x.TINGKAT_GANGGUAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1620 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KATEGORI_EKONOMI' AS CHECK_NAME,
+    SELECT 1810 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KATEGORI_EKONOMI' AS CHECK_NAME,
            'MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN.KATEGORI_EKONOMI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'KATEGORI_EKONOMI' AND v.NILAI = x.KATEGORI_EKONOMI WHERE x.KATEGORI_EKONOMI IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
     UNION ALL
-    SELECT 1630 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1820 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list KATEGORI_LAYANAN' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI.KATEGORI_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'KATEGORI_LAYANAN' AND v.NILAI = x.KATEGORI_LAYANAN WHERE x.KATEGORI_LAYANAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
+    UNION ALL
+    SELECT 1830 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list PELAKU_LANGKAH' AS CHECK_NAME,
+           'MASTER_DATA.LANGKAH_LAYANAN.PELAKU' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LANGKAH_LAYANAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'PELAKU_LANGKAH' AND v.NILAI = x.PELAKU WHERE x.PELAKU IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
+    UNION ALL
+    SELECT 1840 AS SORT_ORDER, 'VOCABULARY' AS CHECK_GROUP, 'Value not in list JENIS_PERSYARATAN' AS CHECK_NAME,
+           'MASTER_DATA.PERSYARATAN_LAYANAN.JENIS_PERSYARATAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.PERSYARATAN_LAYANAN x LEFT JOIN MASTER_DATA.REFERENSI_DAFTAR_NILAI v ON v.KELOMPOK_NILAI = 'JENIS_PERSYARATAN' AND v.NILAI = x.JENIS_PERSYARATAN WHERE x.JENIS_PERSYARATAN IS NOT NULL AND v.NILAI IS NULL) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI.' AS NOTE
+    UNION ALL
+    SELECT 1850 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.INFO_DATASET' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.INFO_DATASET WHERE TANGGAL_MULAI_RIWAYAT < DATE '2000-01-01' OR TANGGAL_MULAI_RIWAYAT > DATE '2030-12-31' OR TANGGAL_SNAPSHOT < DATE '2000-01-01' OR TANGGAL_SNAPSHOT > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_RIWAYAT, TANGGAL_SNAPSHOT.' AS NOTE
     UNION ALL
-    SELECT 1640 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1860 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_KLASIFIKASI_DATA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_KLASIFIKASI_DATA WHERE URUTAN_TINGKAT < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in URUTAN_TINGKAT.' AS NOTE
     UNION ALL
-    SELECT 1650 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1870 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_SEKSI WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1660 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1880 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'MASTER_DATA.MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_SEKSI WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1670 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
+    SELECT 1890 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
            'MASTER_DATA.MASTER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_SEKSI WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'STATUS_AKTIF must be TRUE exactly when there is no end date.' AS NOTE
     UNION ALL
-    SELECT 1680 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1900 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_DAFTAR_NILAI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_DAFTAR_NILAI WHERE URUTAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in URUTAN.' AS NOTE
     UNION ALL
-    SELECT 1690 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1910 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_PERIODE_PELAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_PERIODE_PELAPORAN WHERE TAHUN < 0 OR BULAN < 0 OR KUARTAL < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TAHUN, BULAN, KUARTAL.' AS NOTE
     UNION ALL
-    SELECT 1700 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1920 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.REFERENSI_PERIODE_PELAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_PERIODE_PELAPORAN WHERE TANGGAL_MULAI < DATE '2000-01-01' OR TANGGAL_MULAI > DATE '2030-12-31' OR TANGGAL_SELESAI < DATE '2000-01-01' OR TANGGAL_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI, TANGGAL_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 1710 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1930 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_WILAYAH WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1720 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1940 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'MASTER_DATA.MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_WILAYAH WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1730 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
+    SELECT 1950 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
            'MASTER_DATA.MASTER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_WILAYAH WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'STATUS_AKTIF must be TRUE exactly when there is no end date.' AS NOTE
     UNION ALL
-    SELECT 1740 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 1960 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1750 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 1970 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1760 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
+    SELECT 1980 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'STATUS_AKTIF must be TRUE exactly when there is no end date.' AS NOTE
     UNION ALL
-    SELECT 1770 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 1990 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN WHERE TAHUN_PENILAIAN < 0 OR INDEKS_KAPASITAS_EKONOMI < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TAHUN_PENILAIAN, INDEKS_KAPASITAS_EKONOMI.' AS NOTE
     UNION ALL
-    SELECT 1780 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2000 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1790 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 2010 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1800 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
+    SELECT 2020 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active flag matches end date' AS CHECK_NAME,
            'MASTER_DATA.JADWAL_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.JADWAL_MISA WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'STATUS_AKTIF must be TRUE exactly when there is no end date.' AS NOTE
     UNION ALL
-    SELECT 1810 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2030 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'MASTER_DATA.SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI WHERE TANGGAL_MULAI < DATE '2000-01-01' OR TANGGAL_MULAI > DATE '2030-12-31' OR TANGGAL_SELESAI < DATE '2000-01-01' OR TANGGAL_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI, TANGGAL_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 1820 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2040 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.PERTANYAAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.PERTANYAAN_SURVEI WHERE NOMOR_URUT < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in NOMOR_URUT.' AS NOTE
     UNION ALL
-    SELECT 1830 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2050 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'MASTER_DATA.OPSI_JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.OPSI_JAWABAN_SURVEI WHERE NOMOR_URUT < 0 OR NILAI_SKOR < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in NOMOR_URUT, NILAI_SKOR.' AS NOTE
     UNION ALL
-    SELECT 1840 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2060 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+           'MASTER_DATA.REFERENSI_MODEL_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.REFERENSI_MODEL_PERKIRAAN WHERE HORIZON_HARI < 0 OR MINIMAL_RIWAYAT_MINGGU < 0 OR JENDELA_PELATIHAN_MINGGU < 0 OR LEBAR_RENTANG_PERSEN < 0) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Rows with a negative value in HORIZON_HARI, MINIMAL_RIWAYAT_MINGGU, JENDELA_PELATIHAN_MINGGU, LEBAR_RENTANG_PERSEN.' AS NOTE
+    UNION ALL
+    SELECT 2070 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI WHERE TANGGAL_REVISI < DATE '2000-01-01' OR TANGGAL_REVISI > DATE '2030-12-31') AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Implausible dates in TANGGAL_REVISI.' AS NOTE
+    UNION ALL
+    SELECT 2080 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+           'MASTER_DATA.LANGKAH_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LANGKAH_LAYANAN WHERE NOMOR_URUT < 0) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Rows with a negative value in NOMOR_URUT.' AS NOTE
+    UNION ALL
+    SELECT 2090 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+           'MASTER_DATA.PERSYARATAN_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.PERSYARATAN_LAYANAN WHERE NOMOR_URUT < 0) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Rows with a negative value in NOMOR_URUT.' AS NOTE
+    UNION ALL
+    SELECT 2100 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE TANGGAL_MISA < DATE '2000-01-01' OR TANGGAL_MISA > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MISA.' AS NOTE
     UNION ALL
-    SELECT 1850 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2110 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA WHERE TANGGAL_MULAI < DATE '2000-01-01' OR TANGGAL_MULAI > DATE '2030-12-31' OR TANGGAL_SELESAI < DATE '2000-01-01' OR TANGGAL_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI, TANGGAL_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 1860 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2120 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE JUMLAH_UMAT < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_UMAT.' AS NOTE
     UNION ALL
-    SELECT 1870 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2130 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE JUMLAH_PENERIMAAN < 0 OR JUMLAH_HASIL_PENGHITUNGAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_PENERIMAAN, JUMLAH_HASIL_PENGHITUNGAN.' AS NOTE
     UNION ALL
-    SELECT 1880 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2140 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE TANGGAL_PENCATATAN < DATE '2000-01-01' OR TANGGAL_PENCATATAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENCATATAN.' AS NOTE
     UNION ALL
-    SELECT 1890 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2150 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE JUMLAH_PEKAN_PELATIHAN < 0 OR JUMLAH_PERKIRAAN < 0 OR BATAS_BAWAH < 0 OR BATAS_ATAS < 0 OR PENYESUAIAN_KALENDER < 0) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Rows with a negative value in JUMLAH_PEKAN_PELATIHAN, JUMLAH_PERKIRAAN, BATAS_BAWAH, BATAS_ATAS, PENYESUAIAN_KALENDER.' AS NOTE
+    UNION ALL
+    SELECT 2160 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE AWAL_PEKAN_SASARAN < DATE '2000-01-01' OR AWAL_PEKAN_SASARAN > DATE '2030-12-31' OR TANGGAL_PERKIRAAN < DATE '2000-01-01' OR TANGGAL_PERKIRAAN > DATE '2030-12-31') AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Implausible dates in AWAL_PEKAN_SASARAN, TANGGAL_PERKIRAAN.' AS NOTE
+    UNION ALL
+    SELECT 2170 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA WHERE TANGGAL_TERDAFTAR < DATE '2000-01-01' OR TANGGAL_TERDAFTAR > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_TERDAFTAR.' AS NOTE
     UNION ALL
-    SELECT 1900 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2180 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE TAHUN_LAHIR < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TAHUN_LAHIR.' AS NOTE
     UNION ALL
-    SELECT 1910 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2190 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE TANGGAL_TERDAFTAR < DATE '2000-01-01' OR TANGGAL_TERDAFTAR > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_TERDAFTAR.' AS NOTE
     UNION ALL
-    SELECT 1920 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2200 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1930 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 2210 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1940 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2220 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN WHERE TANGGAL_MULAI_BERLAKU < DATE '2000-01-01' OR TANGGAL_MULAI_BERLAKU > DATE '2030-12-31' OR TANGGAL_AKHIR_BERLAKU < DATE '2000-01-01' OR TANGGAL_AKHIR_BERLAKU > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU.' AS NOTE
     UNION ALL
-    SELECT 1950 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
+    SELECT 2230 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Effective end before start' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows whose end date is earlier than the start date.' AS NOTE
     UNION ALL
-    SELECT 1960 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2240 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI WHERE TANGGAL_PENGISIAN < DATE '2000-01-01' OR TANGGAL_PENGISIAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENGISIAN.' AS NOTE
     UNION ALL
-    SELECT 1970 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2250 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE JUMLAH_RESPONDEN < 0 OR TOTAL_RESPONDEN_PERTANYAAN < 0 OR PERSENTASE_JAWABAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_RESPONDEN, TOTAL_RESPONDEN_PERTANYAAN, PERSENTASE_JAWABAN.' AS NOTE
     UNION ALL
-    SELECT 1980 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2260 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE TANGGAL_AGREGASI < DATE '2000-01-01' OR TANGGAL_AGREGASI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_AGREGASI.' AS NOTE
     UNION ALL
-    SELECT 1990 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2270 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN WHERE TAHUN_RENCANA < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TAHUN_RENCANA.' AS NOTE
     UNION ALL
-    SELECT 2000 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2280 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN WHERE TANGGAL_PENGESAHAN < DATE '2000-01-01' OR TANGGAL_PENGESAHAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENGESAHAN.' AS NOTE
     UNION ALL
-    SELECT 2010 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2290 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN WHERE TANGGAL_RENCANA < DATE '2000-01-01' OR TANGGAL_RENCANA > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_RENCANA.' AS NOTE
     UNION ALL
-    SELECT 2020 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2300 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE TARGET_DANA < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TARGET_DANA.' AS NOTE
     UNION ALL
-    SELECT 2030 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2310 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE PERIODE_MULAI < DATE '2000-01-01' OR PERIODE_MULAI > DATE '2030-12-31' OR PERIODE_SELESAI < DATE '2000-01-01' OR PERIODE_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in PERIODE_MULAI, PERIODE_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 2040 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2320 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE JUMLAH_KELUARGA_PESERTA < 0 OR JUMLAH_SUMBANGAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_KELUARGA_PESERTA, JUMLAH_SUMBANGAN.' AS NOTE
     UNION ALL
-    SELECT 2050 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2330 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE TANGGAL_PENCATATAN < DATE '2000-01-01' OR TANGGAL_PENCATATAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENCATATAN.' AS NOTE
     UNION ALL
-    SELECT 2060 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2340 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA WHERE JUMLAH_SUMBANGAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_SUMBANGAN.' AS NOTE
     UNION ALL
-    SELECT 2070 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2350 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA WHERE TANGGAL_SUMBANGAN < DATE '2000-01-01' OR TANGGAL_SUMBANGAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_SUMBANGAN.' AS NOTE
     UNION ALL
-    SELECT 2080 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2360 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN WHERE JUMLAH_ANGGARAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_ANGGARAN.' AS NOTE
     UNION ALL
-    SELECT 2090 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2370 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN WHERE TANGGAL_PERSETUJUAN < DATE '2000-01-01' OR TANGGAL_PERSETUJUAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PERSETUJUAN.' AS NOTE
     UNION ALL
-    SELECT 2100 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2380 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN WHERE JUMLAH_PENGELUARAN < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_PENGELUARAN.' AS NOTE
     UNION ALL
-    SELECT 2110 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2390 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN WHERE TANGGAL_PENGELUARAN < DATE '2000-01-01' OR TANGGAL_PENGELUARAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_PENGELUARAN.' AS NOTE
     UNION ALL
-    SELECT 2120 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2400 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN WHERE TARGET_PESERTA < 0 OR JUMLAH_PESERTA_AKTUAL < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in TARGET_PESERTA, JUMLAH_PESERTA_AKTUAL.' AS NOTE
     UNION ALL
-    SELECT 2130 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2410 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN WHERE TANGGAL_MULAI < DATE '2000-01-01' OR TANGGAL_MULAI > DATE '2030-12-31' OR TANGGAL_SELESAI < DATE '2000-01-01' OR TANGGAL_SELESAI > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_MULAI, TANGGAL_SELESAI.' AS NOTE
     UNION ALL
-    SELECT 2140 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
+    SELECT 2420 AS SORT_ORDER, 'NUMBERS' AS CHECK_GROUP, 'Negative numeric value' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE JUMLAH_PESERTA < 0 OR REALISASI_BIAYA < 0) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Rows with a negative value in JUMLAH_PESERTA, REALISASI_BIAYA.' AS NOTE
     UNION ALL
-    SELECT 2150 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
+    SELECT 2430 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Date outside 2000-2030' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE TANGGAL_LAPORAN < DATE '2000-01-01' OR TANGGAL_LAPORAN > DATE '2030-12-31') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Implausible dates in TANGGAL_LAPORAN.' AS NOTE
     UNION ALL
-    SELECT 2160 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Attendance for a Mass that was not held' AS CHECK_NAME,
+    SELECT 2440 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Attendance for a Mass that was not held' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE k.STATUS_PELAKSANAAN <> 'Terlaksana') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Attendance may only exist for occurrences with status Terlaksana.' AS NOTE
     UNION ALL
-    SELECT 2170 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory for a Mass that was not held' AS CHECK_NAME,
+    SELECT 2450 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory for a Mass that was not held' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE k.STATUS_PELAKSANAAN <> 'Terlaksana') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Offertory may only exist for occurrences with status Terlaksana.' AS NOTE
     UNION ALL
-    SELECT 2180 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Held Mass without attendance' AS CHECK_NAME,
+    SELECT 2460 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Held Mass without attendance' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k WHERE k.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.KEHADIRAN_MISA x WHERE x.ID_KEJADIAN_MISA = k.ID_KEJADIAN_MISA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every held Mass needs one attendance record.' AS NOTE
     UNION ALL
-    SELECT 2190 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Held Mass without offertory' AS CHECK_NAME,
+    SELECT 2470 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Held Mass without offertory' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k WHERE k.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE x WHERE x.ID_KEJADIAN_MISA = k.ID_KEJADIAN_MISA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every held Mass needs at least one offertory record.' AS NOTE
     UNION ALL
-    SELECT 2200 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Actual times inconsistent with status' AS CHECK_NAME,
+    SELECT 2480 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Actual times inconsistent with status' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE (STATUS_PELAKSANAAN = 'Terlaksana' AND (WAKTU_MULAI_AKTUAL IS NULL OR WAKTU_SELESAI_AKTUAL IS NULL OR WAKTU_SELESAI_AKTUAL <= WAKTU_MULAI_AKTUAL)) OR (STATUS_PELAKSANAAN <> 'Terlaksana' AND (WAKTU_MULAI_AKTUAL IS NOT NULL OR WAKTU_SELESAI_AKTUAL IS NOT NULL))) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Actual times exist only for held Masses and the end must be after the start.' AS NOTE
     UNION ALL
-    SELECT 2210 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Occurrence weekday differs from schedule' AS CHECK_NAME,
+    SELECT 2490 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Occurrence weekday differs from schedule' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k JOIN MASTER_DATA.JADWAL_MISA j ON j.ID_JADWAL_MISA = k.ID_JADWAL_MISA WHERE MOD(DATEDIFF('day', DATE '1900-01-01', k.TANGGAL_MISA), 7) <> CASE j.HARI WHEN 'Senin' THEN 0 WHEN 'Selasa' THEN 1 WHEN 'Rabu' THEN 2 WHEN 'Kamis' THEN 3 WHEN 'Jumat' THEN 4 WHEN 'Sabtu' THEN 5 WHEN 'Minggu' THEN 6 END) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The date must fall on the weekday of its schedule rule (1900-01-01 was a Monday).' AS NOTE
     UNION ALL
-    SELECT 2220 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Occurrence outside schedule validity' AS CHECK_NAME,
+    SELECT 2500 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Occurrence outside schedule validity' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k JOIN MASTER_DATA.JADWAL_MISA j ON j.ID_JADWAL_MISA = k.ID_JADWAL_MISA WHERE k.TANGGAL_MISA < j.TANGGAL_MULAI_BERLAKU OR (j.TANGGAL_AKHIR_BERLAKU IS NOT NULL AND k.TANGGAL_MISA > j.TANGGAL_AKHIR_BERLAKU)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A Mass may only follow a schedule rule that was valid on that date.' AS NOTE
     UNION ALL
-    SELECT 2230 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Status inconsistent with the as-of date' AS CHECK_NAME,
+    SELECT 2510 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Status inconsistent with the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE (STATUS_PELAKSANAAN = 'Terjadwal' AND TANGGAL_MISA <= DATE '2026-09-30') OR (STATUS_PELAKSANAAN <> 'Terjadwal' AND TANGGAL_MISA > DATE '2026-09-30')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Terjadwal only after 2026-09-30 (the demo snapshot date), otherwise Terlaksana or Dibatalkan.' AS NOTE
     UNION ALL
-    SELECT 2240 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'No reporting period for a Mass date' AS CHECK_NAME,
+    SELECT 2520 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'No reporting period for a Mass date' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA k WHERE NOT EXISTS (SELECT 1 FROM MASTER_DATA.REFERENSI_PERIODE_PELAPORAN p WHERE k.TANGGAL_MISA BETWEEN p.TANGGAL_MULAI AND p.TANGGAL_SELESAI)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The monthly views join Masses to the reporting calendar.' AS NOTE
     UNION ALL
-    SELECT 2250 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Counted amount inconsistent with reconciliation status' AS CHECK_NAME,
+    SELECT 2530 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Counted amount inconsistent with reconciliation status' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE (STATUS_REKONSILIASI = 'Belum Dihitung' AND JUMLAH_HASIL_PENGHITUNGAN IS NOT NULL) OR (STATUS_REKONSILIASI <> 'Belum Dihitung' AND JUMLAH_HASIL_PENGHITUNGAN IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The counted amount is empty exactly when the status is Belum Dihitung.' AS NOTE
     UNION ALL
-    SELECT 2260 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Sudah Cocok but recorded and counted differ' AS CHECK_NAME,
+    SELECT 2540 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Sudah Cocok but recorded and counted differ' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE STATUS_REKONSILIASI = 'Sudah Cocok' AND JUMLAH_PENERIMAAN <> JUMLAH_HASIL_PENGHITUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Matched records must have equal recorded and counted amounts.' AS NOTE
     UNION ALL
-    SELECT 2270 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Selisih status but amounts are equal' AS CHECK_NAME,
+    SELECT 2550 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Selisih status but amounts are equal' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE STATUS_REKONSILIASI IN ('Selisih Disetujui', 'Selisih Sedang Ditelusuri') AND JUMLAH_PENERIMAAN = JUMLAH_HASIL_PENGHITUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A discrepancy status needs an actual discrepancy.' AS NOTE
     UNION ALL
-    SELECT 2280 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory booked before the Mass date' AS CHECK_NAME,
+    SELECT 2560 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory booked before the Mass date' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE x.TANGGAL_PENCATATAN < k.TANGGAL_MISA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The booking date cannot precede the Mass.' AS NOTE
     UNION ALL
-    SELECT 2290 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory with open reconciliation' AS CHECK_NAME,
+    SELECT 2570 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Offertory with open reconciliation' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE STATUS_REKONSILIASI IN ('Selisih Sedang Ditelusuri', 'Belum Dihitung')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: records still being counted or investigated.' AS NOTE
     UNION ALL
-    SELECT 2300 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Attendance waiting for validation or recheck' AS CHECK_NAME,
+    SELECT 2580 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Attendance waiting for validation or recheck' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE STATUS_VALIDASI <> 'Sudah Divalidasi') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: attendance not yet validated.' AS NOTE
     UNION ALL
-    SELECT 2310 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Cancelled Mass occurrences' AS CHECK_NAME,
+    SELECT 2590 AS SORT_ORDER, 'MASS' AS CHECK_GROUP, 'Cancelled Mass occurrences' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE STATUS_PELAKSANAAN = 'Dibatalkan') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario.' AS NOTE
     UNION ALL
-    SELECT 2320 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Expenditure after the as-of date' AS CHECK_NAME,
+    SELECT 2600 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Expenditure after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN WHERE TANGGAL_PENGELUARAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Spending cannot be dated after the snapshot date.' AS NOTE
     UNION ALL
-    SELECT 2330 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Offertory booked after the as-of date' AS CHECK_NAME,
+    SELECT 2610 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Offertory booked after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENERIMAAN_KOLEKTE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE TANGGAL_PENCATATAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Bookings cannot be in the future.' AS NOTE
     UNION ALL
-    SELECT 2340 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Attendance recorded after the as-of date' AS CHECK_NAME,
+    SELECT 2620 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Attendance recorded after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE CAST(WAKTU_PENCATATAN AS DATE) > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Records cannot be in the future.' AS NOTE
     UNION ALL
-    SELECT 2350 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Birth year implausible or registration before birth' AS CHECK_NAME,
+    SELECT 2630 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Birth year implausible or registration before birth' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE TAHUN_LAHIR < 1900 OR TAHUN_LAHIR > 2026 OR EXTRACT(YEAR FROM TANGGAL_TERDAFTAR) < TAHUN_LAHIR) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Birth years must be plausible.' AS NOTE
     UNION ALL
-    SELECT 2360 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Assignment dated after the as-of date' AS CHECK_NAME,
+    SELECT 2640 AS SORT_ORDER, 'DATES' AS CHECK_GROUP, 'Assignment dated after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA WHERE TANGGAL_MULAI_BERLAKU > DATE '2026-09-30' OR TANGGAL_AKHIR_BERLAKU > DATE '2026-09-30') + (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN WHERE TANGGAL_MULAI_BERLAKU > DATE '2026-09-30' OR TANGGAL_AKHIR_BERLAKU > DATE '2026-09-30')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Household and community assignments in the past only (both assignment tables).' AS NOTE
     UNION ALL
-    SELECT 2370 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Person without a household assignment' AS CHECK_NAME,
+    SELECT 2650 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Person without a household assignment' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT u WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA x WHERE x.ID_UMAT = u.ID_UMAT)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every person must belong to at least one household over time.' AS NOTE
     UNION ALL
-    SELECT 2380 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Household without a community assignment' AS CHECK_NAME,
+    SELECT 2660 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Household without a community assignment' AS CHECK_NAME,
            'DATA_OPERASIONAL.KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA f WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN x WHERE x.ID_KELUARGA = f.ID_KELUARGA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every household must belong to a community over time.' AS NOTE
     UNION ALL
-    SELECT 2390 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Overlapping household assignments of one person' AS CHECK_NAME,
+    SELECT 2670 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Overlapping household assignments of one person' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA a JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA b ON a.ID_UMAT = b.ID_UMAT AND a.ID_PENUGASAN_KELUARGA < b.ID_PENUGASAN_KELUARGA AND a.TANGGAL_MULAI_BERLAKU <= COALESCE(b.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31') AND b.TANGGAL_MULAI_BERLAKU <= COALESCE(a.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A person can be in only one household at a time.' AS NOTE
     UNION ALL
-    SELECT 2400 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Overlapping community assignments of one household' AS CHECK_NAME,
+    SELECT 2680 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Overlapping community assignments of one household' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN a JOIN DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN b ON a.ID_KELUARGA = b.ID_KELUARGA AND a.ID_PENUGASAN_LINGKUNGAN < b.ID_PENUGASAN_LINGKUNGAN AND a.TANGGAL_MULAI_BERLAKU <= COALESCE(b.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31') AND b.TANGGAL_MULAI_BERLAKU <= COALESCE(a.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A household can be in only one community at a time.' AS NOTE
     UNION ALL
-    SELECT 2410 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Active member without a current household' AS CHECK_NAME,
+    SELECT 2690 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Active member without a current household' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT u WHERE u.STATUS_KEANGGOTAAN = 'Aktif' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA x WHERE x.ID_UMAT = u.ID_UMAT AND x.TANGGAL_AKHIR_BERLAKU IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Active members need an open household assignment.' AS NOTE
     UNION ALL
-    SELECT 2420 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Personal data not classified Terbatas or stricter' AS CHECK_NAME,
+    SELECT 2700 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Personal data not classified Terbatas or stricter' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT, DATA_OPERASIONAL.KELUARGA' AS OBJECT_NAME,
            (SELECT (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT x JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = x.ID_KLASIFIKASI_DATA WHERE k.URUTAN_TINGKAT < 3) + (SELECT COUNT(*) FROM DATA_OPERASIONAL.KELUARGA x JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = x.ID_KLASIFIKASI_DATA WHERE k.URUTAN_TINGKAT < 3)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Identifiable personal data must be Terbatas or Sangat Terbatas.' AS NOTE
     UNION ALL
-    SELECT 2430 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Minors without the strictest classification' AS CHECK_NAME,
+    SELECT 2710 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Minors without the strictest classification' AS CHECK_NAME,
            'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE 2026 - TAHUN_LAHIR < 17 AND ID_KLASIFIKASI_DATA <> 'KLS-04') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Persons under 17 must be Sangat Terbatas (KLS-04).' AS NOTE
     UNION ALL
-    SELECT 2440 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Personal-data columns exposed in ANALISIS' AS CHECK_NAME,
+    SELECT 2720 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Personal-data columns exposed in ANALISIS' AS CHECK_NAME,
            'ANALISIS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE UPPER(TABLE_SCHEMA) = 'ANALISIS' AND UPPER(COLUMN_NAME) IN ('NAMA_FIKTIF', 'NAMA_KELUARGA_FIKTIF', 'ID_UMAT', 'ID_KELUARGA', 'TAHUN_LAHIR', 'ID_RESPONDEN', 'ID_PENUGASAN_KELUARGA', 'ID_SUMBANGAN_KELUARGA')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Summary views must never expose names or person and household identifiers.' AS NOTE
     UNION ALL
-    SELECT 2450 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Geometry not marked synthetic' AS CHECK_NAME,
+    SELECT 2730 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Geometry not marked synthetic' AS CHECK_NAME,
            'MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN WHERE BERSIFAT_SINTETIS = FALSE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'All demo geometry must be labelled synthetic.' AS NOTE
     UNION ALL
-    SELECT 2460 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active community without illustrative geometry' AS CHECK_NAME,
+    SELECT 2740 AS SORT_ORDER, 'GOVERNANCE' AS CHECK_GROUP, 'Active community without illustrative geometry' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN l WHERE l.STATUS_AKTIF = TRUE AND NOT EXISTS (SELECT 1 FROM MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN g WHERE g.ID_LINGKUNGAN = l.ID_LINGKUNGAN)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Needed only for map demos.' AS NOTE
     UNION ALL
-    SELECT 2470 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Households with a community history' AS CHECK_NAME,
+    SELECT 2750 AS SORT_ORDER, 'PARISHIONERS' AS CHECK_GROUP, 'Households with a community history' AS CHECK_NAME,
            'DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_KELUARGA FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN GROUP BY ID_KELUARGA HAVING COUNT(*) > 1) h) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: merged or relocated communities.' AS NOTE
     UNION ALL
-    SELECT 2480 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Campaign dates or status inconsistent' AS CHECK_NAME,
+    SELECT 2760 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Campaign dates or status inconsistent' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE PERIODE_SELESAI < PERIODE_MULAI OR (STATUS_KAMPANYE = 'Selesai' AND PERIODE_SELESAI > DATE '2026-09-30') OR (STATUS_KAMPANYE = 'Direncanakan' AND PERIODE_MULAI <= DATE '2026-09-30') OR (STATUS_KAMPANYE = 'Berjalan' AND (PERIODE_MULAI > DATE '2026-09-30' OR PERIODE_SELESAI <= DATE '2026-09-30'))) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Status must follow the campaign dates and the snapshot date.' AS NOTE
     UNION ALL
-    SELECT 2490 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Campaign funds an activity that starts before it' AS CHECK_NAME,
+    SELECT 2770 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Campaign funds an activity that starts before it' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = k.ID_RENCANA_PENGGUNAAN WHERE p.TANGGAL_RENCANA < k.PERIODE_MULAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A campaign pays for an activity that happens after it opens.' AS NOTE
     UNION ALL
-    SELECT 2500 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Gift dated outside its campaign' AS CHECK_NAME,
+    SELECT 2780 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Gift dated outside its campaign' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA g JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k ON k.ID_KAMPANYE = g.ID_KAMPANYE WHERE g.TANGGAL_SUMBANGAN < k.PERIODE_MULAI OR g.TANGGAL_SUMBANGAN > k.PERIODE_SELESAI OR g.TANGGAL_SUMBANGAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A household gift is received during its campaign.' AS NOTE
     UNION ALL
-    SELECT 2510 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Gift community differs from the household assignment' AS CHECK_NAME,
+    SELECT 2790 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Gift community differs from the household assignment' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA g WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN p WHERE p.ID_KELUARGA = g.ID_KELUARGA AND p.ID_LINGKUNGAN = g.ID_LINGKUNGAN AND p.TANGGAL_MULAI_BERLAKU <= g.TANGGAL_SUMBANGAN AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= g.TANGGAL_SUMBANGAN))) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The community recorded on a gift must be the household community on that date.' AS NOTE
     UNION ALL
-    SELECT 2520 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Regional summary differs from the household gifts' AS CHECK_NAME,
+    SELECT 2800 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Regional summary differs from the household gifts' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s LEFT JOIN (SELECT g.ID_KAMPANYE, l.ID_WILAYAH, COUNT(*) AS JUMLAH_KELUARGA, SUM(g.JUMLAH_SUMBANGAN) AS TOTAL FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA g JOIN MASTER_DATA.MASTER_LINGKUNGAN l ON l.ID_LINGKUNGAN = g.ID_LINGKUNGAN GROUP BY g.ID_KAMPANYE, l.ID_WILAYAH) d ON d.ID_KAMPANYE = s.ID_KAMPANYE AND d.ID_WILAYAH = s.ID_WILAYAH WHERE COALESCE(d.JUMLAH_KELUARGA, 0) <> s.JUMLAH_KELUARGA_PESERTA OR COALESCE(d.TOTAL, 0) <> s.JUMLAH_SUMBANGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The summary of a region must equal the sum and count of its household gifts.' AS NOTE
     UNION ALL
-    SELECT 2530 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Household gifts without a regional summary' AS CHECK_NAME,
+    SELECT 2810 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Household gifts without a regional summary' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KELUARGA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT g.ID_KAMPANYE, l.ID_WILAYAH, COUNT(*) AS JUMLAH_KELUARGA, SUM(g.JUMLAH_SUMBANGAN) AS TOTAL FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA g JOIN MASTER_DATA.MASTER_LINGKUNGAN l ON l.ID_LINGKUNGAN = g.ID_LINGKUNGAN GROUP BY g.ID_KAMPANYE, l.ID_WILAYAH) d LEFT JOIN DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s ON s.ID_KAMPANYE = d.ID_KAMPANYE AND s.ID_WILAYAH = d.ID_WILAYAH WHERE s.ID_SUMBANGAN IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every region with gifts needs its summary row.' AS NOTE
     UNION ALL
-    SELECT 2540 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Summary recorded before the campaign ended' AS CHECK_NAME,
+    SELECT 2820 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Summary recorded before the campaign ended' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k ON k.ID_KAMPANYE = s.ID_KAMPANYE WHERE s.TANGGAL_PENCATATAN < k.PERIODE_SELESAI OR s.TANGGAL_PENCATATAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Regions report after the campaign closes and not after the snapshot date.' AS NOTE
     UNION ALL
-    SELECT 2550 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Participating households exceed households in the region' AS CHECK_NAME,
+    SELECT 2830 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Participating households exceed households in the region' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k ON k.ID_KAMPANYE = s.ID_KAMPANYE JOIN (SELECT s2.ID_SUMBANGAN, COUNT(p.ID_KELUARGA) AS JUMLAH_KELUARGA FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS s2 JOIN DATA_OPERASIONAL.KAMPANYE_SUMBANGAN k2 ON k2.ID_KAMPANYE = s2.ID_KAMPANYE LEFT JOIN MASTER_DATA.MASTER_LINGKUNGAN l ON l.ID_WILAYAH = s2.ID_WILAYAH LEFT JOIN DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN p ON p.ID_LINGKUNGAN = l.ID_LINGKUNGAN AND p.TANGGAL_MULAI_BERLAKU <= k2.PERIODE_SELESAI AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= k2.PERIODE_SELESAI) GROUP BY s2.ID_SUMBANGAN) h ON h.ID_SUMBANGAN = s.ID_SUMBANGAN WHERE s.JUMLAH_KELUARGA_PESERTA > h.JUMLAH_KELUARGA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Compares participants with households assigned to the region on the last day of the campaign.' AS NOTE
     UNION ALL
-    SELECT 2560 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Community without an economic profile' AS CHECK_NAME,
+    SELECT 2840 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Community without an economic profile' AS CHECK_NAME,
            'MASTER_DATA.MASTER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.MASTER_LINGKUNGAN l WHERE NOT EXISTS (SELECT 1 FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN e WHERE e.ID_LINGKUNGAN = l.ID_LINGKUNGAN)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The donation analysis relates gifts to the economic profile of the community.' AS NOTE
     UNION ALL
-    SELECT 2570 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Planned campaigns' AS CHECK_NAME,
+    SELECT 2850 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Planned campaigns' AS CHECK_NAME,
            'DATA_OPERASIONAL.KAMPANYE_SUMBANGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KAMPANYE_SUMBANGAN WHERE STATUS_KAMPANYE = 'Direncanakan') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: Advent of the current year.' AS NOTE
     UNION ALL
-    SELECT 2580 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Donation summaries waiting for validation' AS CHECK_NAME,
+    SELECT 2860 AS SORT_ORDER, 'DONATIONS' AS CHECK_GROUP, 'Donation summaries waiting for validation' AS CHECK_NAME,
            'DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE STATUS_VALIDASI <> 'Sudah Divalidasi') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario.' AS NOTE
     UNION ALL
-    SELECT 2590 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Dataset information missing or duplicated' AS CHECK_NAME,
+    SELECT 2870 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Dataset information missing or duplicated' AS CHECK_NAME,
            'MASTER_DATA.INFO_DATASET' AS OBJECT_NAME,
            (SELECT CASE WHEN COUNT(*) = 1 THEN 0 ELSE 1 END FROM MASTER_DATA.INFO_DATASET) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Exactly one dataset information row is expected.' AS NOTE
     UNION ALL
-    SELECT 2600 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Snapshot date differs from this validation' AS CHECK_NAME,
+    SELECT 2880 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Snapshot date differs from this validation' AS CHECK_NAME,
            'MASTER_DATA.INFO_DATASET' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.INFO_DATASET WHERE TANGGAL_SNAPSHOT <> DATE '2026-09-30' OR BERSIFAT_SIMULASI <> TRUE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The date used by the checks must be the snapshot date of the data, and the data must be marked simulated.' AS NOTE
     UNION ALL
-    SELECT 2610 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Mass history shorter than five years' AS CHECK_NAME,
+    SELECT 2890 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Mass history shorter than five years' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.INFO_DATASET i WHERE (SELECT MIN(TANGGAL_MISA) FROM DATA_OPERASIONAL.KEJADIAN_MISA) > DATEADD('day', 7, i.TANGGAL_MULAI_RIWAYAT) OR DATEDIFF('day', i.TANGGAL_MULAI_RIWAYAT, i.TANGGAL_SNAPSHOT) < 1826) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'History must start within a week of the recorded start date and cover at least five years.' AS NOTE
     UNION ALL
-    SELECT 2620 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Plan history shorter than five years' AS CHECK_NAME,
+    SELECT 2900 AS SORT_ORDER, 'DATASET' AS CHECK_GROUP, 'Plan history shorter than five years' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.INFO_DATASET i WHERE (SELECT MIN(TAHUN_RENCANA) FROM DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN) > EXTRACT(YEAR FROM i.TANGGAL_SNAPSHOT) - 5) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Annual plans must reach at least five years back.' AS NOTE
     UNION ALL
-    SELECT 2630 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Event ends before it starts' AS CHECK_NAME,
+    SELECT 2910 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Event ends before it starts' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA WHERE TANGGAL_SELESAI < TANGGAL_MULAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Event dates.' AS NOTE
     UNION ALL
-    SELECT 2640 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Event windows overlap' AS CHECK_NAME,
+    SELECT 2920 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Event windows overlap' AS CHECK_NAME,
            'DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA a JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA b ON a.ID_PERISTIWA < b.ID_PERISTIWA AND a.TANGGAL_MULAI <= b.TANGGAL_SELESAI AND b.TANGGAL_MULAI <= a.TANGGAL_SELESAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Overlapping events would make the effect of each one impossible to separate.' AS NOTE
     UNION ALL
-    SELECT 2650 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance linked to an event that does not cover the Mass date' AS CHECK_NAME,
+    SELECT 2930 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance linked to an event that does not cover the Mass date' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA e ON e.ID_PERISTIWA = x.ID_PERISTIWA WHERE k.TANGGAL_MISA < e.TANGGAL_MULAI OR k.TANGGAL_MISA > e.TANGGAL_SELESAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A note about an event only applies to Masses inside its window.' AS NOTE
     UNION ALL
-    SELECT 2660 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance during an event without a link to it' AS CHECK_NAME,
+    SELECT 2940 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance during an event without a link to it' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA x JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA e ON k.TANGGAL_MISA BETWEEN e.TANGGAL_MULAI AND e.TANGGAL_SELESAI WHERE x.ID_PERISTIWA IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Records inside an event window should name the event, otherwise the dip cannot be explained.' AS NOTE
     UNION ALL
-    SELECT 2670 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance records linked to an unforeseen event' AS CHECK_NAME,
+    SELECT 2950 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Attendance records linked to an unforeseen event' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEHADIRAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE ID_PERISTIWA IS NOT NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Masses whose attendance and offertory carry an explanation.' AS NOTE
     UNION ALL
-    SELECT 2680 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Masses cancelled' AS CHECK_NAME,
+    SELECT 2960 AS SORT_ORDER, 'EVENTS' AS CHECK_GROUP, 'Masses cancelled' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEJADIAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE STATUS_PELAKSANAAN = 'Dibatalkan' AND KETERANGAN IS NOT NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Cancellations, some caused by events.' AS NOTE
     UNION ALL
-    SELECT 2690 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event section differs from its plan' AS CHECK_NAME,
+    SELECT 2970 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Target week does not start on a Monday' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE MOD(DATEDIFF('day', DATE '1900-01-01', AWAL_PEKAN_SASARAN), 7) <> 0) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Weeks run from Monday to Sunday, like the weekly offertory view (1900-01-01 was a Monday).' AS NOTE
+    UNION ALL
+    SELECT 2980 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Forecast not issued exactly one horizon before its week' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN f JOIN MASTER_DATA.REFERENSI_MODEL_PERKIRAAN m ON m.ID_MODEL = f.ID_MODEL WHERE DATEDIFF('day', f.TANGGAL_PERKIRAAN, f.AWAL_PEKAN_SASARAN) <> m.HORIZON_HARI) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Every forecast is made the number of days ahead that the model declares.' AS NOTE
+    UNION ALL
+    SELECT 2990 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Forecast issued after the as-of date' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE TANGGAL_PERKIRAAN > DATE '2026-09-30') AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'A forecast cannot be dated in the future of the snapshot.' AS NOTE
+    UNION ALL
+    SELECT 3000 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Range does not contain the point forecast' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE BATAS_BAWAH > JUMLAH_PERKIRAAN OR JUMLAH_PERKIRAAN > BATAS_ATAS OR PENYESUAIAN_KALENDER < 0.5) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Lower bound <= forecast <= upper bound, and the calendar multiplier must be plausible.' AS NOTE
+    UNION ALL
+    SELECT 3010 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Too little history behind a forecast' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN f JOIN MASTER_DATA.REFERENSI_MODEL_PERKIRAAN m ON m.ID_MODEL = f.ID_MODEL WHERE f.JUMLAH_PEKAN_PELATIHAN < 10 OR f.JUMLAH_PEKAN_PELATIHAN > m.JENDELA_PELATIHAN_MINGGU) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'The model learns from at least 10 undisturbed weeks and at most its training window.' AS NOTE
+    UNION ALL
+    SELECT 3020 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Gap in the weekly forecast series' AS CHECK_NAME,
+           'DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_MODEL, COUNT(*) AS N, MIN(AWAL_PEKAN_SASARAN) AS A, MAX(AWAL_PEKAN_SASARAN) AS B FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN GROUP BY ID_MODEL) g WHERE DATEDIFF('day', g.A, g.B) / 7 + 1 <> g.N) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'A forecast exists for every week between the first and the last one.' AS NOTE
+    UNION ALL
+    SELECT 3030 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Complete week without a forecast' AS CHECK_NAME,
+           'ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA w CROSS JOIN MASTER_DATA.INFO_DATASET i WHERE DATEADD('day', 6, w.AWAL_PEKAN) <= i.TANGGAL_SNAPSHOT AND w.AWAL_PEKAN >= (SELECT MIN(AWAL_PEKAN_SASARAN) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN) AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN f WHERE f.AWAL_PEKAN_SASARAN = w.AWAL_PEKAN)) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'After the first forecast every complete week with a collection must have been forecast.' AS NOTE
+    UNION ALL
+    SELECT 3040 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Forecast view differs from the forecast table' AS CHECK_NAME,
+           'ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT ABS((SELECT COUNT(*) FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN) - (SELECT COUNT(*) FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN))) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'The comparison view shows exactly one row per stored forecast.' AS NOTE
+    UNION ALL
+    SELECT 3050 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Actual offertory in the view differs from the Mass data' AS CHECK_NAME,
+           'ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN v WHERE v.STATUS_PEKAN = 'Lengkap' AND v.KOLEKTE_AKTUAL <> (SELECT COALESCE(SUM(COALESCE(c.JUMLAH_HASIL_PENGHITUNGAN, c.JUMLAH_PENERIMAAN)), 0) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE c JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = c.ID_KEJADIAN_MISA WHERE k.STATUS_PELAKSANAAN = 'Terlaksana' AND k.TANGGAL_MISA BETWEEN v.AWAL_PEKAN AND DATEADD('day', 6, v.AWAL_PEKAN))) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Recomputes the actual weekly offertory from the collections themselves.' AS NOTE
+    UNION ALL
+    SELECT 3060 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Weeks with an actual result outside the forecast range' AS CHECK_NAME,
+           'ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN WHERE POSISI_TERHADAP_RENTANG IN ('Di bawah rentang', 'Di atas rentang')) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
+           'Expected to be about one week in five for ordinary weeks, because the range is an 80% range.' AS NOTE
+    UNION ALL
+    SELECT 3070 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Gaps explained by an unforeseen event' AS CHECK_NAME,
+           'ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN WHERE PENJELASAN_SELISIH = 'Di luar rentang, dijelaskan peristiwa luar biasa') AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
+           'Deliberate demo scenario: the event log explains why the forecast missed.' AS NOTE
+    UNION ALL
+    SELECT 3080 AS SORT_ORDER, 'FORECAST' AS CHECK_GROUP, 'Forecast weeks still to come' AS CHECK_NAME,
+           'ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN WHERE STATUS_PEKAN <> 'Lengkap') AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
+           'Forecasts for the current week and the weeks ahead, which have no complete actual result yet.' AS NOTE
+    UNION ALL
+    SELECT 3090 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Service without steps or without requirements' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI l WHERE NOT EXISTS (SELECT 1 FROM MASTER_DATA.LANGKAH_LAYANAN g WHERE g.ID_LAYANAN = l.ID_LAYANAN) OR NOT EXISTS (SELECT 1 FROM MASTER_DATA.PERSYARATAN_LAYANAN r WHERE r.ID_LAYANAN = l.ID_LAYANAN)) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'A guide without steps or without requirements is not a guide.' AS NOTE
+    UNION ALL
+    SELECT 3100 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Step numbers have gaps or do not start at 1' AS CHECK_NAME,
+           'MASTER_DATA.LANGKAH_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_LAYANAN FROM MASTER_DATA.LANGKAH_LAYANAN GROUP BY ID_LAYANAN HAVING MIN(NOMOR_URUT) <> 1 OR MAX(NOMOR_URUT) <> COUNT(*)) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Steps are numbered 1, 2, 3 and so on without gaps, so the order is unambiguous.' AS NOTE
+    UNION ALL
+    SELECT 3110 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Requirement numbers have gaps or do not start at 1' AS CHECK_NAME,
+           'MASTER_DATA.PERSYARATAN_LAYANAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM (SELECT ID_LAYANAN FROM MASTER_DATA.PERSYARATAN_LAYANAN GROUP BY ID_LAYANAN HAVING MIN(NOMOR_URUT) <> 1 OR MAX(NOMOR_URUT) <> COUNT(*)) d) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Requirements are numbered 1, 2, 3 and so on without gaps.' AS NOTE
+    UNION ALL
+    SELECT 3120 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Guide file name does not start with the service id or is not a PDF' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI WHERE LEFT(NAMA_BERKAS_PANDUAN, LENGTH(ID_LAYANAN) + 1) <> ID_LAYANAN || '_' OR LOWER(NAMA_BERKAS_PANDUAN) NOT LIKE '%.pdf' OR NAMA_BERKAS_PANDUAN LIKE '%/%') AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Only the file name is stored. The service id at the start of the name is how a file is matched to its row.' AS NOTE
+    UNION ALL
+    SELECT 3130 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Service guide with a classification that may not be public' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI l JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = l.ID_KLASIFIKASI_DATA WHERE k.DAPAT_DITAMPILKAN_PUBLIK = FALSE) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
+           'Such a service is hidden from the public views. That is allowed, but not what the demo expects.' AS NOTE
+    UNION ALL
+    SELECT 3140 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Public view differs from the service tables' AS CHECK_NAME,
+           'ANALISIS.LAYANAN_PUBLIK' AS OBJECT_NAME,
+           (SELECT ABS((SELECT COUNT(*) FROM ANALISIS.LAYANAN_PUBLIK) - (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI l JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = l.ID_KLASIFIKASI_DATA WHERE k.DAPAT_DITAMPILKAN_PUBLIK = TRUE)) + ABS((SELECT COUNT(*) FROM ANALISIS.LANGKAH_LAYANAN_PUBLIK) - (SELECT SUM(JUMLAH_LANGKAH) FROM ANALISIS.LAYANAN_PUBLIK)) + ABS((SELECT COUNT(*) FROM ANALISIS.PERSYARATAN_LAYANAN_PUBLIK) - (SELECT SUM(JUMLAH_PERSYARATAN) FROM ANALISIS.LAYANAN_PUBLIK))) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'The public views show every step and requirement of every public service, and nothing else.' AS NOTE
+    UNION ALL
+    SELECT 3150 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Guide text containing an email address' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI WHERE RINGKASAN LIKE '%@%' OR CATATAN_PENTING LIKE '%@%') + (SELECT COUNT(*) FROM MASTER_DATA.LANGKAH_LAYANAN WHERE URAIAN LIKE '%@%') + (SELECT COUNT(*) FROM MASTER_DATA.PERSYARATAN_LAYANAN WHERE KETERANGAN LIKE '%@%')) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'Public guides must not carry contact details of individuals.' AS NOTE
+    UNION ALL
+    SELECT 3160 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Revision date after the as-of date' AS CHECK_NAME,
+           'MASTER_DATA.LAYANAN_PAROKI' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM MASTER_DATA.LAYANAN_PAROKI WHERE TANGGAL_REVISI > DATE '2026-09-30') AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'A guide cannot be reviewed in the future of the snapshot.' AS NOTE
+    UNION ALL
+    SELECT 3170 AS SORT_ORDER, 'SERVICES' AS CHECK_GROUP, 'Public services' AS CHECK_NAME,
+           'ANALISIS.LAYANAN_PUBLIK' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.LAYANAN_PUBLIK) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
+           'Services whose guide is shown on the public dashboard page.' AS NOTE
+    UNION ALL
+    SELECT 3180 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event section differs from its plan' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN e JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = e.ID_RENCANA JOIN DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE h.ID_SEKSI <> e.ID_SEKSI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'ID_SEKSI is repeated on the event on purpose, so it must agree with the plan.' AS NOTE
     UNION ALL
-    SELECT 2700 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event status differs from its plan status' AS CHECK_NAME,
+    SELECT 3190 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event status differs from its plan status' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN e JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = e.ID_RENCANA WHERE p.STATUS_PELAKSANAAN <> e.STATUS_KEGIATAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Plan and event must tell the same story.' AS NOTE
     UNION ALL
-    SELECT 2710 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Completed plan without an event' AS CHECK_NAME,
+    SELECT 3200 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Completed plan without an event' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN p WHERE p.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.KEGIATAN e WHERE e.ID_RENCANA = p.ID_RENCANA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A plan marked Terlaksana needs the event that carried it out.' AS NOTE
     UNION ALL
-    SELECT 2720 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event dates or participants inconsistent' AS CHECK_NAME,
+    SELECT 3210 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Event dates or participants inconsistent' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN WHERE TANGGAL_SELESAI < TANGGAL_MULAI OR (STATUS_KEGIATAN = 'Terlaksana' AND (JUMLAH_PESERTA_AKTUAL IS NULL OR TANGGAL_SELESAI > DATE '2026-09-30')) OR (STATUS_KEGIATAN <> 'Terlaksana' AND JUMLAH_PESERTA_AKTUAL IS NOT NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Actual participants exist exactly for events that were held, and held events are in the past.' AS NOTE
     UNION ALL
-    SELECT 2730 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Plan date outside the plan year' AS CHECK_NAME,
+    SELECT 3220 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Plan date outside the plan year' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN p JOIN DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM p.TANGGAL_RENCANA) <> h.TAHUN_RENCANA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Planned dates must fall in the year of the annual plan.' AS NOTE
     UNION ALL
-    SELECT 2740 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Open plan missing from the upcoming activities view' AS CHECK_NAME,
+    SELECT 3230 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Open plan missing from the upcoming activities view' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN p WHERE p.STATUS_PELAKSANAAN = 'Direncanakan' AND NOT EXISTS (SELECT 1 FROM ANALISIS.KEGIATAN_MENDATANG u WHERE u.ID_RENCANA = p.ID_RENCANA)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every plan that has not been carried out yet must show up on the upcoming activities page.' AS NOTE
     UNION ALL
-    SELECT 2750 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Plan listed twice in the upcoming activities view' AS CHECK_NAME,
+    SELECT 3240 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Plan listed twice in the upcoming activities view' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_RENCANA FROM ANALISIS.KEGIATAN_MENDATANG GROUP BY ID_RENCANA HAVING COUNT(*) > 1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'One row per plan: a duplicate would double the budget shown for upcoming activities.' AS NOTE
     UNION ALL
-    SELECT 2760 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Upcoming activity dated before the snapshot date' AS CHECK_NAME,
+    SELECT 3250 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Upcoming activity dated before the snapshot date' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_MENDATANG WHERE TAHAP <> 'Ditunda, perlu jadwal baru' AND TANGGAL_MULAI < TANGGAL_DATA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'A plan still marked Direncanakan after its date is overdue and should be updated.' AS NOTE
     UNION ALL
-    SELECT 2770 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Upcoming activities' AS CHECK_NAME,
+    SELECT 3260 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Upcoming activities' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_MENDATANG) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: scheduled events, plan-only activities and postponed ones.' AS NOTE
     UNION ALL
-    SELECT 2780 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Source file name does not start with the report number' AS CHECK_NAME,
+    SELECT 3270 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Source file name does not start with the report number' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE NAMA_BERKAS_SUMBER IS NOT NULL AND LEFT(NAMA_BERKAS_SUMBER, LENGTH(ID_LAPORAN) + 1) <> ID_LAPORAN || '_') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The report number at the start of the file name is how a document is matched to its row.' AS NOTE
     UNION ALL
-    SELECT 2790 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Source file is not a PDF or names a folder' AS CHECK_NAME,
+    SELECT 3280 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Source file is not a PDF or names a folder' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE NAMA_BERKAS_SUMBER IS NOT NULL AND (LOWER(NAMA_BERKAS_SUMBER) NOT LIKE '%.pdf' OR NAMA_BERKAS_SUMBER LIKE '%/%')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Only the file name is stored, never a folder, because the folder differs between a repository and a stage.' AS NOTE
     UNION ALL
-    SELECT 2800 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Reports without a source document' AS CHECK_NAME,
+    SELECT 3290 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Reports without a source document' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE NAMA_BERKAS_SUMBER IS NULL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Every report in the demo was extracted from a PDF, so a report entered by hand would show here.' AS NOTE
     UNION ALL
-    SELECT 2810 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Expenditure outside the plan year' AS CHECK_NAME,
+    SELECT 3300 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Expenditure outside the plan year' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN x JOIN DATA_OPERASIONAL.ALOKASI_ANGGARAN a ON a.ID_ALOKASI = x.ID_ALOKASI JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = a.ID_RENCANA JOIN DATA_OPERASIONAL.RENCANA_KERJA_TAHUNAN h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM x.TANGGAL_PENGELUARAN) <> h.TAHUN_RENCANA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Spending must be dated in the plan year.' AS NOTE
     UNION ALL
-    SELECT 2820 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Expenditure on a plan that is Direncanakan or Dibatalkan' AS CHECK_NAME,
+    SELECT 3310 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Expenditure on a plan that is Direncanakan or Dibatalkan' AS CHECK_NAME,
            'DATA_OPERASIONAL.REALISASI_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN x JOIN DATA_OPERASIONAL.ALOKASI_ANGGARAN a ON a.ID_ALOKASI = x.ID_ALOKASI JOIN DATA_OPERASIONAL.RENCANA_KEGIATAN p ON p.ID_RENCANA = a.ID_RENCANA WHERE p.STATUS_PELAKSANAAN IN ('Direncanakan', 'Dibatalkan')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Possible but unusual: spending before a plan starts or after it was cancelled.' AS NOTE
     UNION ALL
-    SELECT 2830 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations without any expenditure' AS CHECK_NAME,
+    SELECT 3320 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations without any expenditure' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN a WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN x WHERE x.ID_ALOKASI = a.ID_ALOKASI)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: budget not yet used.' AS NOTE
     UNION ALL
-    SELECT 2840 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations partly used' AS CHECK_NAME,
+    SELECT 3330 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations partly used' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT a.ID_ALOKASI, a.JUMLAH_ANGGARAN, COALESCE(SUM(x.JUMLAH_PENGELUARAN), 0) AS TERPAKAI FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN a LEFT JOIN DATA_OPERASIONAL.REALISASI_PENGELUARAN x ON x.ID_ALOKASI = a.ID_ALOKASI GROUP BY a.ID_ALOKASI, a.JUMLAH_ANGGARAN) t WHERE t.TERPAKAI BETWEEN 1 AND t.JUMLAH_ANGGARAN - 1) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: spending below budget.' AS NOTE
     UNION ALL
-    SELECT 2850 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations spent above budget' AS CHECK_NAME,
+    SELECT 3340 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Allocations spent above budget' AS CHECK_NAME,
            'DATA_OPERASIONAL.ALOKASI_ANGGARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT a.ID_ALOKASI, a.JUMLAH_ANGGARAN, COALESCE(SUM(x.JUMLAH_PENGELUARAN), 0) AS TERPAKAI FROM DATA_OPERASIONAL.ALOKASI_ANGGARAN a LEFT JOIN DATA_OPERASIONAL.REALISASI_PENGELUARAN x ON x.ID_ALOKASI = a.ID_ALOKASI GROUP BY a.ID_ALOKASI, a.JUMLAH_ANGGARAN) t WHERE t.TERPAKAI > t.JUMLAH_ANGGARAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: overspending to be explained.' AS NOTE
     UNION ALL
-    SELECT 2860 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report for an event that was not held' AS CHECK_NAME,
+    SELECT 3350 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report for an event that was not held' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r JOIN DATA_OPERASIONAL.KEGIATAN e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE e.STATUS_KEGIATAN <> 'Terlaksana') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Only events that took place can be reported.' AS NOTE
     UNION ALL
-    SELECT 2870 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report date before the event ended or after the as-of date' AS CHECK_NAME,
+    SELECT 3360 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report date before the event ended or after the as-of date' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r JOIN DATA_OPERASIONAL.KEGIATAN e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE r.TANGGAL_LAPORAN < e.TANGGAL_SELESAI OR r.TANGGAL_LAPORAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A report follows the event.' AS NOTE
     UNION ALL
-    SELECT 2880 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Final report with empty required fields' AS CHECK_NAME,
+    SELECT 3370 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Final report with empty required fields' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE STATUS_LAPORAN = 'Final' AND (RINGKASAN_PELAKSANAAN IS NULL OR JUMLAH_PESERTA IS NULL OR REALISASI_BIAYA IS NULL OR EVALUASI_LOGISTIK IS NULL OR HASIL_KEGIATAN IS NULL OR REKOMENDASI_TINDAK_LANJUT IS NULL)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A final report must be complete.' AS NOTE
     UNION ALL
-    SELECT 2890 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report participants differ from the event' AS CHECK_NAME,
+    SELECT 3380 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report participants differ from the event' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r JOIN DATA_OPERASIONAL.KEGIATAN e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE r.JUMLAH_PESERTA IS NOT NULL AND r.JUMLAH_PESERTA <> e.JUMLAH_PESERTA_AKTUAL) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Expected: 1 (the report with status Perlu Revisi is deliberately inconsistent).' AS NOTE
     UNION ALL
-    SELECT 2900 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report cost differs from recorded expenditure' AS CHECK_NAME,
+    SELECT 3390 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Report cost differs from recorded expenditure' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r JOIN DATA_OPERASIONAL.KEGIATAN e ON e.ID_KEGIATAN = r.ID_KEGIATAN LEFT JOIN (SELECT a.ID_RENCANA, SUM(x.JUMLAH_PENGELUARAN) AS TOTAL_PENGELUARAN FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN x JOIN DATA_OPERASIONAL.ALOKASI_ANGGARAN a ON a.ID_ALOKASI = x.ID_ALOKASI GROUP BY a.ID_RENCANA) s ON s.ID_RENCANA = e.ID_RENCANA WHERE r.REALISASI_BIAYA IS NOT NULL AND e.ID_RENCANA IS NOT NULL AND r.REALISASI_BIAYA <> COALESCE(s.TOTAL_PENGELUARAN, 0)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
            'Compares the cost in the report with the sum of expenditure lines of the planned activity.' AS NOTE
     UNION ALL
-    SELECT 2910 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Completed events without a report' AS CHECK_NAME,
+    SELECT 3400 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Completed events without a report' AS CHECK_NAME,
            'DATA_OPERASIONAL.KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.KEGIATAN e WHERE e.STATUS_KEGIATAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN r WHERE r.ID_KEGIATAN = e.ID_KEGIATAN)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: reports not yet submitted.' AS NOTE
     UNION ALL
-    SELECT 2920 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Draft or revision reports' AS CHECK_NAME,
+    SELECT 3410 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Draft or revision reports' AS CHECK_NAME,
            'DATA_OPERASIONAL.LAPORAN_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE STATUS_LAPORAN <> 'Final') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: incomplete reports.' AS NOTE
     UNION ALL
-    SELECT 2930 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Postponed or cancelled plans' AS CHECK_NAME,
+    SELECT 3420 AS SORT_ORDER, 'PLANNING' AS CHECK_GROUP, 'Postponed or cancelled plans' AS CHECK_NAME,
            'DATA_OPERASIONAL.RENCANA_KEGIATAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RENCANA_KEGIATAN WHERE STATUS_PELAKSANAAN IN ('Ditunda', 'Dibatalkan')) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario.' AS NOTE
     UNION ALL
-    SELECT 2940 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Answer option does not belong to the question' AS CHECK_NAME,
+    SELECT 3430 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Answer option does not belong to the question' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI j JOIN MASTER_DATA.OPSI_JAWABAN_SURVEI o ON o.ID_OPSI = j.ID_OPSI WHERE o.ID_PERTANYAAN <> j.ID_PERTANYAAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'The chosen option must be one of the question options.' AS NOTE
     UNION ALL
-    SELECT 2950 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Question and respondent belong to different surveys' AS CHECK_NAME,
+    SELECT 3440 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Question and respondent belong to different surveys' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.JAWABAN_SURVEI j JOIN MASTER_DATA.PERTANYAAN_SURVEI q ON q.ID_PERTANYAAN = j.ID_PERTANYAAN JOIN DATA_OPERASIONAL.RESPONDEN_SURVEI r ON r.ID_RESPONDEN = j.ID_RESPONDEN WHERE q.ID_SURVEI <> r.ID_SURVEI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'A respondent only answers questions of the survey they filled in.' AS NOTE
     UNION ALL
-    SELECT 2960 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Aggregate count differs from the answers' AS CHECK_NAME,
+    SELECT 3450 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Aggregate count differs from the answers' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT h LEFT JOIN (SELECT ID_OPSI, COUNT(*) AS N FROM DATA_OPERASIONAL.JAWABAN_SURVEI GROUP BY ID_OPSI) c ON c.ID_OPSI = h.ID_OPSI WHERE h.JUMLAH_RESPONDEN <> COALESCE(c.N, 0)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Recomputes every option count from the raw answers.' AS NOTE
     UNION ALL
-    SELECT 2970 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Aggregate total differs from the answers' AS CHECK_NAME,
+    SELECT 3460 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Aggregate total differs from the answers' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT h LEFT JOIN (SELECT ID_PERTANYAAN, COUNT(*) AS N FROM DATA_OPERASIONAL.JAWABAN_SURVEI GROUP BY ID_PERTANYAAN) c ON c.ID_PERTANYAAN = h.ID_PERTANYAAN WHERE h.TOTAL_RESPONDEN_PERTANYAAN <> COALESCE(c.N, 0)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Recomputes the number of respondents per question.' AS NOTE
     UNION ALL
-    SELECT 2980 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Percentage differs from count divided by total' AS CHECK_NAME,
+    SELECT 3470 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Percentage differs from count divided by total' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE (TOTAL_RESPONDEN_PERTANYAAN = 0 AND PERSENTASE_JAWABAN <> 0) OR (TOTAL_RESPONDEN_PERTANYAAN > 0 AND ABS(PERSENTASE_JAWABAN - 100.0 * JUMLAH_RESPONDEN / TOTAL_RESPONDEN_PERTANYAAN) > 0.01)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Tolerance 0.01 percentage point for rounding.' AS NOTE
     UNION ALL
-    SELECT 2990 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Option counts do not add up to the question total' AS CHECK_NAME,
+    SELECT 3480 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Option counts do not add up to the question total' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PERTANYAAN FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT GROUP BY ID_PERTANYAAN HAVING SUM(JUMLAH_RESPONDEN) <> MAX(TOTAL_RESPONDEN_PERTANYAAN)) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Single answers: option counts must sum to the number of respondents.' AS NOTE
     UNION ALL
-    SELECT 3000 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Percentages do not add up to 100' AS CHECK_NAME,
+    SELECT 3490 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Percentages do not add up to 100' AS CHECK_NAME,
            'DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM (SELECT ID_PERTANYAAN FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT GROUP BY ID_PERTANYAAN HAVING MAX(TOTAL_RESPONDEN_PERTANYAAN) > 0 AND ABS(SUM(PERSENTASE_JAWABAN) - 100) > 0.1) d) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Tolerance 0.1 percentage point for rounding.' AS NOTE
     UNION ALL
-    SELECT 3010 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Answered question without aggregate rows' AS CHECK_NAME,
+    SELECT 3500 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Answered question without aggregate rows' AS CHECK_NAME,
            'DATA_OPERASIONAL.JAWABAN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(DISTINCT j.ID_PERTANYAAN) FROM DATA_OPERASIONAL.JAWABAN_SURVEI j WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT h WHERE h.ID_PERTANYAAN = j.ID_PERTANYAAN)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Every answered question must be summarised.' AS NOTE
     UNION ALL
-    SELECT 3020 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Respondent filled outside the survey window' AS CHECK_NAME,
+    SELECT 3510 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Respondent filled outside the survey window' AS CHECK_NAME,
            'DATA_OPERASIONAL.RESPONDEN_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM DATA_OPERASIONAL.RESPONDEN_SURVEI r JOIN MASTER_DATA.SURVEI s ON s.ID_SURVEI = r.ID_SURVEI WHERE r.TANGGAL_PENGISIAN < s.TANGGAL_MULAI OR r.TANGGAL_PENGISIAN > s.TANGGAL_SELESAI OR r.TANGGAL_PENGISIAN > DATE '2026-09-30') AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Responses fall inside the survey dates.' AS NOTE
     UNION ALL
-    SELECT 3030 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Survey ends before it starts' AS CHECK_NAME,
+    SELECT 3520 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Survey ends before it starts' AS CHECK_NAME,
            'MASTER_DATA.SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI WHERE TANGGAL_SELESAI < TANGGAL_MULAI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
            'Survey dates.' AS NOTE
     UNION ALL
-    SELECT 3040 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Surveys without responses' AS CHECK_NAME,
+    SELECT 3530 AS SORT_ORDER, 'SURVEYS' AS CHECK_GROUP, 'Surveys without responses' AS CHECK_NAME,
            'MASTER_DATA.SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM MASTER_DATA.SURVEI s WHERE NOT EXISTS (SELECT 1 FROM DATA_OPERASIONAL.RESPONDEN_SURVEI r WHERE r.ID_SURVEI = s.ID_SURVEI)) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: a planned survey has no responses and no aggregates.' AS NOTE
     UNION ALL
-    SELECT 3050 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3540 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.STRUKTUR_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.STRUKTUR_WILAYAH) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3060 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3550 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PELAKSANAAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PELAKSANAAN_MISA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3070 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3560 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEHADIRAN_MISA_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEHADIRAN_MISA_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3080 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3570 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KOLEKTE_MISA_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MISA_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3090 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3580 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.TREN_KEHADIRAN_PERIODE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.TREN_KEHADIRAN_PERIODE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3100 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3590 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.SUMBANGAN_KHUSUS_PER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.SUMBANGAN_KHUSUS_PER_WILAYAH) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3110 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3600 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3120 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3610 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.ANGGARAN_VS_REALISASI_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.ANGGARAN_VS_REALISASI_SEKSI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3130 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3620 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_DAN_LAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_DAN_LAPORAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3140 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3630 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KELENGKAPAN_LAPORAN_PER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KELENGKAPAN_LAPORAN_PER_SEKSI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3150 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3640 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.HASIL_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.HASIL_SURVEI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3160 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3650 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.RINGKASAN_SKOR_LIKERT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_SKOR_LIKERT) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3170 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3660 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.RINGKASAN_UMAT_PER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_UMAT_PER_LINGKUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3180 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3670 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3190 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3680 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3200 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3690 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3210 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3700 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KORELASI_KOLEKTE_KEHADIRAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KORELASI_KOLEKTE_KEHADIRAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3220 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3710 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3230 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3720 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3240 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3730 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3250 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3740 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3260 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3750 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.TITIK_IMPAS_KAMPANYE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.TITIK_IMPAS_KAMPANYE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3270 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3760 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_MENDATANG) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3770 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3780 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3790 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.AKURASI_PERKIRAAN_TAHUNAN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.AKURASI_PERKIRAAN_TAHUNAN) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3800 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.LAYANAN_PUBLIK' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.LAYANAN_PUBLIK) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3810 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.LANGKAH_LAYANAN_PUBLIK' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.LANGKAH_LAYANAN_PUBLIK) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3820 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.PERSYARATAN_LAYANAN_PUBLIK' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.PERSYARATAN_LAYANAN_PUBLIK) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
 ),

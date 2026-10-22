@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import altair as alt
 import pandas as pd
@@ -37,20 +38,26 @@ DATA_LABEL = "Data simulasi (fiktif)"
 
 # The only views this dashboard may read. A test checks that each one exists in sql/05.
 VIEWS = (
+    "AKURASI_PERKIRAAN_TAHUNAN",
     "ANGGARAN_VS_REALISASI_PROGRAM",
     "ANGGARAN_VS_REALISASI_SEKSI",
+    "BIAS_PERKIRAAN_PER_PERISTIWA",
     "DAMPAK_PERISTIWA_LUAR_BIASA",
     "HASIL_SURVEI",
     "KEGIATAN_DAN_LAPORAN",
     "KEGIATAN_MENDATANG",
     "KEHADIRAN_MISA_BULANAN",
     "KELENGKAPAN_LAPORAN_PER_SEKSI",
+    "KOLEKTE_AKTUAL_VS_PERKIRAAN",
     "KOLEKTE_MINGGUAN_DAN_PERISTIWA",
     "KOLEKTE_MISA_BULANAN",
     "KORELASI_KOLEKTE_KEHADIRAN",
+    "LANGKAH_LAYANAN_PUBLIK",
+    "LAYANAN_PUBLIK",
     "PELAKSANAAN_MISA",
     "PEMASUKAN_PENGELUARAN_BULANAN",
     "PEMASUKAN_PENGELUARAN_TAHUNAN",
+    "PERSYARATAN_LAYANAN_PUBLIK",
     "POLA_KOLEKTE_HARI_DALAM_BULAN",
     "PROYEKSI_PEMASUKAN_PENGELUARAN",
     "RINGKASAN_SKOR_LIKERT",
@@ -69,6 +76,7 @@ PALETTES = {
     "light": ["#2a78d6", "#eb6834", "#1baf7a"],
     "dark": ["#3987e5", "#d95926", "#199e70"],
 }
+GUIDE_FOLDER = "public_documents"  # the guide PDFs of the service pages, stored next to this file
 NEUTRAL = "#898781"
 INK = {"light": "#0b0b0b", "dark": "#f0efec"}  # text drawn inside charts follows the theme
 
@@ -402,6 +410,120 @@ def horizontal_bar_chart(frame, category, value, value_title, order, label_colum
         line = pd.DataFrame({"Acuan": [reference]})
         layers.append(alt.Chart(line).mark_rule(color=NEUTRAL, strokeWidth=1).encode(x="Acuan:Q"))
     show_chart(alt.layer(*layers), height=height or max(120, 30 * len(data) + 40))
+
+
+# --------------------------------------------------------------------------------------------
+# Shadow forecast charts
+# --------------------------------------------------------------------------------------------
+SERIES_ACTUAL = "Kolekte sebenarnya"
+SERIES_FORECAST = "Perkiraan bayangan"
+SERIES_EVENT = "Pekan terdampak peristiwa"
+KIND_ORDINARY = "Pekan biasa"
+KIND_CALENDAR = "Hari raya atau kolekte khusus"
+KIND_EVENT = "Peristiwa luar biasa"
+FORECAST_KINDS = [KIND_ORDINARY, KIND_CALENDAR, KIND_EVENT]
+SHORT_MONTHS_EXPR = ('["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"][month(datum.value)]'
+                     ' + " " + year(datum.value)')
+
+
+def forecast_frames(frame):
+    """The data behind forecast_chart: (one row per week with formatted tooltip texts, the long table of the two lines,
+    the weeks hit by an unforeseen event). `frame` is a slice of KOLEKTE_AKTUAL_VS_PERKIRAAN."""
+    data = frame.sort_values("AWAL_PEKAN").reset_index(drop=True).copy()
+    for column in ("KOLEKTE_AKTUAL", "JUMLAH_PERKIRAAN", "BATAS_BAWAH", "BATAS_ATAS"):
+        data[column] = data[column].astype(float) / 1e6
+    data["Akhir"] = data["AWAL_PEKAN"] + pd.Timedelta(days=7)
+    data["Pekan"] = [f"Pekan {long_date(d)}" for d in data["AWAL_PEKAN"]]
+    data["Teks sebenarnya"] = [rupiah(v * 1e6) if not _missing(v) else "belum lengkap" for v in data["KOLEKTE_AKTUAL"]]
+    data["Teks perkiraan"] = [rupiah(v * 1e6) for v in data["JUMLAH_PERKIRAAN"]]
+    data["Teks rentang"] = [f"{juta(lo * 1e6)} sampai {juta(hi * 1e6)}" for lo, hi in zip(data["BATAS_BAWAH"], data["BATAS_ATAS"])]
+    data["Teks selisih"] = [signed_percent(v) for v in data["SELISIH_PERSEN"]]
+    data["Teks peristiwa"] = [text(v) if isinstance(v, str) else "-" for v in data["NAMA_PERISTIWA"]]
+    data["Teks kalender"] = [text(v) if isinstance(v, str) else "-" for v in data["CATATAN_KALENDER"]]
+    data["Nilai titik"] = data["KOLEKTE_AKTUAL"].fillna(data["JUMLAH_PERKIRAAN"])
+
+    actual = data.dropna(subset=["KOLEKTE_AKTUAL"])
+    long = pd.concat([
+        pd.DataFrame({"AWAL_PEKAN": actual["AWAL_PEKAN"], "Seri": SERIES_ACTUAL, "Juta": actual["KOLEKTE_AKTUAL"]}),
+        pd.DataFrame({"AWAL_PEKAN": data["AWAL_PEKAN"], "Seri": SERIES_FORECAST, "Juta": data["JUMLAH_PERKIRAAN"]}),
+    ])
+    struck = data[data["NAMA_PERISTIWA"].map(lambda n: isinstance(n, str))].copy()
+    struck["Seri"] = SERIES_EVENT
+    return data, long, struck
+
+
+def forecast_chart(frame, height=360, close_up=False):
+    """Actual weekly offertory (solid) against the stored forecast (dashed) with its 80% range (pale band).
+    Weeks hit by an unforeseen event are shaded. Only complete weeks have an actual value, so the solid line
+    stops at the data date while the forecast goes on."""
+    data, long, struck = forecast_frames(frame)
+    line_colour = alt.Color("Seri:N", scale=alt.Scale(domain=[SERIES_ACTUAL, SERIES_FORECAST], range=[palette()[0], palette()[1]]),
+                            legend=alt.Legend(title=None))
+    band_colour = alt.Color("Seri:N", scale=alt.Scale(domain=[SERIES_EVENT], range=[NEUTRAL]),
+                            legend=alt.Legend(title=None, symbolOpacity=0.5))
+    if close_up:
+        x_axis = alt.Axis(title=None, labelExpr=SHORT_MONTHS_EXPR, tickCount=6)
+    else:
+        x_axis = alt.Axis(format="%Y", title=None, tickCount="year")
+    x = alt.X("AWAL_PEKAN:T", axis=x_axis)
+    y = alt.Y("Juta:Q", axis=alt.Axis(title="Juta rupiah per pekan"), scale=alt.Scale(zero=True))
+
+    layers = []
+    if not struck.empty:
+        layers.append(alt.Chart(struck).mark_rect(opacity=0.22).encode(x=alt.X("AWAL_PEKAN:T"), x2="Akhir:T", color=band_colour))
+    layers.append(alt.Chart(data).mark_area(opacity=0.16, color=palette()[1]).encode(
+        x=alt.X("AWAL_PEKAN:T"), y=alt.Y("BATAS_BAWAH:Q"), y2="BATAS_ATAS:Q"))
+    lines = alt.Chart(long).mark_line(strokeWidth=2, strokeJoin="round").encode(
+        x=x, y=y, color=line_colour,
+        strokeDash=alt.StrokeDash("Seri:N", scale=alt.Scale(domain=[SERIES_ACTUAL, SERIES_FORECAST], range=[[1, 0], [6, 4]]),
+                                  legend=alt.Legend(title=None)))
+    layers.append(lines)
+    layers.append(alt.Chart(data).mark_circle(size=60, opacity=0).encode(
+        x=alt.X("AWAL_PEKAN:T"), y=alt.Y("Nilai titik:Q"),
+        tooltip=[alt.Tooltip("Pekan:N", title="Pekan"), alt.Tooltip("Teks sebenarnya:N", title="Kolekte sebenarnya"),
+                 alt.Tooltip("Teks perkiraan:N", title="Perkiraan"), alt.Tooltip("Teks rentang:N", title="Rentang 80%"),
+                 alt.Tooltip("Teks selisih:N", title="Selisih"), alt.Tooltip("Teks peristiwa:N", title="Peristiwa"),
+                 alt.Tooltip("Teks kalender:N", title="Catatan kalender")]))
+
+    ahead = data[data["STATUS_PEKAN"] != "Lengkap"]
+    if not ahead.empty and not close_up:
+        marker = pd.DataFrame({"AWAL_PEKAN": [ahead["AWAL_PEKAN"].min()], "Teks": ["Perkiraan ke depan"]})
+        layers.append(alt.Chart(marker).mark_rule(color=NEUTRAL, strokeDash=[4, 4], strokeWidth=1).encode(x="AWAL_PEKAN:T"))
+        layers.append(alt.Chart(marker).mark_text(align="right", dx=-6, fontSize=12, color=NEUTRAL)
+                      .encode(x="AWAL_PEKAN:T", y=alt.value(12), text="Teks:N"))
+    show_chart(alt.layer(*layers).resolve_scale(color="independent", strokeDash="independent"), height=height)
+
+
+def event_gap_chart(events, typical):
+    """Horizontal bars: how far each event's weeks fell below (or above) the forecast, in event order.
+    The grey band is the usual error of an ordinary week."""
+    data = events[["NAMA_PERISTIWA", "SELISIH_PERSEN"]].copy()
+    data["Teks"] = [signed_percent(v, 1 if abs(v) < 1 else 0) for v in data["SELISIH_PERSEN"]]
+    order = list(events["NAMA_PERISTIWA"])
+    base = alt.Chart(data).encode(
+        y=alt.Y("NAMA_PERISTIWA:N", sort=order, axis=alt.Axis(title=None, labelLimit=300)),
+        x=alt.X("SELISIH_PERSEN:Q", axis=alt.Axis(title="Selisih kolekte terhadap perkiraan (%)"), scale=alt.Scale(zero=True)),
+        tooltip=[alt.Tooltip("NAMA_PERISTIWA:N", title="Peristiwa"), alt.Tooltip("Teks:N", title="Selisih")])
+    layers = []
+    if not _missing(typical):
+        band = pd.DataFrame({"Bawah": [-float(typical)], "Atas": [float(typical)]})
+        layers.append(alt.Chart(band).mark_rect(color=NEUTRAL, opacity=0.18).encode(x="Bawah:Q", x2="Atas:Q"))
+    layers.append(base.mark_bar(size=16, color=palette()[1], cornerRadiusTopRight=4, cornerRadiusBottomRight=4))
+    layers.append(base.transform_filter(alt.datum.SELISIH_PERSEN < 0)
+                  .mark_text(align="right", dx=-6, fontSize=12, color=ink()).encode(text="Teks:N"))
+    layers.append(base.transform_filter(alt.datum.SELISIH_PERSEN >= 0)
+                  .mark_text(align="left", dx=6, fontSize=12, color=ink()).encode(text="Teks:N"))
+    layers.append(alt.Chart(pd.DataFrame({"Nol": [0]})).mark_rule(color=NEUTRAL, strokeWidth=1).encode(x="Nol:Q"))
+    show_chart(alt.layer(*layers), height=max(160, 34 * len(data) + 50))
+
+
+def pooled(frame, kind, column):
+    """Average of an accuracy column over the selected years, weighted by the number of weeks."""
+    rows = frame[frame["JENIS_PEKAN"] == kind]
+    weeks = rows["JUMLAH_PEKAN"].sum()
+    if rows.empty or weeks == 0:
+        return None
+    return float((rows[column].astype(float) * rows["JUMLAH_PEKAN"]).sum() / weeks)
 
 
 # --------------------------------------------------------------------------------------------
@@ -983,10 +1105,139 @@ def page_events():
                 ("PERKIRAAN_KOLEKTE_YANG_TIDAK_DITERIMA", "Kolekte tidak diterima", rupiah),
             ])
 
+    st.caption("Untuk melihat bagaimana peristiwa-peristiwa ini membuat perkiraan kolekte meleset, buka halaman \"Perkiraan kolekte\".")
     how_to_read(
         "Catatan peristiwa menjelaskan mengapa angka pada suatu periode menyimpang dari tren. Dampaknya tidak disimpan sebagai angka, "
         "tetapi dihitung dari perbandingan dengan delapan pekan sebelumnya.",
         "Bila perkiraan masa depan dibuat tanpa memisahkan pekan-pekan ini, penurunan sementara bisa terbaca sebagai perubahan tren.",
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Page: Perkiraan kolekte
+# --------------------------------------------------------------------------------------------
+def page_forecast():
+    st.title("Perkiraan kolekte")
+    banner()
+    weeks = get("KOLEKTE_AKTUAL_VS_PERKIRAAN").sort_values("AWAL_PEKAN").reset_index(drop=True)
+    events = get("BIAS_PERKIRAAN_PER_PERISTIWA").sort_values("TANGGAL_MULAI").reset_index(drop=True)
+    accuracy = get("AKURASI_PERKIRAAN_TAHUNAN")
+
+    st.write("Perkiraan bayangan dibuat **empat pekan sebelum** pekan yang diperkirakan, hanya dari data yang saat itu sudah ada, "
+             "lalu disimpan apa adanya. Perkiraan tidak pernah diubah setelah hasilnya diketahui, sehingga dapat dibandingkan "
+             "dengan kolekte sebenarnya secara jujur. Perkiraan tidak mengetahui peristiwa yang belum terjadi, dan di situlah "
+             "catatan peristiwa luar biasa menjelaskan selisihnya.")
+
+    first, last = year_range_slider("Rentang tahun", week_year(weeks).unique())
+    chosen = weeks[(week_year(weeks) >= first) & (week_year(weeks) <= last)]
+    years = accuracy[(accuracy["TAHUN"] >= first) & (accuracy["TAHUN"] <= last)]
+
+    ordinary_error = pooled(years, KIND_ORDINARY, "GALAT_RATA_RATA_PERSEN")
+    ordinary_inside = pooled(years, KIND_ORDINARY, "PERSEN_DALAM_RENTANG")
+    event_error = pooled(years, KIND_EVENT, "GALAT_RATA_RATA_PERSEN")
+    event_inside = pooled(years, KIND_EVENT, "PERSEN_DALAM_RENTANG")
+    tiles = st.columns(4)
+    tiles[0].metric("Galat pekan biasa", percent(ordinary_error), help="Rata-rata selisih mutlak terhadap perkiraan pada pekan tanpa peristiwa dan tanpa hari raya.")
+    tiles[1].metric("Pekan biasa dalam rentang", percent(ordinary_inside, 0), help="Rentang perkiraan dirancang memuat sekitar 80% pekan.")
+    tiles[2].metric("Galat pekan berperistiwa", percent(event_error), help="Rata-rata selisih mutlak pada pekan yang terkena peristiwa luar biasa.")
+    tiles[3].metric("Berperistiwa dalam rentang", percent(event_inside, 0), help="Peristiwa membuat kolekte keluar dari rentang perkiraan.")
+
+    forecast_chart(chosen)
+    st.caption("Garis biru adalah kolekte sebenarnya, garis putus-putus oranye adalah perkiraan yang dibuat empat pekan sebelumnya, dan pita oranye muda "
+               "adalah rentang yang diharapkan memuat 80% hasil. Pekan berlatar abu-abu terkena peristiwa luar biasa. "
+               "Garis putus-putus vertikal menandai awal pekan yang belum lengkap pada tanggal data: ke kanan hanya ada perkiraan.")
+    with st.expander("Tabel pekan yang kolekte sebenarnya di luar rentang"):
+        outside = chosen[chosen["POSISI_TERHADAP_RENTANG"].isin(["Di bawah rentang", "Di atas rentang"])]
+        if outside.empty:
+            st.write("Tidak ada pekan di luar rentang pada tahun yang dipilih.")
+        else:
+            show_table(outside, [
+                ("AWAL_PEKAN", "Pekan mulai", long_date), ("JUMLAH_PERKIRAAN", "Perkiraan", rupiah),
+                ("KOLEKTE_AKTUAL", "Sebenarnya", rupiah), ("SELISIH_PERSEN", "Selisih", signed_percent),
+                ("POSISI_TERHADAP_RENTANG", "Posisi", text), ("PENJELASAN_SELISIH", "Penjelasan", text),
+                ("NAMA_PERISTIWA", "Peristiwa", text)])
+        unexplained = int((outside["PENJELASAN_SELISIH"] == "Di luar rentang, tanpa peristiwa tercatat").sum())
+        st.caption(f"{unexplained} dari {len(outside)} pekan di luar rentang tidak memiliki peristiwa tercatat. Itu wajar: rentang 80% memang "
+                   "diperkirakan meleset pada sekitar satu dari lima pekan biasa.")
+
+    st.subheader("Mengapa perkiraan meleset?")
+    inside_events = events[(events["TANGGAL_MULAI"].dt.year >= first) & (events["TANGGAL_MULAI"].dt.year <= last)]
+    if inside_events.empty:
+        st.info("Tidak ada peristiwa yang dapat dibandingkan pada rentang tahun yang dipilih.")
+    else:
+        typical = inside_events["GALAT_PEKAN_BIASA_PERSEN"].dropna().iloc[0] if inside_events["GALAT_PEKAN_BIASA_PERSEN"].notna().any() else None
+        event_gap_chart(inside_events, typical)
+        st.caption("Setiap batang menunjukkan selisih total kolekte pada pekan-pekan peristiwa terhadap perkiraannya. Pita abu-abu adalah galat biasa "
+                   f"pada pekan tanpa peristiwa (sekitar plus minus {percent(typical)}). Batang yang jauh keluar dari pita tidak bisa dijelaskan "
+                   "oleh kebiasaan perkiraan, tetapi oleh peristiwa itu sendiri. Urutan mengikuti tanggal kejadian, bukan besar selisih.")
+
+        names = list(inside_events["NAMA_PERISTIWA"])
+        pick = st.selectbox("Pilih peristiwa untuk dilihat dari dekat", names, index=len(names) - 1)
+        row = inside_events[inside_events["NAMA_PERISTIWA"] == pick].iloc[0]
+        st.markdown(f"**{row['NAMA_PERISTIWA']}** ({row['JENIS_PERISTIWA']}, gangguan {str(row['TINGKAT_GANGGUAN']).lower()}), "
+                    f"{long_date(row['TANGGAL_MULAI'])} sampai {long_date(row['TANGGAL_SELESAI'])}")
+        st.write(row["DESKRIPSI"])
+        cards = st.columns(4)
+        cards[0].metric("Pekan terdampak", whole(row["JUMLAH_PEKAN_TERDAMPAK"]),
+                        help=f"{whole(row['JUMLAH_PEKAN_DI_LUAR_RENTANG'])} dari pekan ini berada di luar rentang perkiraan.")
+        cards[1].metric("Perkiraan", juta(row["PERKIRAAN_TOTAL"]))
+        cards[2].metric("Sebenarnya", juta(row["KOLEKTE_AKTUAL_TOTAL"]))
+        cards[3].metric("Selisih", signed_percent(row["SELISIH_PERSEN"]), help="Kolekte sebenarnya dikurangi perkiraan, dibagi perkiraan.")
+        multiple = row["KELIPATAN_GALAT_BIASA"]
+        if not _missing(multiple) and multiple < 1:
+            st.info("Selisihnya masih dalam batas galat biasa: peristiwa ini nyaris tidak terlihat pada kolekte. "
+                    "Perkiraan sudah memperhitungkan kenaikan kolekte setelah hari gajian, dan peristiwa jatuh pada awal bulan.")
+        elif not _missing(multiple):
+            st.markdown(f"Selisih ini sekitar **{number(multiple, 1)} kali** galat biasa pada pekan tanpa peristiwa. "
+                        "Perkiraan dibuat sebelum peristiwa terjadi dan tidak dapat mengetahuinya.")
+        close = weeks[(weeks["AWAL_PEKAN"] >= row["PEKAN_PERTAMA"] - pd.Timedelta(days=42))
+                      & (weeks["AWAL_PEKAN"] <= row["PEKAN_TERAKHIR"] + pd.Timedelta(days=42))]
+        forecast_chart(close, height=300, close_up=True)
+
+    st.subheader("Seberapa tepat perkiraan ini?")
+    summary = []
+    for kind in FORECAST_KINDS:
+        n = years[years["JENIS_PEKAN"] == kind]["JUMLAH_PEKAN"].sum()
+        if n:
+            summary.append({"Jenis pekan": kind, "Pekan": int(n), "Galat": pooled(years, kind, "GALAT_RATA_RATA_PERSEN"),
+                            "Selisih": pooled(years, kind, "SELISIH_RATA_RATA_PERSEN"), "Dalam rentang": pooled(years, kind, "PERSEN_DALAM_RENTANG")})
+    if summary:
+        table = pd.DataFrame(summary)
+        order = list(table["Jenis pekan"])
+        table["Teks galat"] = [percent(v) for v in table["Galat"]]
+        table["Teks rentang"] = [percent(v, 0) for v in table["Dalam rentang"]]
+        left, right = st.columns(2)
+        with left:
+            st.markdown("**Galat rata-rata (%)**")
+            horizontal_bar_chart(table, "Jenis pekan", "Galat", "Galat rata-rata (%)", order, label_column="Teks galat", color_index=0, height=190)
+        with right:
+            st.markdown("**Pekan yang jatuh dalam rentang (%)**")
+            horizontal_bar_chart(table, "Jenis pekan", "Dalam rentang", "% pekan dalam rentang", order, label_column="Teks rentang",
+                                 reference=80, color_index=1, max_value=110, height=190)
+        st.caption("Garis abu-abu pada grafik kanan adalah 80%, yaitu ketepatan rentang yang dirancang. Perkiraan tepat pada pekan biasa dan pekan hari raya, "
+                   "dan meleset terutama bila ada peristiwa luar biasa.")
+        with st.expander("Tabel ketepatan per tahun"):
+            show_table(years.sort_values(["TAHUN", "JENIS_PEKAN"]), [
+                ("TAHUN", "Tahun", lambda v: str(int(v))), ("JENIS_PEKAN", "Jenis pekan", text), ("JUMLAH_PEKAN", "Pekan", whole),
+                ("GALAT_RATA_RATA_PERSEN", "Galat rata-rata", percent), ("SELISIH_RATA_RATA_PERSEN", "Selisih rata-rata", signed_percent),
+                ("PERSEN_DALAM_RENTANG", "Dalam rentang", lambda v: percent(v, 0))])
+
+    st.subheader("Perkiraan untuk pekan-pekan ke depan")
+    ahead = weeks[weeks["STATUS_PEKAN"] != "Lengkap"]
+    if ahead.empty:
+        st.write("Belum ada perkiraan untuk pekan yang akan datang.")
+    else:
+        show_table(ahead, [
+            ("AWAL_PEKAN", "Pekan mulai", long_date), ("STATUS_PEKAN", "Keterangan", text), ("JUMLAH_PERKIRAAN", "Perkiraan", rupiah),
+            ("BATAS_BAWAH", "Batas bawah", rupiah), ("BATAS_ATAS", "Batas atas", rupiah), ("CATATAN_KALENDER", "Catatan kalender", text)])
+        st.caption("Perkiraan ini belum mengetahui peristiwa yang mungkin terjadi. Bila ada, selisihnya akan terlihat pada grafik di atas.")
+
+    how_to_read(
+        "Selisih adalah kolekte sebenarnya dikurangi perkiraan. Selisih negatif berarti kolekte lebih rendah dari perkiraan.",
+        "Perkiraan memakai garis tren dari 52 pekan terakhir yang tidak terganggu, kenaikan setelah hari gajian, dan kalender liturgi (hari raya dan kolekte khusus). "
+        "Pekan yang sudah tercatat terganggu peristiwa tidak dipakai untuk belajar, agar bencana yang lalu tidak menurunkan perkiraan berikutnya.",
+        "Angka kolekte adalah ringkasan administrasi keuangan. Angka ini bukan ukuran iman atau komitmen rohani dan tidak dipakai untuk menilai siapa pun.",
+        "Tahun 2021 hanya memuat pekan sejak Agustus karena model memerlukan sekitar setengah tahun riwayat sebelum mulai membuat perkiraan.",
     )
 
 
@@ -1293,6 +1544,72 @@ def page_surveys():
 # --------------------------------------------------------------------------------------------
 # Page: Tentang data
 # --------------------------------------------------------------------------------------------
+def read_guide(file_name):
+    """Bytes of a guide PDF kept next to this file, or None when it is not there (for example when the app was
+    pasted into the Snowsight editor, which holds only the code). Only plain PDF names are accepted."""
+    name = str(file_name)
+    if name != Path(name).name or not name.lower().endswith(".pdf"):
+        return None
+    try:
+        path = Path(__file__).resolve().parent / GUIDE_FOLDER / name
+        return path.read_bytes() if path.is_file() else None
+    except Exception:  # noqa: BLE001 - no __file__ or no access: the page still shows the text of the guide
+        return None
+
+
+def page_services():
+    st.title("Layanan dan prosedur")
+    banner()
+    services = get("LAYANAN_PUBLIK").sort_values("ID_LAYANAN").reset_index(drop=True)
+    steps = get("LANGKAH_LAYANAN_PUBLIK").sort_values(["ID_LAYANAN", "NOMOR_URUT"])
+    requirements = get("PERSYARATAN_LAYANAN_PUBLIK").sort_values(["ID_LAYANAN", "NOMOR_URUT"])
+
+    st.write("Langkah dan persyaratan layanan paroki, untuk dibaca siapa saja. Pilih layanan, lihat apa yang perlu disiapkan dan urutan langkahnya, "
+             "atau unduh panduan PDF untuk dicetak.")
+    st.warning(services["CATATAN_PENGGUNAAN"].iloc[0] if not services.empty else "Panduan ini contoh untuk demonstrasi.")
+    if services.empty:
+        st.info("Belum ada layanan yang dapat ditampilkan untuk umum.")
+        return
+
+    with st.expander("Daftar semua layanan"):
+        show_table(services, [("NAMA_LAYANAN", "Layanan", text), ("KATEGORI_LAYANAN", "Kategori", text),
+                              ("PERKIRAAN_WAKTU_PROSES", "Perkiraan waktu", text), ("JUMLAH_PERSYARATAN", "Persyaratan", whole),
+                              ("JUMLAH_LANGKAH", "Langkah", whole), ("SEKSI_PENGELOLA", "Dikelola oleh", text)])
+
+    pick = st.selectbox("Pilih layanan", list(services["NAMA_LAYANAN"]))
+    row = services[services["NAMA_LAYANAN"] == pick].iloc[0]
+    sid = row["ID_LAYANAN"]
+    st.subheader(row["NAMA_LAYANAN"])
+    st.caption(f"{row['KATEGORI_LAYANAN']}  |  dikelola {row['SEKSI_PENGELOLA']}  |  terakhir ditinjau {long_date(row['TANGGAL_REVISI'])}")
+    st.write(row["RINGKASAN"])
+    st.markdown(f"**Perkiraan waktu:** {row['PERKIRAAN_WAKTU_PROSES']}")
+
+    needs = requirements[requirements["ID_LAYANAN"] == sid]
+    todo = steps[steps["ID_LAYANAN"] == sid]
+    first_tab, second_tab = st.tabs([f"Persyaratan ({len(needs)})", f"Langkah-langkah ({len(todo)})"])
+    with first_tab:
+        st.markdown(f"{whole(row['JUMLAH_PERSYARATAN_WAJIB'])} dari {len(needs)} persyaratan selalu wajib. Sisanya hanya berlaku pada keadaan tertentu.")
+        for _, item in needs.iterrows():
+            st.markdown(f"- ☐ **{item['NAMA_PERSYARATAN']}** ({item['JENIS_PERSYARATAN']}, {item['STATUS_PERSYARATAN'].lower()})"
+                        + (f"  \n  {item['KETERANGAN']}" if isinstance(item["KETERANGAN"], str) else ""))
+    with second_tab:
+        for _, item in todo.iterrows():
+            st.markdown(f"**{int(item['NOMOR_URUT'])}. {item['JUDUL_LANGKAH']}**  \n*Pelaku: {item['PELAKU']}.* {item['URAIAN']}")
+
+    st.info("**Catatan penting.** " + str(row["CATATAN_PENTING"]))
+    content = read_guide(row["NAMA_BERKAS_PANDUAN"])
+    if content is not None:
+        st.download_button("Unduh panduan (PDF)", data=content, file_name=row["NAMA_BERKAS_PANDUAN"], mime="application/pdf")
+    else:
+        st.caption(f"Panduan PDF ({row['NAMA_BERKAS_PANDUAN']}) tidak ditemukan di samping aplikasi ini. Berkasnya tersimpan di folder "
+                   f"app/{GUIDE_FOLDER} pada repositori. Isi panduan tetap dapat dibaca pada halaman ini.")
+    how_to_read(
+        "Isi halaman ini sama dengan isi panduan PDF: keduanya dibuat dari data yang sama.",
+        "Data pribadi tidak ditampilkan. Pendaftaran dan data keluarga hanya dilihat petugas yang berwenang.",
+        "Panduan ini contoh untuk demonstrasi. Ketentuan sebenarnya ditetapkan oleh paroki dan keuskupan masing-masing.",
+    )
+
+
 def page_about():
     st.title("Tentang data")
     banner()
@@ -1314,6 +1631,11 @@ Batas wilayah dan peta, bila ada pada versi mendatang, hanya ilustrasi dan bukan
 **Tentang angka sumbangan dan kolekte.** Angka ini menggambarkan administrasi keuangan dan kapasitas ekonomi. Angka ini bukan ukuran iman,
 komitmen rohani, atau kemurahan hati, dan tidak dipakai untuk memeringkat wilayah atau lingkungan.
 
+**Tentang perkiraan bayangan.** Perkiraan kolekte mingguan dibuat empat pekan sebelumnya dan disimpan tanpa pernah diubah. Dasbor membandingkannya
+dengan kolekte sebenarnya agar terlihat seberapa tepat perkiraan itu dan peristiwa apa yang membuatnya meleset.
+
+**Tentang layanan dan prosedur.** Halaman layanan memuat panduan contoh (langkah dan persyaratan) yang fiktif dan bukan ketentuan resmi.
+
 **Tentang proyeksi.** Garis tren adalah garis lurus dari lima tahun lengkap. Ia membantu menggambarkan arah, bukan meramalkan masa depan.
 Peristiwa luar biasa tidak bisa diprediksi; karena itu dicatat agar penyimpangan perkiraan dapat dijelaskan.
 """
@@ -1333,10 +1655,12 @@ PAGES = {
     "Kegiatan mendatang": page_upcoming,
     "Pemasukan dan pengeluaran": page_income_outcome,
     "Kolekte dan kehadiran": page_offertory_attendance,
+    "Perkiraan kolekte": page_forecast,
     "Peristiwa luar biasa": page_events,
     "Sumbangan khusus": page_donations,
     "Rencana, anggaran, kegiatan": page_plans,
     "Survei umat": page_surveys,
+    "Layanan dan prosedur": page_services,
     "Tentang data": page_about,
 }
 

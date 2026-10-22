@@ -125,6 +125,23 @@ DAFTAR_NILAI = {
         ("Menengah Atas", "Kapasitas ekonomi umum lingkungan agak di atas rata-rata paroki."),
         ("Tinggi", "Kapasitas ekonomi umum lingkungan di atas rata-rata paroki."),
     ],
+    "KATEGORI_LAYANAN": [
+        ("Sakramen", "Layanan sakramen: baptis, krisma, dan perkawinan."),
+        ("Administrasi Umat", "Layanan pencatatan umat, misalnya pendaftaran ke lingkungan."),
+        ("Pelayanan Duka", "Pendampingan keluarga yang kehilangan anggota keluarga."),
+    ],
+    "JENIS_PERSYARATAN": [
+        ("Dokumen", "Berkas yang perlu diserahkan atau ditunjukkan."),
+        ("Pembinaan", "Pertemuan, kursus, atau wawancara yang perlu diikuti."),
+        ("Ketentuan Umum", "Ketentuan yang perlu dipenuhi, misalnya usia dan wali."),
+    ],
+    "PELAKU_LANGKAH": [
+        ("Pemohon atau keluarga", "Orang yang mengajukan layanan atau keluarganya."),
+        ("Sekretariat paroki", "Petugas sekretariat dan administrasi paroki."),
+        ("Pastor paroki", "Pastor paroki atau imam yang ditugaskan."),
+        ("Seksi terkait", "Seksi paroki yang mengelola layanan itu."),
+        ("Ketua lingkungan", "Pengurus lingkungan tempat tinggal pemohon."),
+    ],
     "KELOMPOK_PENGGUNA": [
         ("Pastor Paroki dan Pengurus Harian", "Pimpinan paroki."),
         ("Ketua Seksi", "Ketua seksi pelayanan."),
@@ -167,6 +184,9 @@ NILAI_TERKENDALI = [
     ("DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA", "JENIS_PERISTIWA", "JENIS_PERISTIWA"),
     ("DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA", "TINGKAT_GANGGUAN", "TINGKAT_GANGGUAN"),
     ("MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN", "KATEGORI_EKONOMI", "KATEGORI_EKONOMI"),
+    ("MASTER_DATA.LAYANAN_PAROKI", "KATEGORI_LAYANAN", "KATEGORI_LAYANAN"),
+    ("MASTER_DATA.LANGKAH_LAYANAN", "PELAKU", "PELAKU_LANGKAH"),
+    ("MASTER_DATA.PERSYARATAN_LAYANAN", "JENIS_PERSYARATAN", "JENIS_PERSYARATAN"),
 ]
 
 

@@ -14,11 +14,13 @@ Dokumen ini **dihasilkan otomatis** dari komentar pada `sql/02_create_tables.sql
 - Pada kolom `TANGGAL_AKHIR_BERLAKU`, nilai kosong berarti catatan **masih berlaku**.
 - Klasifikasi data: **Publik**, **Internal**, **Terbatas**, **Sangat Terbatas**. Data umat berklasifikasi Terbatas atau lebih ketat dan tidak boleh tampil di dasbor publik.
 
-## Sembilan domain data
+## Domain data
+
+Sembilan domain awal ditambah satu domain tambahan (layanan dan prosedur publik) untuk informasi umum.
 
 | No | Domain | Tabel |
 |---|---|---|
-| 1 | Kolekte | `PENERIMAAN_KOLEKTE`, `REFERENSI_JENIS_KOLEKTE` |
+| 1 | Kolekte | `PENERIMAAN_KOLEKTE`, `REFERENSI_JENIS_KOLEKTE`, `PERKIRAAN_KOLEKTE_MINGGUAN`, `REFERENSI_MODEL_PERKIRAAN` |
 | 2 | Kehadiran Misa | `KEHADIRAN_MISA`, `PERISTIWA_LUAR_BIASA` |
 | 3 | Basis data umat (simulasi BIDUK) | `KELUARGA`, `UMAT`, `PENUGASAN_KELUARGA`, `PENUGASAN_LINGKUNGAN`, `REFERENSI_KLASIFIKASI_DATA`, `KEBIJAKAN_AKSES_DATA`, `REFERENSI_KATEGORI_INFORMASI` |
 | 4 | Sumbangan kesempatan khusus per wilayah | `KAMPANYE_SUMBANGAN`, `SUMBANGAN_KESEMPATAN_KHUSUS`, `SUMBANGAN_KELUARGA`, `REFERENSI_KESEMPATAN_KHUSUS` |
@@ -27,6 +29,7 @@ Dokumen ini **dihasilkan otomatis** dari komentar pada `sql/02_create_tables.sql
 | 7 | Rencana tahunan, anggaran, dan realisasi | `RENCANA_KERJA_TAHUNAN`, `RENCANA_KEGIATAN`, `ALOKASI_ANGGARAN`, `REALISASI_PENGELUARAN`, `REFERENSI_KATEGORI_BIAYA` |
 | 8 | Kegiatan dan laporan pascakegiatan | `KEGIATAN`, `LAPORAN_KEGIATAN` |
 | 9 | Data induk wilayah dan GIS | `MASTER_WILAYAH`, `MASTER_LINGKUNGAN`, `PROFIL_EKONOMI_LINGKUNGAN`, `GEOMETRI_ILUSTRATIF_LINGKUNGAN` |
+| 10 | Layanan dan prosedur publik (tambahan) | `LAYANAN_PAROKI`, `LANGKAH_LAYANAN`, `PERSYARATAN_LAYANAN` |
 | - | Referensi bersama | `INFO_DATASET`, `MASTER_SEKSI`, `REFERENSI_DAFTAR_NILAI`, `REFERENSI_PERIODE_PELAPORAN` |
 
 ## Ringkasan tabel
@@ -36,8 +39,8 @@ Dokumen ini **dihasilkan otomatis** dari komentar pada `sql/02_create_tables.sql
 | MASTER_DATA | [`INFO_DATASET`](#master_datainfodataset) | Referensi bersama | Publik | 1 |
 | MASTER_DATA | [`REFERENSI_KLASIFIKASI_DATA`](#master_datareferensiklasifikasidata) | Basis data umat (simulasi BIDUK) | Publik | 4 |
 | MASTER_DATA | [`MASTER_SEKSI`](#master_datamasterseksi) | Referensi bersama | Publik | 9 |
-| MASTER_DATA | [`REFERENSI_KATEGORI_INFORMASI`](#master_datareferensikategoriinformasi) | Basis data umat (simulasi BIDUK) | Internal | 9 |
-| MASTER_DATA | [`REFERENSI_DAFTAR_NILAI`](#master_datareferensidaftarnilai) | Referensi bersama | Publik | 82 |
+| MASTER_DATA | [`REFERENSI_KATEGORI_INFORMASI`](#master_datareferensikategoriinformasi) | Basis data umat (simulasi BIDUK) | Internal | 10 |
+| MASTER_DATA | [`REFERENSI_DAFTAR_NILAI`](#master_datareferensidaftarnilai) | Referensi bersama | Publik | 93 |
 | MASTER_DATA | [`REFERENSI_JENIS_KOLEKTE`](#master_datareferensijeniskolekte) | Kolekte | Publik | 3 |
 | MASTER_DATA | [`REFERENSI_KESEMPATAN_KHUSUS`](#master_datareferensikesempatankhusus) | Sumbangan kesempatan khusus per wilayah | Publik | 3 |
 | MASTER_DATA | [`REFERENSI_KATEGORI_BIAYA`](#master_datareferensikategoribiaya) | Rencana tahunan, anggaran, dan realisasi | Internal | 7 |
@@ -51,10 +54,15 @@ Dokumen ini **dihasilkan otomatis** dari komentar pada `sql/02_create_tables.sql
 | MASTER_DATA | [`SURVEI`](#master_datasurvei) | Survei | Internal | 4 |
 | MASTER_DATA | [`PERTANYAAN_SURVEI`](#master_datapertanyaansurvei) | Survei | Internal | 17 |
 | MASTER_DATA | [`OPSI_JAWABAN_SURVEI`](#master_dataopsijawabansurvei) | Survei | Internal | 85 |
+| MASTER_DATA | [`REFERENSI_MODEL_PERKIRAAN`](#master_datareferensimodelperkiraan) | Kolekte | Publik | 1 |
+| MASTER_DATA | [`LAYANAN_PAROKI`](#master_datalayananparoki) | Layanan dan prosedur publik (tambahan) | Publik | 6 |
+| MASTER_DATA | [`LANGKAH_LAYANAN`](#master_datalangkahlayanan) | Layanan dan prosedur publik (tambahan) | Publik | 46 |
+| MASTER_DATA | [`PERSYARATAN_LAYANAN`](#master_datapersyaratanlayanan) | Layanan dan prosedur publik (tambahan) | Publik | 48 |
 | DATA_OPERASIONAL | [`KEJADIAN_MISA`](#data_operasionalkejadianmisa) | Jadwal Misa | Internal | 1825 |
 | DATA_OPERASIONAL | [`PERISTIWA_LUAR_BIASA`](#data_operasionalperistiwaluarbiasa) | Kehadiran Misa | Internal | 10 |
 | DATA_OPERASIONAL | [`KEHADIRAN_MISA`](#data_operasionalkehadiranmisa) | Kehadiran Misa | Internal | 1734 |
 | DATA_OPERASIONAL | [`PENERIMAAN_KOLEKTE`](#data_operasionalpenerimaankolekte) | Kolekte | Internal | 3263 |
+| DATA_OPERASIONAL | [`PERKIRAAN_KOLEKTE_MINGGUAN`](#data_operasionalperkiraankolektemingguan) | Kolekte | Internal | 274 |
 | DATA_OPERASIONAL | [`KELUARGA`](#data_operasionalkeluarga) | Basis data umat (simulasi BIDUK) | Terbatas | 227 |
 | DATA_OPERASIONAL | [`UMAT`](#data_operasionalumat) | Basis data umat (simulasi BIDUK) | Terbatas (anak di bawah 17 tahun: Sangat Terbatas) | 653 |
 | DATA_OPERASIONAL | [`PENUGASAN_KELUARGA`](#data_operasionalpenugasankeluarga) | Basis data umat (simulasi BIDUK) | Terbatas | 659 |
@@ -71,7 +79,7 @@ Dokumen ini **dihasilkan otomatis** dari komentar pada `sql/02_create_tables.sql
 | DATA_OPERASIONAL | [`REALISASI_PENGELUARAN`](#data_operasionalrealisasipengeluaran) | Rencana tahunan, anggaran, dan realisasi | Internal | 698 |
 | DATA_OPERASIONAL | [`KEGIATAN`](#data_operasionalkegiatan) | Kegiatan dan laporan pascakegiatan | Internal | 169 |
 | DATA_OPERASIONAL | [`LAPORAN_KEGIATAN`](#data_operasionallaporankegiatan) | Kegiatan dan laporan pascakegiatan | Internal | 132 |
-| | **Jumlah** | | | **13899** |
+| | **Jumlah** | | | **14286** |
 
 ## Rincian tabel
 
@@ -424,6 +432,96 @@ Opsi jawaban yang tersedia untuk setiap pertanyaan.
 | `KATEGORI_JAWABAN` | `VARCHAR(150)` | Ya | Teks kategori jawaban, misalnya Setuju atau Sabtu pagi |  |
 | `NILAI_SKOR` | `NUMBER(2,0)` | Tidak | Skor 1 sampai 5 untuk skala Likert, kosong untuk pilihan tunggal |  |
 
+### MASTER_DATA.REFERENSI_MODEL_PERKIRAAN
+<a id="master_datareferensimodelperkiraan"></a>
+
+Daftar model perkiraan kolekte beserta ketentuannya. Setiap perkiraan tersimpan menyebut model yang membuatnya.
+
+- **Granularitas:** satu baris per model perkiraan.
+- **Klasifikasi data:** Publik.
+- **Domain:** Kolekte.
+- **Kunci utama (PK):** `ID_MODEL`.
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_MODEL` (PK) | `VARCHAR(30)` | Ya | Pengenal model perkiraan (contoh: MDL-01) |  |
+| `NAMA_MODEL` | `VARCHAR(150)` | Ya | Nama model untuk tampilan |  |
+| `DESKRIPSI_METODE` | `VARCHAR(1000)` | Ya | Penjelasan metode dalam bahasa awam, termasuk apa yang diketahui dan tidak diketahui model |  |
+| `HORIZON_HARI` | `NUMBER(3,0)` | Ya | Berapa hari sebelum awal pekan sasaran perkiraan dibuat |  |
+| `MINIMAL_RIWAYAT_MINGGU` | `NUMBER(3,0)` | Ya | Jumlah pekan riwayat minimal sebelum model mulai membuat perkiraan |  |
+| `JENDELA_PELATIHAN_MINGGU` | `NUMBER(3,0)` | Ya | Jumlah pekan terakhir yang dipakai model untuk belajar |  |
+| `LEBAR_RENTANG_PERSEN` | `NUMBER(3,0)` | Ya | Peluang yang diharapkan agar kolekte sebenarnya jatuh di dalam rentang perkiraan, dalam persen |  |
+| `STATUS_AKTIF` | `BOOLEAN` | Ya | TRUE jika model masih dipakai membuat perkiraan baru |  |
+
+### MASTER_DATA.LAYANAN_PAROKI
+<a id="master_datalayananparoki"></a>
+
+Layanan paroki untuk umat beserta panduan PDF-nya. Isi panduan fiktif dan bukan ketentuan resmi.
+
+- **Granularitas:** satu baris per layanan.
+- **Klasifikasi data:** Publik.
+- **Domain:** Layanan dan prosedur publik (tambahan).
+- **Kunci utama (PK):** `ID_LAYANAN`.
+- **Kunci unik (UQ):** `NAMA_BERKAS_PANDUAN`.
+- **Relasi (FK):** `ID_SEKSI_PENGELOLA` merujuk ke `MASTER_DATA.MASTER_SEKSI` (`ID_SEKSI`).
+- **Relasi (FK):** `ID_KLASIFIKASI_DATA` merujuk ke `MASTER_DATA.REFERENSI_KLASIFIKASI_DATA` (`ID_KLASIFIKASI_DATA`).
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_LAYANAN` (PK) | `VARCHAR(30)` | Ya | Pengenal layanan (contoh: LYN-01) |  |
+| `NAMA_LAYANAN` | `VARCHAR(150)` | Ya | Nama layanan untuk umat, misalnya Baptis Dewasa |  |
+| `KATEGORI_LAYANAN` | `VARCHAR(100)` | Ya | Kelompok layanan: Sakramen, Administrasi Umat, atau Pelayanan Duka | Salah satu dari: `Sakramen`, `Administrasi Umat`, `Pelayanan Duka` |
+| `RINGKASAN` | `VARCHAR(500)` | Ya | Untuk siapa layanan ini, dalam satu atau dua kalimat |  |
+| `PERKIRAAN_WAKTU_PROSES` | `VARCHAR(200)` | Ya | Perkiraan lama proses dari pendaftaran sampai selesai |  |
+| `CATATAN_PENTING` | `VARCHAR(1000)` | Ya | Hal yang perlu diketahui pemohon, misalnya biaya dan waktu pendaftaran |  |
+| `ID_SEKSI_PENGELOLA` | `VARCHAR(30)` | Ya | Seksi yang bertanggung jawab atas layanan dan isi panduannya | Merujuk ke `MASTER_SEKSI` |
+| `ID_KLASIFIKASI_DATA` | `VARCHAR(30)` | Ya | Klasifikasi informasi. Hanya klasifikasi yang boleh tampil publik muncul di dasbor umum | Merujuk ke `REFERENSI_KLASIFIKASI_DATA` |
+| `NAMA_BERKAS_PANDUAN` | `VARCHAR(200)` | Ya | Nama berkas PDF panduan, tanpa folder dan diawali pengenal layanan |  |
+| `TANGGAL_REVISI` | `DATE` | Ya | Tanggal terakhir isi panduan ditinjau |  |
+
+### MASTER_DATA.LANGKAH_LAYANAN
+<a id="master_datalangkahlayanan"></a>
+
+Langkah-langkah berurutan untuk setiap layanan.
+
+- **Granularitas:** satu baris per langkah dalam satu layanan.
+- **Klasifikasi data:** Publik.
+- **Domain:** Layanan dan prosedur publik (tambahan).
+- **Kunci utama (PK):** `ID_LANGKAH`.
+- **Kunci unik (UQ):** `ID_LAYANAN, NOMOR_URUT`.
+- **Relasi (FK):** `ID_LAYANAN` merujuk ke `MASTER_DATA.LAYANAN_PAROKI` (`ID_LAYANAN`).
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_LANGKAH` (PK) | `VARCHAR(30)` | Ya | Pengenal langkah (contoh: LGK-0101) |  |
+| `ID_LAYANAN` | `VARCHAR(30)` | Ya | Layanan pemilik langkah | Merujuk ke `LAYANAN_PAROKI` |
+| `NOMOR_URUT` | `NUMBER(2,0)` | Ya | Urutan langkah dalam layanan, dimulai dari 1 tanpa lompatan |  |
+| `JUDUL_LANGKAH` | `VARCHAR(150)` | Ya | Judul singkat langkah |  |
+| `URAIAN` | `VARCHAR(1000)` | Ya | Penjelasan apa yang dilakukan pada langkah ini |  |
+| `PELAKU` | `VARCHAR(100)` | Ya | Siapa yang melakukan langkah ini: pemohon, sekretariat, pastor, seksi, atau ketua lingkungan | Salah satu dari: `Pemohon atau keluarga`, `Sekretariat paroki`, `Pastor paroki`, `Seksi terkait`, `Ketua lingkungan` |
+
+### MASTER_DATA.PERSYARATAN_LAYANAN
+<a id="master_datapersyaratanlayanan"></a>
+
+Persyaratan untuk setiap layanan.
+
+- **Granularitas:** satu baris per persyaratan dalam satu layanan.
+- **Klasifikasi data:** Publik.
+- **Domain:** Layanan dan prosedur publik (tambahan).
+- **Kunci utama (PK):** `ID_PERSYARATAN`.
+- **Kunci unik (UQ):** `ID_LAYANAN, NOMOR_URUT`.
+- **Relasi (FK):** `ID_LAYANAN` merujuk ke `MASTER_DATA.LAYANAN_PAROKI` (`ID_LAYANAN`).
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_PERSYARATAN` (PK) | `VARCHAR(30)` | Ya | Pengenal persyaratan (contoh: PSY-0101) |  |
+| `ID_LAYANAN` | `VARCHAR(30)` | Ya | Layanan pemilik persyaratan | Merujuk ke `LAYANAN_PAROKI` |
+| `NOMOR_URUT` | `NUMBER(2,0)` | Ya | Urutan persyaratan dalam layanan, dimulai dari 1 tanpa lompatan |  |
+| `NAMA_PERSYARATAN` | `VARCHAR(200)` | Ya | Nama persyaratan, misalnya Fotokopi surat baptis |  |
+| `JENIS_PERSYARATAN` | `VARCHAR(50)` | Ya | Jenis: Dokumen, Pembinaan, atau Ketentuan Umum | Salah satu dari: `Dokumen`, `Pembinaan`, `Ketentuan Umum` |
+| `WAJIB_DIPENUHI` | `BOOLEAN` | Ya | TRUE jika selalu wajib, FALSE jika hanya berlaku pada keadaan tertentu |  |
+| `KETERANGAN` | `VARCHAR(500)` | Tidak | Penjelasan tambahan, kosong jika tidak ada |  |
+
 ### DATA_OPERASIONAL.KEJADIAN_MISA
 <a id="data_operasionalkejadianmisa"></a>
 
@@ -513,6 +611,31 @@ Ringkasan kolekte per Misa dan jenis kolekte, membedakan jumlah tercatat, hasil 
 | `STATUS_REKONSILIASI` | `VARCHAR(50)` | Ya | Status: Sudah Cocok, Selisih Disetujui, Selisih Sedang Ditelusuri, atau Belum Dihitung | Salah satu dari: `Sudah Cocok`, `Selisih Disetujui`, `Selisih Sedang Ditelusuri`, `Belum Dihitung` |
 | `TANGGAL_PENCATATAN` | `DATE` | Ya | Tanggal hasil terakhir dicatat |  |
 | `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan, misalnya penjelasan selisih |  |
+
+### DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN
+<a id="data_operasionalperkiraankolektemingguan"></a>
+
+Perkiraan bayangan kolekte mingguan, disimpan persis seperti dibuat empat pekan sebelumnya dan tidak pernah diperbarui sesudah kolekte sebenarnya diketahui. Dipakai untuk membandingkan perkiraan dengan kenyataan. Bukan ukuran iman atau komitmen rohani.
+
+- **Granularitas:** satu baris per model dan pekan sasaran.
+- **Klasifikasi data:** Internal.
+- **Domain:** Kolekte.
+- **Kunci utama (PK):** `ID_PERKIRAAN`.
+- **Kunci unik (UQ):** `ID_MODEL, AWAL_PEKAN_SASARAN`.
+- **Relasi (FK):** `ID_MODEL` merujuk ke `MASTER_DATA.REFERENSI_MODEL_PERKIRAAN` (`ID_MODEL`).
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_PERKIRAAN` (PK) | `VARCHAR(30)` | Ya | Pengenal perkiraan (contoh: PKR-0001) |  |
+| `ID_MODEL` | `VARCHAR(30)` | Ya | Model yang membuat perkiraan | Merujuk ke `REFERENSI_MODEL_PERKIRAAN` |
+| `AWAL_PEKAN_SASARAN` | `DATE` | Ya | Hari Senin awal pekan yang diperkirakan (pekan berjalan dari Senin sampai Minggu) |  |
+| `TANGGAL_PERKIRAAN` | `DATE` | Ya | Tanggal perkiraan dibuat. Hanya data sebelum tanggal ini yang dipakai, sehingga peristiwa sesudahnya tidak diketahui |  |
+| `JUMLAH_PEKAN_PELATIHAN` | `NUMBER(3,0)` | Ya | Jumlah pekan riwayat yang dipakai model untuk belajar, tidak termasuk pekan hari raya dan pekan terganggu peristiwa |  |
+| `JUMLAH_PERKIRAAN` | `NUMBER(18,0)` | Ya | Perkiraan total kolekte pekan itu, dalam rupiah dan dibulatkan ke ribuan |  |
+| `BATAS_BAWAH` | `NUMBER(18,0)` | Ya | Batas bawah rentang perkiraan, dalam rupiah |  |
+| `BATAS_ATAS` | `NUMBER(18,0)` | Ya | Batas atas rentang perkiraan, dalam rupiah |  |
+| `PENYESUAIAN_KALENDER` | `NUMBER(6,3)` | Ya | Pengali kalender liturgi untuk pekan sasaran, 1.000 berarti tanpa penyesuaian |  |
+| `KETERANGAN` | `VARCHAR(500)` | Tidak | Hari raya atau kolekte khusus yang dipertimbangkan, kosong jika tidak ada |  |
 
 ### DATA_OPERASIONAL.KELUARGA
 <a id="data_operasionalkeluarga"></a>
@@ -1103,6 +1226,38 @@ Dipakai pada: `MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN.KATEGORI_EKONOMI`.
 | `Menengah Atas` | Kapasitas ekonomi umum lingkungan agak di atas rata-rata paroki. |
 | `Tinggi` | Kapasitas ekonomi umum lingkungan di atas rata-rata paroki. |
 
+### KATEGORI_LAYANAN
+
+Dipakai pada: `MASTER_DATA.LAYANAN_PAROKI.KATEGORI_LAYANAN`.
+
+| Nilai | Arti |
+|---|---|
+| `Sakramen` | Layanan sakramen: baptis, krisma, dan perkawinan. |
+| `Administrasi Umat` | Layanan pencatatan umat, misalnya pendaftaran ke lingkungan. |
+| `Pelayanan Duka` | Pendampingan keluarga yang kehilangan anggota keluarga. |
+
+### JENIS_PERSYARATAN
+
+Dipakai pada: `MASTER_DATA.PERSYARATAN_LAYANAN.JENIS_PERSYARATAN`.
+
+| Nilai | Arti |
+|---|---|
+| `Dokumen` | Berkas yang perlu diserahkan atau ditunjukkan. |
+| `Pembinaan` | Pertemuan, kursus, atau wawancara yang perlu diikuti. |
+| `Ketentuan Umum` | Ketentuan yang perlu dipenuhi, misalnya usia dan wali. |
+
+### PELAKU_LANGKAH
+
+Dipakai pada: `MASTER_DATA.LANGKAH_LAYANAN.PELAKU`.
+
+| Nilai | Arti |
+|---|---|
+| `Pemohon atau keluarga` | Orang yang mengajukan layanan atau keluarganya. |
+| `Sekretariat paroki` | Petugas sekretariat dan administrasi paroki. |
+| `Pastor paroki` | Pastor paroki atau imam yang ditugaskan. |
+| `Seksi terkait` | Seksi paroki yang mengelola layanan itu. |
+| `Ketua lingkungan` | Pengurus lingkungan tempat tinggal pemohon. |
+
 ### KELOMPOK_PENGGUNA
 
 Dipakai pada: `MASTER_DATA.KEBIJAKAN_AKSES_DATA.KELOMPOK_PENGGUNA`.
@@ -1154,6 +1309,12 @@ View hanya berisi data agregat atau ringkasan operasional. Tidak ada view yang m
 | `ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN` | Sumbangan kampanye per lingkungan: total, rata-rata, median, dan per keluarga atau umat terdaftar, beserta kapasitas ekonomi lingkungan. Menggambarkan sebaran, bukan menilai iman atau kemurahan hati. Data simulasi. |
 | `ANALISIS.TITIK_IMPAS_KAMPANYE` | Sumbangan kampanye (Prapaskah, Adven, solidaritas) dibandingkan dengan biaya kegiatan besar yang didanainya, per tahun. Surplus menjadi pemasukan gereja, defisit ditutup gereja. Data simulasi. |
 | `ANALISIS.KEGIATAN_MENDATANG` | Kegiatan yang akan datang, satu baris per rencana yang belum terlaksana: sudah dijadwalkan sebagai kegiatan, masih berupa rencana tahunan, atau ditunda tahun ini dan perlu jadwal baru. Lengkap dengan tanggal, tempat, target peserta, anggaran, dan dana pendukung. Acuan waktu adalah tanggal data. Data simulasi. |
+| `ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN` | Kolekte mingguan sebenarnya dibandingkan dengan perkiraan bayangan yang dibuat empat pekan sebelumnya, lengkap dengan rentang perkiraan, selisih, dan peristiwa luar biasa yang menjelaskan selisih besar. Hanya pekan yang sudah lengkap pada tanggal data yang dibandingkan. Data simulasi. |
+| `ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA` | Untuk setiap peristiwa luar biasa: seberapa jauh kolekte sebenarnya menyimpang dari perkiraan bayangan selama pekan-pekan peristiwa, dibandingkan dengan galat biasa pada pekan tanpa peristiwa. Menjelaskan mengapa perkiraan meleset. Data simulasi. |
+| `ANALISIS.AKURASI_PERKIRAAN_TAHUNAN` | Ketepatan perkiraan bayangan per tahun dan jenis pekan (pekan biasa, hari raya atau kolekte khusus, peristiwa luar biasa): galat rata-rata, selisih rata-rata, dan persentase pekan yang jatuh di dalam rentang perkiraan. Data simulasi. |
+| `ANALISIS.LAYANAN_PUBLIK` | Layanan paroki yang boleh dibaca umum (klasifikasi yang dapat tampil publik): ringkasan, waktu proses, seksi pengelola, nama berkas PDF panduan, dan jumlah langkah serta persyaratan. Isi panduan fiktif dan bukan ketentuan resmi. Data simulasi. |
+| `ANALISIS.LANGKAH_LAYANAN_PUBLIK` | Langkah berurutan setiap layanan publik, dengan pelaku langkah (pemohon, sekretariat, pastor, seksi, atau ketua lingkungan). Hanya layanan yang boleh dibaca umum. Data simulasi. |
+| `ANALISIS.PERSYARATAN_LAYANAN_PUBLIK` | Persyaratan setiap layanan publik: dokumen, pembinaan, dan ketentuan umum, ditandai wajib atau hanya jika berlaku. Hanya layanan yang boleh dibaca umum. Data simulasi. |
 
 ## Catatan kewajaran dan privasi
 
@@ -1165,4 +1326,6 @@ View hanya berisi data agregat atau ringkasan operasional. Tidak ada view yang m
 - `SUMBANGAN_KELUARGA` memuat jumlah sumbangan keluarga fiktif yang teridentifikasi. Data ini berklasifikasi Sangat Terbatas dan hanya boleh tampil sebagai angka agregat (misalnya rata-rata, median, dan total per lingkungan).
 - Kapasitas ekonomi hanya dicatat pada tingkat lingkungan (`PROFIL_EKONOMI_LINGKUNGAN`). Tidak ada data ekonomi per keluarga, dan keluarga penyumbang besar tidak ditandai pada data mana pun.
 - `PERISTIWA_LUAR_BIASA` mencatat kejadian dan tingkat gangguannya, tetapi sengaja tidak menyimpan besar dampaknya terhadap kehadiran atau kolekte. Dampak dihitung oleh view analisis dari data.
+- `PERKIRAAN_KOLEKTE_MINGGUAN` menyimpan perkiraan kolekte apa adanya seperti dibuat empat pekan sebelumnya dan tidak pernah dihitung ulang. Perkiraan tidak mengetahui peristiwa yang belum terjadi, sehingga selisih besar dijelaskan oleh catatan `PERISTIWA_LUAR_BIASA`. Angka perkiraan adalah alat bantu administrasi, bukan penilaian atas umat.
+- Panduan layanan (`LAYANAN_PAROKI`, `LANGKAH_LAYANAN`, `PERSYARATAN_LAYANAN`) berisi contoh fiktif untuk demonstrasi, bukan ketentuan resmi gereja, keuskupan, atau paroki mana pun. Panduan berklasifikasi Publik dan tidak memuat data pribadi maupun nomor telepon.
 - Geometri pada `GEOMETRI_ILUSTRATIF_LINGKUNGAN` sengaja diletakkan di koordinat 0 derajat Lintang dan 0 derajat Bujur agar tidak disangka batas wilayah paroki yang sebenarnya.

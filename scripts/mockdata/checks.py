@@ -10,9 +10,9 @@ postponed events, incomplete reports, partly used budgets and so on.
 
 import re
 from collections import Counter, defaultdict
-from datetime import date
+from datetime import date, timedelta
 
-from . import config
+from . import config, forecast
 from .sqlwriter import DataError, validate_rows
 from .vocab import DAFTAR_NILAI, NILAI_TERKENDALI
 
@@ -93,6 +93,7 @@ def check_integrity(tables, data):
     problems += _check_parishioners(data)
     problems += _check_planning(data)
     problems += _check_surveys(data)
+    problems += _check_forecast(data)
     return problems
 
 
@@ -301,6 +302,34 @@ def _check_donations(data):
     return problems
 
 
+def _check_forecast(data):
+    problems = []
+    model_rows = data["MASTER_DATA.REFERENSI_MODEL_PERKIRAAN"]
+    models = {m["ID_MODEL"]: m for m in model_rows}
+    seen_weeks = defaultdict(list)
+    for f in data["DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN"]:
+        model = models[f["ID_MODEL"]]
+        week = f["AWAL_PEKAN_SASARAN"]
+        seen_weeks[f["ID_MODEL"]].append(week)
+        if week.weekday() != 0:
+            problems.append(f"{f['ID_PERKIRAAN']}: target week does not start on a Monday")
+        if (week - f["TANGGAL_PERKIRAAN"]).days != model["HORIZON_HARI"]:
+            problems.append(f"{f['ID_PERKIRAAN']}: not issued one horizon before the target week")
+        if f["TANGGAL_PERKIRAAN"] > config.AS_OF:
+            problems.append(f"{f['ID_PERKIRAAN']}: issued after the as-of date")
+        if not f["BATAS_BAWAH"] <= f["JUMLAH_PERKIRAAN"] <= f["BATAS_ATAS"]:
+            problems.append(f"{f['ID_PERKIRAAN']}: the range does not contain the forecast")
+        if not 10 <= f["JUMLAH_PEKAN_PELATIHAN"] <= model["JENDELA_PELATIHAN_MINGGU"]:
+            problems.append(f"{f['ID_PERKIRAAN']}: implausible number of training weeks")
+        if (f["KETERANGAN"] is None) != (f["PENYESUAIAN_KALENDER"] == 1):
+            problems.append(f"{f['ID_PERKIRAAN']}: a calendar note exists exactly when the multiplier differs from 1")
+    for model_id, weeks in seen_weeks.items():
+        weeks.sort()
+        if any((b - a).days != 7 for a, b in zip(weeks, weeks[1:])):
+            problems.append(f"{model_id}: gap in the weekly forecast series")
+    return problems
+
+
 def _check_surveys(data):
     problems = []
     options = {o["ID_OPSI"]: o for o in data["MASTER_DATA.OPSI_JAWABAN_SURVEI"]}
@@ -417,6 +446,26 @@ def check_scenarios(data):
     funded = {k["ID_RENCANA_PENGGUNAAN"] for k in data["DATA_OPERASIONAL.KAMPANYE_SUMBANGAN"] if k["ID_RENCANA_PENGGUNAAN"]}
     need(any(i in funded for i in open_plans), "no upcoming activity funded by a campaign")
     need(all(r["TANGGAL_RENCANA"] > config.AS_OF for r in open_plans.values()), "an open plan is dated before the snapshot date")
+
+    # Shadow forecast: it must be good on ordinary weeks and visibly wrong where an event struck.
+    _, weekly, _, event_week, _ = forecast.inputs(data)
+    forecasts = {f["AWAL_PEKAN_SASARAN"]: f for f in data["DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN"]}
+    compared = [(w, weekly[w], f) for w, f in forecasts.items() if w in weekly and w + timedelta(days=6) <= config.AS_OF]
+    ordinary = [(a, f) for w, a, f in compared if w not in event_week and f["KETERANGAN"] is None]
+    struck = [(a, f) for w, a, f in compared if w in event_week]
+    need(len(ordinary) >= 100 and len(struck) >= 10, "too few compared weeks in the shadow forecast")
+    if len(ordinary) >= 100 and struck:
+        typical = sum(abs(a - f["JUMLAH_PERKIRAAN"]) / f["JUMLAH_PERKIRAAN"] for a, f in ordinary) / len(ordinary)
+        inside = sum(f["BATAS_BAWAH"] <= a <= f["BATAS_ATAS"] for a, f in ordinary) / len(ordinary)
+        need(typical < 0.10, f"the forecast is not accurate on ordinary weeks (mean error {typical:.1%})")
+        need(0.70 <= inside <= 0.95, f"the 80% range holds {inside:.0%} of the ordinary weeks")
+        outside = [(a, f) for a, f in struck if not f["BATAS_BAWAH"] <= a <= f["BATAS_ATAS"]]
+        need(len(outside) >= 10, "the unforeseen events no longer fall outside the forecast range")
+        need(any(a < 0.6 * f["JUMLAH_PERKIRAAN"] for a, f in struck), "no event week misses the forecast by more than 40%")
+        need(all(a < f["JUMLAH_PERKIRAAN"] for a, f in struck if a < f["BATAS_BAWAH"]), "an event week lies above the range")
+    need(any(f["KETERANGAN"] and "Paskah" in f["KETERANGAN"] for f in forecasts.values()),
+         "the forecast never mentions the Easter calendar adjustment")
+    need(any(w > config.AS_OF - timedelta(days=7) for w in forecasts), "the shadow forecast has no weeks ahead of the snapshot")
 
     survey_status = Counter(s["STATUS_SURVEI"] for s in data["MASTER_DATA.SURVEI"])
     for value in ("Direncanakan", "Sedang Berjalan", "Selesai"):

@@ -1,4 +1,4 @@
-# Mock source documents: post-event report PDFs
+# Mock documents: post-event report PDFs and public service guides
 
 For every row of `DATA_OPERASIONAL.LAPORAN_KEGIATAN` there is a PDF in
 [`data/documents/laporan_kegiatan/`](../data/documents/laporan_kegiatan/). The story they tell: a parish section
@@ -98,6 +98,24 @@ unfinished reports have a watermark whose letters can appear in the extracted te
 * `python scripts/generate_mock_data.py` writes them together with the SQL, and **removes PDFs that are no longer generated**.
   `python scripts/generate_mock_data.py --check` fails when any PDF differs, is missing, or is left over.
 * The folder is marked binary in `.gitattributes`, so Git never converts line endings inside the PDFs.
+
+## Public service guides (`app/public_documents/`)
+
+A second set of PDFs has the opposite direction. The post-event reports are *source* documents from which table rows were extracted. The service guides are
+*published* documents generated **from** table rows: `MASTER_DATA.LAYANAN_PAROKI`, `LANGKAH_LAYANAN` and `PERSYARATAN_LAYANAN`. They are public information, so they live next to
+the dashboard in `app/public_documents/`, which is where the page **Layanan dan prosedur** offers them for download.
+
+* **6 PDFs**, one per service, one to two pages each, named `<ID_LAYANAN>_<name>.pdf` (for example `LYN-04_Pernikahan.pdf`). Each service row names its file in `NAMA_BERKAS_PANDUAN`
+  (the name only, never a folder, starting with the service id and ending in `.pdf`).
+* The services are *Baptis Dewasa*, *Baptis Batuta (bayi dan anak di bawah 7 tahun)*, *Krisma*, *Pernikahan*, *Pendaftaran Lingkungan* and *Pelayanan Kematian (Tutup Usia)*.
+* Layout: letterhead of the fictional parish, a boxed notice that the guide is an example, then **A. Untuk siapa**, **B. Persyaratan** (a checklist with a box for each item, marked *Wajib* or
+  *Jika berlaku*), **C. Langkah-langkah** (numbered, with who does each step) and **D. Catatan penting**. Same fonts, footer and fixed creation date (the revision date) as the reports, so the files are byte-identical on every run.
+* **Fictional and generic.** The steps and requirements are plausible examples, not the rules of any diocese or parish, and every guide says so. There is no telephone number, e-mail or
+  other contact detail, and no personal data. "Baptis Batuta" is read as the baptism of babies and children under seven.
+* `tests/test_layanan.py` reads every committed PDF back and finds each service's summary, notes, requirements and steps in the document, in the same order as the tables, with the
+  right *Wajib* or *Jika berlaku* mark and the right actor; checks the footer on every page, that text never leaves the margin, and that no PDF holds a long number, e-mail or web address.
+  `python scripts/generate_mock_data.py --check` also fails when a guide differs, is missing or is left over.
+* Nothing about these PDFs is loaded into Snowflake. The dashboard page renders the same content from the three public views, so it works even where the PDF files are not available.
 
 ## Limits
 
