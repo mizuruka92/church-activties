@@ -1,0 +1,4 @@
+# Only needed for the optional local SQL tests (tests/test_sql_local.py).
+# The generator itself and tests/test_generator.py use the standard library only.
+duckdb>=1.4
+sqlglot>=25

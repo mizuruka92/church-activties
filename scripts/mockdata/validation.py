@@ -1,0 +1,432 @@
+"""Builds sql/06_validate_data.sql.
+
+The file is ONE statement that returns ONE result table, because Snowsight shows
+only the result of the last statement when a worksheet is run with "Run All".
+
+Mechanical checks (row counts, duplicate keys, orphaned references, allowed
+values, negative numbers, date ranges) are derived from the DDL, so a new table
+or foreign key cannot be forgotten. Business rules are written by hand below.
+
+Rule types
+    ROWS       FAIL if the table is empty, PASS if it has the bundled demo row
+               count, WARN if the count differs (for example partial load).
+    NONEMPTY   FAIL when the object returns no rows.
+    ZERO_FAIL  FAIL when the count is above zero.
+    ZERO_WARN  WARN when the count is above zero.
+    INFO       Reported for interpretation only.
+"""
+
+import re
+
+from . import config
+from .vocab import NILAI_TERKENDALI
+
+AS_OF = f"DATE '{config.AS_OF.isoformat()}'"
+PLAUSIBLE_FROM, PLAUSIBLE_TO = "DATE '2000-01-01'", "DATE '2027-12-31'"
+DB = "PUSAT_INFORMASI_PAROKI"
+
+_DAY_CASE = ("CASE {col} WHEN 'Senin' THEN 0 WHEN 'Selasa' THEN 1 WHEN 'Rabu' THEN 2 WHEN 'Kamis' THEN 3 "
+             "WHEN 'Jumat' THEN 4 WHEN 'Sabtu' THEN 5 WHEN 'Minggu' THEN 6 END")
+
+M, O, A = "MASTER_DATA", "DATA_OPERASIONAL", "ANALISIS"
+
+
+def _q(text):
+    return text.replace("'", "''")
+
+
+class Arm:
+    def __init__(self, group, name, obj, count_sql, rule, note, expected=None):
+        self.group, self.name, self.obj = group, name, obj
+        self.count_sql, self.rule, self.note, self.expected = count_sql.strip(), rule, note, expected
+
+
+def _generic_arms(tables, data):
+    arms = []
+    for t in tables:
+        arms.append(Arm("STRUCTURE", "Row count", t.qualified, f"SELECT COUNT(*) FROM {t.qualified}", "ROWS",
+                        "Row count of the bundled demo data.", expected=len(data[t.qualified])))
+    for t in tables:
+        keys = [("Duplicate primary key", t.primary_key)] + [(f"Duplicate unique key {n}", c) for n, c in t.unique_keys]
+        for label, columns in keys:
+            cols = ", ".join(columns)
+            where = " AND ".join(f"{c} IS NOT NULL" for c in columns)
+            arms.append(Arm("KEYS", label, t.qualified,
+                            f"SELECT COUNT(*) FROM (SELECT {cols} FROM {t.qualified} WHERE {where} "
+                            f"GROUP BY {cols} HAVING COUNT(*) > 1) d",
+                            "ZERO_FAIL", f"Number of key values that occur more than once ({cols})."))
+    for t in tables:
+        for fk in t.foreign_keys:
+            parent = f"{fk.ref_schema}.{fk.ref_table}"
+            on = " AND ".join(f"c.{a} = p.{b}" for a, b in zip(fk.columns, fk.ref_columns))
+            present = " AND ".join(f"c.{a} IS NOT NULL" for a in fk.columns)
+            arms.append(Arm("REFERENCES", "Orphaned reference", f"{t.qualified}.{'+'.join(fk.columns)} -> {fk.ref_table}",
+                            f"SELECT COUNT(*) FROM {t.qualified} c LEFT JOIN {parent} p ON {on} "
+                            f"WHERE {present} AND p.{fk.ref_columns[0]} IS NULL",
+                            "ZERO_FAIL", "Child rows whose parent row does not exist."))
+    for table, column, group in NILAI_TERKENDALI:
+        arms.append(Arm("VOCABULARY", f"Value not in list {group}", f"{table}.{column}",
+                        f"SELECT COUNT(*) FROM {table} x LEFT JOIN {M}.REFERENSI_DAFTAR_NILAI v "
+                        f"ON v.KELOMPOK_NILAI = '{group}' AND v.NILAI = x.{column} "
+                        f"WHERE x.{column} IS NOT NULL AND v.NILAI IS NULL",
+                        "ZERO_FAIL", "Rows using a label that is not defined in REFERENSI_DAFTAR_NILAI."))
+    for t in tables:
+        numbers = [c.name for c in t.columns if c.base_type == "NUMBER"]
+        if numbers:
+            cond = " OR ".join(f"{c} < 0" for c in numbers)
+            arms.append(Arm("NUMBERS", "Negative numeric value", t.qualified,
+                            f"SELECT COUNT(*) FROM {t.qualified} WHERE {cond}", "ZERO_FAIL",
+                            f"Rows with a negative value in {', '.join(numbers)}."))
+        dates = [c.name for c in t.columns if c.base_type == "DATE"]
+        if dates:
+            cond = " OR ".join(f"{c} < {PLAUSIBLE_FROM} OR {c} > {PLAUSIBLE_TO}" for c in dates)
+            arms.append(Arm("DATES", "Date outside 2000-2027", t.qualified,
+                            f"SELECT COUNT(*) FROM {t.qualified} WHERE {cond}", "ZERO_FAIL",
+                            f"Implausible dates in {', '.join(dates)}."))
+        names = t.column_names
+        if "TANGGAL_MULAI_BERLAKU" in names and "TANGGAL_AKHIR_BERLAKU" in names:
+            arms.append(Arm("DATES", "Effective end before start", t.qualified,
+                            f"SELECT COUNT(*) FROM {t.qualified} WHERE TANGGAL_AKHIR_BERLAKU IS NOT NULL "
+                            f"AND TANGGAL_AKHIR_BERLAKU < TANGGAL_MULAI_BERLAKU", "ZERO_FAIL",
+                            "Rows whose end date is earlier than the start date."))
+        if "STATUS_AKTIF" in names and "TANGGAL_AKHIR_BERLAKU" in names:
+            arms.append(Arm("GOVERNANCE", "Active flag matches end date", t.qualified,
+                            f"SELECT COUNT(*) FROM {t.qualified} WHERE (STATUS_AKTIF = TRUE AND TANGGAL_AKHIR_BERLAKU IS NOT NULL) "
+                            f"OR (STATUS_AKTIF = FALSE AND TANGGAL_AKHIR_BERLAKU IS NULL)", "ZERO_FAIL",
+                            "STATUS_AKTIF must be TRUE exactly when there is no end date."))
+    return arms
+
+
+def _business_arms(views):
+    k, a, c = f"{O}.KEJADIAN_MISA", f"{O}.KEHADIRAN_MISA", f"{O}.PENERIMAAN_KOLEKTE"
+    arms = []
+
+    def add(group, name, obj, sql, rule, note):
+        arms.append(Arm(group, name, obj, sql, rule, note))
+
+    # --- Mass ---------------------------------------------------------------------
+    add("MASS", "Attendance for a Mass that was not held", a,
+        f"SELECT COUNT(*) FROM {a} x JOIN {k} k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE k.STATUS_PELAKSANAAN <> 'Terlaksana'",
+        "ZERO_FAIL", "Attendance may only exist for occurrences with status Terlaksana.")
+    add("MASS", "Offertory for a Mass that was not held", c,
+        f"SELECT COUNT(*) FROM {c} x JOIN {k} k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE k.STATUS_PELAKSANAAN <> 'Terlaksana'",
+        "ZERO_FAIL", "Offertory may only exist for occurrences with status Terlaksana.")
+    add("MASS", "Held Mass without attendance", k,
+        f"SELECT COUNT(*) FROM {k} k WHERE k.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS "
+        f"(SELECT 1 FROM {a} x WHERE x.ID_KEJADIAN_MISA = k.ID_KEJADIAN_MISA)",
+        "ZERO_FAIL", "Every held Mass needs one attendance record.")
+    add("MASS", "Held Mass without offertory", k,
+        f"SELECT COUNT(*) FROM {k} k WHERE k.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS "
+        f"(SELECT 1 FROM {c} x WHERE x.ID_KEJADIAN_MISA = k.ID_KEJADIAN_MISA)",
+        "ZERO_FAIL", "Every held Mass needs at least one offertory record.")
+    add("MASS", "Actual times inconsistent with status", k,
+        f"SELECT COUNT(*) FROM {k} WHERE (STATUS_PELAKSANAAN = 'Terlaksana' AND (WAKTU_MULAI_AKTUAL IS NULL OR "
+        f"WAKTU_SELESAI_AKTUAL IS NULL OR WAKTU_SELESAI_AKTUAL <= WAKTU_MULAI_AKTUAL)) OR (STATUS_PELAKSANAAN <> 'Terlaksana' "
+        f"AND (WAKTU_MULAI_AKTUAL IS NOT NULL OR WAKTU_SELESAI_AKTUAL IS NOT NULL))",
+        "ZERO_FAIL", "Actual times exist only for held Masses and the end must be after the start.")
+    add("MASS", "Occurrence weekday differs from schedule", k,
+        f"SELECT COUNT(*) FROM {k} k JOIN {M}.JADWAL_MISA j ON j.ID_JADWAL_MISA = k.ID_JADWAL_MISA "
+        f"WHERE MOD(DATEDIFF('day', DATE '1900-01-01', k.TANGGAL_MISA), 7) <> {_DAY_CASE.format(col='j.HARI')}",
+        "ZERO_FAIL", "The date must fall on the weekday of its schedule rule (1900-01-01 was a Monday).")
+    add("MASS", "Occurrence outside schedule validity", k,
+        f"SELECT COUNT(*) FROM {k} k JOIN {M}.JADWAL_MISA j ON j.ID_JADWAL_MISA = k.ID_JADWAL_MISA "
+        f"WHERE k.TANGGAL_MISA < j.TANGGAL_MULAI_BERLAKU OR (j.TANGGAL_AKHIR_BERLAKU IS NOT NULL AND k.TANGGAL_MISA > j.TANGGAL_AKHIR_BERLAKU)",
+        "ZERO_FAIL", "A Mass may only follow a schedule rule that was valid on that date.")
+    add("MASS", "Status inconsistent with the as-of date", k,
+        f"SELECT COUNT(*) FROM {k} WHERE (STATUS_PELAKSANAAN = 'Terjadwal' AND TANGGAL_MISA <= {AS_OF}) "
+        f"OR (STATUS_PELAKSANAAN <> 'Terjadwal' AND TANGGAL_MISA > {AS_OF})",
+        "ZERO_FAIL", f"Terjadwal only after {config.AS_OF.isoformat()} (the demo snapshot date), otherwise Terlaksana or Dibatalkan.")
+    add("MASS", "No reporting period for a Mass date", k,
+        f"SELECT COUNT(*) FROM {k} k WHERE NOT EXISTS (SELECT 1 FROM {M}.REFERENSI_PERIODE_PELAPORAN p "
+        f"WHERE k.TANGGAL_MISA BETWEEN p.TANGGAL_MULAI AND p.TANGGAL_SELESAI)",
+        "ZERO_FAIL", "The monthly views join Masses to the reporting calendar.")
+    add("MASS", "Counted amount inconsistent with reconciliation status", c,
+        f"SELECT COUNT(*) FROM {c} WHERE (STATUS_REKONSILIASI = 'Belum Dihitung' AND JUMLAH_HASIL_PENGHITUNGAN IS NOT NULL) "
+        f"OR (STATUS_REKONSILIASI <> 'Belum Dihitung' AND JUMLAH_HASIL_PENGHITUNGAN IS NULL)",
+        "ZERO_FAIL", "The counted amount is empty exactly when the status is Belum Dihitung.")
+    add("MASS", "Sudah Cocok but recorded and counted differ", c,
+        f"SELECT COUNT(*) FROM {c} WHERE STATUS_REKONSILIASI = 'Sudah Cocok' AND JUMLAH_PENERIMAAN <> JUMLAH_HASIL_PENGHITUNGAN",
+        "ZERO_FAIL", "Matched records must have equal recorded and counted amounts.")
+    add("MASS", "Selisih status but amounts are equal", c,
+        f"SELECT COUNT(*) FROM {c} WHERE STATUS_REKONSILIASI IN ('Selisih Disetujui', 'Selisih Sedang Ditelusuri') "
+        f"AND JUMLAH_PENERIMAAN = JUMLAH_HASIL_PENGHITUNGAN",
+        "ZERO_FAIL", "A discrepancy status needs an actual discrepancy.")
+    add("MASS", "Offertory booked before the Mass date", c,
+        f"SELECT COUNT(*) FROM {c} x JOIN {k} k ON k.ID_KEJADIAN_MISA = x.ID_KEJADIAN_MISA WHERE x.TANGGAL_PENCATATAN < k.TANGGAL_MISA",
+        "ZERO_FAIL", "The booking date cannot precede the Mass.")
+    add("MASS", "Offertory with open reconciliation", c,
+        f"SELECT COUNT(*) FROM {c} WHERE STATUS_REKONSILIASI IN ('Selisih Sedang Ditelusuri', 'Belum Dihitung')",
+        "INFO", "Deliberate demo scenario: records still being counted or investigated.")
+    add("MASS", "Attendance waiting for validation or recheck", a,
+        f"SELECT COUNT(*) FROM {a} WHERE STATUS_VALIDASI <> 'Sudah Divalidasi'",
+        "INFO", "Deliberate demo scenario: attendance not yet validated.")
+    add("MASS", "Cancelled Mass occurrences", k,
+        f"SELECT COUNT(*) FROM {k} WHERE STATUS_PELAKSANAAN = 'Dibatalkan'", "INFO", "Deliberate demo scenario.")
+
+    # --- dates that must be historical -------------------------------------------------
+    add("DATES", "Expenditure after the as-of date", f"{O}.REALISASI_PENGELUARAN",
+        f"SELECT COUNT(*) FROM {O}.REALISASI_PENGELUARAN WHERE TANGGAL_PENGELUARAN > {AS_OF}", "ZERO_FAIL",
+        "Spending cannot be dated after the snapshot date.")
+    add("DATES", "Offertory booked after the as-of date", c,
+        f"SELECT COUNT(*) FROM {c} WHERE TANGGAL_PENCATATAN > {AS_OF}", "ZERO_FAIL", "Bookings cannot be in the future.")
+    add("DATES", "Attendance recorded after the as-of date", a,
+        f"SELECT COUNT(*) FROM {a} WHERE CAST(WAKTU_PENCATATAN AS DATE) > {AS_OF}", "ZERO_FAIL", "Records cannot be in the future.")
+    add("DATES", "Birth year implausible or registration before birth", f"{O}.UMAT",
+        f"SELECT COUNT(*) FROM {O}.UMAT WHERE TAHUN_LAHIR < 1900 OR TAHUN_LAHIR > {config.AS_OF.year} "
+        f"OR EXTRACT(YEAR FROM TANGGAL_TERDAFTAR) < TAHUN_LAHIR", "ZERO_FAIL", "Birth years must be plausible.")
+    add("DATES", "Assignment dated after the as-of date", f"{O}.PENUGASAN_KELUARGA",
+        f"SELECT (SELECT COUNT(*) FROM {O}.PENUGASAN_KELUARGA WHERE TANGGAL_MULAI_BERLAKU > {AS_OF} OR TANGGAL_AKHIR_BERLAKU > {AS_OF}) "
+        f"+ (SELECT COUNT(*) FROM {O}.PENUGASAN_LINGKUNGAN WHERE TANGGAL_MULAI_BERLAKU > {AS_OF} OR TANGGAL_AKHIR_BERLAKU > {AS_OF})",
+        "ZERO_FAIL", "Household and community assignments in the past only (both assignment tables).")
+
+    # --- parishioners and governance ------------------------------------------------------------
+    pk, pl = f"{O}.PENUGASAN_KELUARGA", f"{O}.PENUGASAN_LINGKUNGAN"
+    add("PARISHIONERS", "Person without a household assignment", f"{O}.UMAT",
+        f"SELECT COUNT(*) FROM {O}.UMAT u WHERE NOT EXISTS (SELECT 1 FROM {pk} x WHERE x.ID_UMAT = u.ID_UMAT)",
+        "ZERO_FAIL", "Every person must belong to at least one household over time.")
+    add("PARISHIONERS", "Household without a community assignment", f"{O}.KELUARGA",
+        f"SELECT COUNT(*) FROM {O}.KELUARGA f WHERE NOT EXISTS (SELECT 1 FROM {pl} x WHERE x.ID_KELUARGA = f.ID_KELUARGA)",
+        "ZERO_FAIL", "Every household must belong to a community over time.")
+    add("PARISHIONERS", "Overlapping household assignments of one person", pk,
+        f"SELECT COUNT(*) FROM {pk} a JOIN {pk} b ON a.ID_UMAT = b.ID_UMAT AND a.ID_PENUGASAN_KELUARGA < b.ID_PENUGASAN_KELUARGA "
+        f"AND a.TANGGAL_MULAI_BERLAKU <= COALESCE(b.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31') "
+        f"AND b.TANGGAL_MULAI_BERLAKU <= COALESCE(a.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31')",
+        "ZERO_FAIL", "A person can be in only one household at a time.")
+    add("PARISHIONERS", "Overlapping community assignments of one household", pl,
+        f"SELECT COUNT(*) FROM {pl} a JOIN {pl} b ON a.ID_KELUARGA = b.ID_KELUARGA AND a.ID_PENUGASAN_LINGKUNGAN < b.ID_PENUGASAN_LINGKUNGAN "
+        f"AND a.TANGGAL_MULAI_BERLAKU <= COALESCE(b.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31') "
+        f"AND b.TANGGAL_MULAI_BERLAKU <= COALESCE(a.TANGGAL_AKHIR_BERLAKU, DATE '9999-12-31')",
+        "ZERO_FAIL", "A household can be in only one community at a time.")
+    add("PARISHIONERS", "Active member without a current household", f"{O}.UMAT",
+        f"SELECT COUNT(*) FROM {O}.UMAT u WHERE u.STATUS_KEANGGOTAAN = 'Aktif' AND NOT EXISTS "
+        f"(SELECT 1 FROM {pk} x WHERE x.ID_UMAT = u.ID_UMAT AND x.TANGGAL_AKHIR_BERLAKU IS NULL)",
+        "ZERO_FAIL", "Active members need an open household assignment.")
+    add("GOVERNANCE", "Personal data not classified Terbatas or stricter", f"{O}.UMAT, {O}.KELUARGA",
+        f"SELECT (SELECT COUNT(*) FROM {O}.UMAT x JOIN {M}.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = x.ID_KLASIFIKASI_DATA WHERE k.URUTAN_TINGKAT < 3) "
+        f"+ (SELECT COUNT(*) FROM {O}.KELUARGA x JOIN {M}.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = x.ID_KLASIFIKASI_DATA WHERE k.URUTAN_TINGKAT < 3)",
+        "ZERO_FAIL", "Identifiable personal data must be Terbatas or Sangat Terbatas.")
+    add("GOVERNANCE", "Minors without the strictest classification", f"{O}.UMAT",
+        f"SELECT COUNT(*) FROM {O}.UMAT WHERE {config.AS_OF.year} - TAHUN_LAHIR < 17 AND ID_KLASIFIKASI_DATA <> 'KLS-04'",
+        "ZERO_FAIL", "Persons under 17 must be Sangat Terbatas (KLS-04).")
+    add("GOVERNANCE", "Personal-data columns exposed in ANALISIS", A,
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE UPPER(TABLE_SCHEMA) = 'ANALISIS' AND UPPER(COLUMN_NAME) IN "
+        "('NAMA_FIKTIF', 'NAMA_KELUARGA_FIKTIF', 'ID_UMAT', 'ID_KELUARGA', 'TAHUN_LAHIR', 'ID_RESPONDEN', 'ID_PENUGASAN_KELUARGA')",
+        "ZERO_FAIL", "Summary views must never expose names or person and household identifiers.")
+    add("GOVERNANCE", "Geometry not marked synthetic", f"{M}.GEOMETRI_ILUSTRATIF_LINGKUNGAN",
+        f"SELECT COUNT(*) FROM {M}.GEOMETRI_ILUSTRATIF_LINGKUNGAN WHERE BERSIFAT_SINTETIS = FALSE", "ZERO_FAIL",
+        "All demo geometry must be labelled synthetic.")
+    add("GOVERNANCE", "Active community without illustrative geometry", f"{M}.MASTER_LINGKUNGAN",
+        f"SELECT COUNT(*) FROM {M}.MASTER_LINGKUNGAN l WHERE l.STATUS_AKTIF = TRUE AND NOT EXISTS "
+        f"(SELECT 1 FROM {M}.GEOMETRI_ILUSTRATIF_LINGKUNGAN g WHERE g.ID_LINGKUNGAN = l.ID_LINGKUNGAN)",
+        "ZERO_WARN", "Needed only for map demos.")
+    add("PARISHIONERS", "Households with a community history", pl,
+        f"SELECT COUNT(*) FROM (SELECT ID_KELUARGA FROM {pl} GROUP BY ID_KELUARGA HAVING COUNT(*) > 1) h", "INFO",
+        "Deliberate demo scenario: merged or relocated communities.")
+
+    # --- donations -------------------------------------------------------------------------------
+    s = f"{O}.SUMBANGAN_KESEMPATAN_KHUSUS"
+    add("DONATIONS", "Period or booking date inconsistent", s,
+        f"SELECT COUNT(*) FROM {s} WHERE PERIODE_SELESAI < PERIODE_MULAI OR TANGGAL_PENCATATAN < PERIODE_SELESAI OR TANGGAL_PENCATATAN > {AS_OF}",
+        "ZERO_FAIL", "Booking happens after the period ends and not after the snapshot date.")
+    add("DONATIONS", "Participating households exceed households in the region", s,
+        f"SELECT COUNT(*) FROM {s} s JOIN (SELECT s2.ID_SUMBANGAN, COUNT(p.ID_KELUARGA) AS JUMLAH_KELUARGA FROM {s} s2 "
+        f"LEFT JOIN {M}.MASTER_LINGKUNGAN l ON l.ID_WILAYAH = s2.ID_WILAYAH "
+        f"LEFT JOIN {pl} p ON p.ID_LINGKUNGAN = l.ID_LINGKUNGAN AND p.TANGGAL_MULAI_BERLAKU <= s2.PERIODE_SELESAI "
+        f"AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= s2.PERIODE_SELESAI) "
+        f"GROUP BY s2.ID_SUMBANGAN) h ON h.ID_SUMBANGAN = s.ID_SUMBANGAN WHERE s.JUMLAH_KELUARGA_PESERTA > h.JUMLAH_KELUARGA",
+        "ZERO_WARN", "Compares participants with households assigned to the region on the last day of the period.")
+    add("DONATIONS", "Donation records waiting for validation", s,
+        f"SELECT COUNT(*) FROM {s} WHERE STATUS_VALIDASI <> 'Sudah Divalidasi'", "INFO", "Deliberate demo scenario.")
+
+    # --- planning, events, reports -------------------------------------------------------------------
+    e, r, plan, hdr = f"{O}.KEGIATAN", f"{O}.LAPORAN_KEGIATAN", f"{O}.RENCANA_KEGIATAN", f"{O}.RENCANA_KERJA_TAHUNAN"
+    alk, rl = f"{O}.ALOKASI_ANGGARAN", f"{O}.REALISASI_PENGELUARAN"
+    add("PLANNING", "Event section differs from its plan", e,
+        f"SELECT COUNT(*) FROM {e} e JOIN {plan} p ON p.ID_RENCANA = e.ID_RENCANA JOIN {hdr} h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA "
+        f"WHERE h.ID_SEKSI <> e.ID_SEKSI", "ZERO_FAIL", "ID_SEKSI is repeated on the event on purpose, so it must agree with the plan.")
+    add("PLANNING", "Event status differs from its plan status", e,
+        f"SELECT COUNT(*) FROM {e} e JOIN {plan} p ON p.ID_RENCANA = e.ID_RENCANA WHERE p.STATUS_PELAKSANAAN <> e.STATUS_KEGIATAN",
+        "ZERO_FAIL", "Plan and event must tell the same story.")
+    add("PLANNING", "Completed plan without an event", plan,
+        f"SELECT COUNT(*) FROM {plan} p WHERE p.STATUS_PELAKSANAAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM {e} e WHERE e.ID_RENCANA = p.ID_RENCANA)",
+        "ZERO_FAIL", "A plan marked Terlaksana needs the event that carried it out.")
+    add("PLANNING", "Event dates or participants inconsistent", e,
+        f"SELECT COUNT(*) FROM {e} WHERE TANGGAL_SELESAI < TANGGAL_MULAI OR (STATUS_KEGIATAN = 'Terlaksana' AND (JUMLAH_PESERTA_AKTUAL IS NULL OR TANGGAL_SELESAI > {AS_OF})) "
+        f"OR (STATUS_KEGIATAN <> 'Terlaksana' AND JUMLAH_PESERTA_AKTUAL IS NOT NULL)",
+        "ZERO_FAIL", "Actual participants exist exactly for events that were held, and held events are in the past.")
+    add("PLANNING", "Plan date outside the plan year", plan,
+        f"SELECT COUNT(*) FROM {plan} p JOIN {hdr} h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM p.TANGGAL_RENCANA) <> h.TAHUN_RENCANA",
+        "ZERO_FAIL", "Planned dates must fall in the year of the annual plan.")
+    add("PLANNING", "Expenditure outside the plan year", rl,
+        f"SELECT COUNT(*) FROM {rl} x JOIN {alk} a ON a.ID_ALOKASI = x.ID_ALOKASI JOIN {plan} p ON p.ID_RENCANA = a.ID_RENCANA "
+        f"JOIN {hdr} h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM x.TANGGAL_PENGELUARAN) <> h.TAHUN_RENCANA",
+        "ZERO_FAIL", "Spending must be dated in the plan year.")
+    add("PLANNING", "Expenditure on a plan that is Direncanakan or Dibatalkan", rl,
+        f"SELECT COUNT(*) FROM {rl} x JOIN {alk} a ON a.ID_ALOKASI = x.ID_ALOKASI JOIN {plan} p ON p.ID_RENCANA = a.ID_RENCANA "
+        f"WHERE p.STATUS_PELAKSANAAN IN ('Direncanakan', 'Dibatalkan')", "ZERO_WARN",
+        "Possible but unusual: spending before a plan starts or after it was cancelled.")
+    add("PLANNING", "Allocations without any expenditure", alk,
+        f"SELECT COUNT(*) FROM {alk} a WHERE NOT EXISTS (SELECT 1 FROM {rl} x WHERE x.ID_ALOKASI = a.ID_ALOKASI)", "INFO",
+        "Deliberate demo scenario: budget not yet used.")
+    add("PLANNING", "Allocations partly used", alk,
+        f"SELECT COUNT(*) FROM (SELECT a.ID_ALOKASI, a.JUMLAH_ANGGARAN, COALESCE(SUM(x.JUMLAH_PENGELUARAN), 0) AS TERPAKAI "
+        f"FROM {alk} a LEFT JOIN {rl} x ON x.ID_ALOKASI = a.ID_ALOKASI GROUP BY a.ID_ALOKASI, a.JUMLAH_ANGGARAN) t "
+        f"WHERE t.TERPAKAI BETWEEN 1 AND t.JUMLAH_ANGGARAN - 1", "INFO", "Deliberate demo scenario: spending below budget.")
+    add("PLANNING", "Allocations spent above budget", alk,
+        f"SELECT COUNT(*) FROM (SELECT a.ID_ALOKASI, a.JUMLAH_ANGGARAN, COALESCE(SUM(x.JUMLAH_PENGELUARAN), 0) AS TERPAKAI "
+        f"FROM {alk} a LEFT JOIN {rl} x ON x.ID_ALOKASI = a.ID_ALOKASI GROUP BY a.ID_ALOKASI, a.JUMLAH_ANGGARAN) t "
+        f"WHERE t.TERPAKAI > t.JUMLAH_ANGGARAN", "INFO", "Deliberate demo scenario: overspending to be explained.")
+    add("PLANNING", "Report for an event that was not held", r,
+        f"SELECT COUNT(*) FROM {r} r JOIN {e} e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE e.STATUS_KEGIATAN <> 'Terlaksana'",
+        "ZERO_FAIL", "Only events that took place can be reported.")
+    add("PLANNING", "Report date before the event ended or after the as-of date", r,
+        f"SELECT COUNT(*) FROM {r} r JOIN {e} e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE r.TANGGAL_LAPORAN < e.TANGGAL_SELESAI OR r.TANGGAL_LAPORAN > {AS_OF}",
+        "ZERO_FAIL", "A report follows the event.")
+    add("PLANNING", "Final report with empty required fields", r,
+        f"SELECT COUNT(*) FROM {r} WHERE STATUS_LAPORAN = 'Final' AND (RINGKASAN_PELAKSANAAN IS NULL OR JUMLAH_PESERTA IS NULL OR "
+        f"REALISASI_BIAYA IS NULL OR EVALUASI_LOGISTIK IS NULL OR HASIL_KEGIATAN IS NULL OR REKOMENDASI_TINDAK_LANJUT IS NULL)",
+        "ZERO_FAIL", "A final report must be complete.")
+    add("PLANNING", "Report participants differ from the event", r,
+        f"SELECT COUNT(*) FROM {r} r JOIN {e} e ON e.ID_KEGIATAN = r.ID_KEGIATAN WHERE r.JUMLAH_PESERTA IS NOT NULL "
+        f"AND r.JUMLAH_PESERTA <> e.JUMLAH_PESERTA_AKTUAL", "ZERO_WARN",
+        "Expected: 1 (the report with status Perlu Revisi is deliberately inconsistent).")
+    add("PLANNING", "Report cost differs from recorded expenditure", r,
+        f"SELECT COUNT(*) FROM {r} r JOIN {e} e ON e.ID_KEGIATAN = r.ID_KEGIATAN "
+        f"LEFT JOIN (SELECT a.ID_RENCANA, SUM(x.JUMLAH_PENGELUARAN) AS TOTAL_PENGELUARAN FROM {rl} x "
+        f"JOIN {alk} a ON a.ID_ALOKASI = x.ID_ALOKASI GROUP BY a.ID_RENCANA) s ON s.ID_RENCANA = e.ID_RENCANA "
+        f"WHERE r.REALISASI_BIAYA IS NOT NULL AND e.ID_RENCANA IS NOT NULL AND r.REALISASI_BIAYA <> COALESCE(s.TOTAL_PENGELUARAN, 0)",
+        "ZERO_WARN",
+        "Compares the cost in the report with the sum of expenditure lines of the planned activity.")
+    add("PLANNING", "Completed events without a report", e,
+        f"SELECT COUNT(*) FROM {e} e WHERE e.STATUS_KEGIATAN = 'Terlaksana' AND NOT EXISTS (SELECT 1 FROM {r} r WHERE r.ID_KEGIATAN = e.ID_KEGIATAN)",
+        "INFO", "Deliberate demo scenario: reports not yet submitted.")
+    add("PLANNING", "Draft or revision reports", r,
+        f"SELECT COUNT(*) FROM {r} WHERE STATUS_LAPORAN <> 'Final'", "INFO", "Deliberate demo scenario: incomplete reports.")
+    add("PLANNING", "Postponed or cancelled plans", plan,
+        f"SELECT COUNT(*) FROM {plan} WHERE STATUS_PELAKSANAAN IN ('Ditunda', 'Dibatalkan')", "INFO", "Deliberate demo scenario.")
+
+    # --- surveys -----------------------------------------------------------------------------------------------
+    j, h, rs = f"{O}.JAWABAN_SURVEI", f"{O}.HASIL_SURVEI_AGREGAT", f"{O}.RESPONDEN_SURVEI"
+    add("SURVEYS", "Answer option does not belong to the question", j,
+        f"SELECT COUNT(*) FROM {j} j JOIN {M}.OPSI_JAWABAN_SURVEI o ON o.ID_OPSI = j.ID_OPSI WHERE o.ID_PERTANYAAN <> j.ID_PERTANYAAN",
+        "ZERO_FAIL", "The chosen option must be one of the question options.")
+    add("SURVEYS", "Question and respondent belong to different surveys", j,
+        f"SELECT COUNT(*) FROM {j} j JOIN {M}.PERTANYAAN_SURVEI q ON q.ID_PERTANYAAN = j.ID_PERTANYAAN "
+        f"JOIN {rs} r ON r.ID_RESPONDEN = j.ID_RESPONDEN WHERE q.ID_SURVEI <> r.ID_SURVEI", "ZERO_FAIL",
+        "A respondent only answers questions of the survey they filled in.")
+    add("SURVEYS", "Aggregate count differs from the answers", h,
+        f"SELECT COUNT(*) FROM {h} h LEFT JOIN (SELECT ID_OPSI, COUNT(*) AS N FROM {j} GROUP BY ID_OPSI) c "
+        f"ON c.ID_OPSI = h.ID_OPSI WHERE h.JUMLAH_RESPONDEN <> COALESCE(c.N, 0)",
+        "ZERO_FAIL", "Recomputes every option count from the raw answers.")
+    add("SURVEYS", "Aggregate total differs from the answers", h,
+        f"SELECT COUNT(*) FROM {h} h LEFT JOIN (SELECT ID_PERTANYAAN, COUNT(*) AS N FROM {j} GROUP BY ID_PERTANYAAN) c "
+        f"ON c.ID_PERTANYAAN = h.ID_PERTANYAAN WHERE h.TOTAL_RESPONDEN_PERTANYAAN <> COALESCE(c.N, 0)",
+        "ZERO_FAIL", "Recomputes the number of respondents per question.")
+    add("SURVEYS", "Percentage differs from count divided by total", h,
+        f"SELECT COUNT(*) FROM {h} WHERE (TOTAL_RESPONDEN_PERTANYAAN = 0 AND PERSENTASE_JAWABAN <> 0) OR (TOTAL_RESPONDEN_PERTANYAAN > 0 "
+        f"AND ABS(PERSENTASE_JAWABAN - 100.0 * JUMLAH_RESPONDEN / TOTAL_RESPONDEN_PERTANYAAN) > 0.01)", "ZERO_FAIL",
+        "Tolerance 0.01 percentage point for rounding.")
+    add("SURVEYS", "Option counts do not add up to the question total", h,
+        f"SELECT COUNT(*) FROM (SELECT ID_PERTANYAAN FROM {h} GROUP BY ID_PERTANYAAN HAVING SUM(JUMLAH_RESPONDEN) <> MAX(TOTAL_RESPONDEN_PERTANYAAN)) d",
+        "ZERO_FAIL", "Single answers: option counts must sum to the number of respondents.")
+    add("SURVEYS", "Percentages do not add up to 100", h,
+        f"SELECT COUNT(*) FROM (SELECT ID_PERTANYAAN FROM {h} GROUP BY ID_PERTANYAAN HAVING MAX(TOTAL_RESPONDEN_PERTANYAAN) > 0 "
+        f"AND ABS(SUM(PERSENTASE_JAWABAN) - 100) > 0.1) d", "ZERO_FAIL", "Tolerance 0.1 percentage point for rounding.")
+    add("SURVEYS", "Answered question without aggregate rows", j,
+        f"SELECT COUNT(DISTINCT j.ID_PERTANYAAN) FROM {j} j WHERE NOT EXISTS (SELECT 1 FROM {h} h WHERE h.ID_PERTANYAAN = j.ID_PERTANYAAN)",
+        "ZERO_FAIL", "Every answered question must be summarised.")
+    add("SURVEYS", "Respondent filled outside the survey window", rs,
+        f"SELECT COUNT(*) FROM {rs} r JOIN {M}.SURVEI s ON s.ID_SURVEI = r.ID_SURVEI WHERE r.TANGGAL_PENGISIAN < s.TANGGAL_MULAI "
+        f"OR r.TANGGAL_PENGISIAN > s.TANGGAL_SELESAI OR r.TANGGAL_PENGISIAN > {AS_OF}", "ZERO_FAIL", "Responses fall inside the survey dates.")
+    add("SURVEYS", "Survey ends before it starts", f"{M}.SURVEI",
+        f"SELECT COUNT(*) FROM {M}.SURVEI WHERE TANGGAL_SELESAI < TANGGAL_MULAI", "ZERO_FAIL", "Survey dates.")
+    add("SURVEYS", "Surveys without responses", f"{M}.SURVEI",
+        f"SELECT COUNT(*) FROM {M}.SURVEI s WHERE NOT EXISTS (SELECT 1 FROM {rs} r WHERE r.ID_SURVEI = s.ID_SURVEI)", "INFO",
+        "Deliberate demo scenario: a planned survey has no responses and no aggregates.")
+
+    for view in views:
+        add("VIEWS", "View returns rows", f"{A}.{view}", f"SELECT COUNT(*) FROM {A}.{view}", "NONEMPTY",
+            "Fails when the view is missing, broken, or empty.")
+    return arms
+
+
+def view_names(views_sql):
+    return re.findall(r"CREATE OR REPLACE VIEW ANALISIS\.(\w+)", views_sql)
+
+
+def build_arms(tables, data, views_sql):
+    return _generic_arms(tables, data) + _business_arms(view_names(views_sql))
+
+
+def render(tables, data, views_sql, seed):
+    arms = build_arms(tables, data, views_sql)
+    lines = [
+        "-- =============================================================================",
+        "-- Step 6: Validate the data (read-only)",
+        "--",
+        "-- GENERATED FILE. Do not edit by hand: run  python scripts/generate_mock_data.py",
+        "-- after changing sql/02_create_tables.sql, sql/05_create_views.sql or the generator.",
+        "--",
+        "-- Purpose : Row counts, duplicate keys, orphaned references, allowed values,",
+        "--           negative numbers, date plausibility, cross-domain consistency",
+        "--           (Mass schedule, attendance, offertory, plans, budgets, events,",
+        "--           reports, surveys) and privacy guards.",
+        "-- Output  : ONE result table. The first two rows summarise the run.",
+        "--           RESULT is PASS, FAIL (data is wrong), WARN (look at it) or INFO",
+        "--           (a deliberate demo scenario, for interpretation only).",
+        "--           Expected for the bundled demo data: 0 FAIL and exactly 1 WARN.",
+        "-- Safe to re-run: yes. This file only reads data and never changes anything.",
+        "-- Dates   : checks use the fixed snapshot date "
+        f"{config.AS_OF.isoformat()} of the demo data, never today's date.",
+        f"-- Seed    : {seed}",
+        "-- =============================================================================",
+        "",
+        f"USE DATABASE {DB};",
+        "",
+        "WITH CHECKS AS (",
+    ]
+    body = []
+    for order, arm in enumerate(arms, start=1):
+        expected = "NULL" if arm.expected is None else str(arm.expected)
+        count_sql = arm.count_sql.replace("\n", "\n        ")
+        body.append(
+            f"    SELECT {order * 10} AS SORT_ORDER, '{arm.group}' AS CHECK_GROUP, '{_q(arm.name)}' AS CHECK_NAME,\n"
+            f"           '{_q(arm.obj)}' AS OBJECT_NAME,\n"
+            f"           ({count_sql}) AS FOUND_COUNT,\n"
+            f"           {expected} AS EXPECTED_COUNT, '{arm.rule}' AS RULE_TYPE,\n"
+            f"           '{_q(arm.note)}' AS NOTE"
+        )
+    lines.append("\n    UNION ALL\n".join(body))
+    lines += [
+        "),",
+        "RESULTS AS (",
+        "    SELECT",
+        "        SORT_ORDER, CHECK_GROUP, CHECK_NAME, OBJECT_NAME, FOUND_COUNT, EXPECTED_COUNT,",
+        "        CASE RULE_TYPE",
+        "            WHEN 'ROWS' THEN CASE WHEN FOUND_COUNT = 0 THEN 'FAIL' WHEN FOUND_COUNT = EXPECTED_COUNT THEN 'PASS' ELSE 'WARN' END",
+        "            WHEN 'NONEMPTY' THEN CASE WHEN FOUND_COUNT > 0 THEN 'PASS' ELSE 'FAIL' END",
+        "            WHEN 'ZERO_FAIL' THEN CASE WHEN FOUND_COUNT = 0 THEN 'PASS' ELSE 'FAIL' END",
+        "            WHEN 'ZERO_WARN' THEN CASE WHEN FOUND_COUNT = 0 THEN 'PASS' ELSE 'WARN' END",
+        "            ELSE 'INFO'",
+        "        END AS RESULT,",
+        "        NOTE",
+        "    FROM CHECKS",
+        ")",
+        "SELECT SORT_ORDER, CHECK_GROUP, CHECK_NAME, OBJECT_NAME, FOUND_COUNT, EXPECTED_COUNT, RESULT, NOTE",
+        "FROM (",
+        "    SELECT * FROM RESULTS",
+        "    UNION ALL",
+        "    SELECT 1, 'SUMMARY', 'Checks with result FAIL', 'ALL CHECKS', COUNT(*), 0,",
+        "           CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END,",
+        "           'Must be 0. Filter RESULT = FAIL to see which checks failed.'",
+        "    FROM RESULTS WHERE RESULT = 'FAIL'",
+        "    UNION ALL",
+        "    SELECT 2, 'SUMMARY', 'Checks with result WARN', 'ALL CHECKS', COUNT(*), 1,",
+        "           CASE WHEN COUNT(*) = 1 THEN 'PASS' ELSE 'WARN' END,",
+        "           'The bundled demo data has exactly 1 WARN (a report whose participant count is deliberately inconsistent).'",
+        "    FROM RESULTS WHERE RESULT = 'WARN'",
+        ") ALL_ROWS",
+        "ORDER BY SORT_ORDER;",
+        "",
+    ]
+    return "\n".join(lines)
