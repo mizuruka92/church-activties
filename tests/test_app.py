@@ -358,11 +358,76 @@ class PageTests(unittest.TestCase):
         self.assertEqual(len(forecast) - len(actual), 5, "the week in progress and four weeks ahead have a forecast but no actual")
         self.assertLess(actual["AWAL_PEKAN"].max(), pd.Timestamp("2026-09-28"))
         self.assertGreaterEqual(forecast["AWAL_PEKAN"].max(), pd.Timestamp("2026-10-26"))
-        self.assertTrue(data.loc[data["KOLEKTE_AKTUAL"].isna(), "Teks sebenarnya"].eq("belum lengkap").all())
+        self.assertTrue(data.loc[data["KOLEKTE_AKTUAL"].isna(), "Teks aktual"].eq("belum lengkap").all())
         self.assertEqual(set(struck["ID_PERISTIWA"]), {f"PRS-{n:02d}" for n in range(2, 11)})
         spec = charts(self.pages["Perkiraan kolekte"])[0].proto.spec
         self.assertIn('"type": "rule"', spec, "the marker where the forecast goes on alone")
         self.assertIn('"resolve"', spec)
+
+    def chart_with_both_series(self, at):
+        """Charts whose single specification holds the actual line AND the forecast line."""
+        return [c for c in charts(at) if app.SERIES_ACTUAL in c.proto.spec and app.SERIES_FORECAST in c.proto.spec]
+
+    def test_the_series_are_named_the_way_the_parish_says_them(self):
+        self.assertEqual(app.SERIES_ACTUAL, "Kolekte aktual")
+        self.assertEqual(app.SERIES_FORECAST, "Perkiraan kolekte")
+
+    def test_the_offertory_tab_shows_the_forecast_in_the_same_chart_as_the_actual_offertory(self):
+        at = self.pages["Kolekte dan kehadiran"]
+        self.assertIn("Kolekte aktual dan perkiraan kolekte, per pekan", page_text(at))
+        both = self.chart_with_both_series(at)
+        self.assertEqual(len(both), 1)
+        spec = both[0].proto.spec
+        self.assertIn('"strokeDash"', spec)
+        self.assertIn("Pekan terdampak peristiwa", spec)
+
+    def test_the_events_page_compares_the_forecast_with_the_actual_offertory_in_one_chart(self):
+        at = open_page("Peristiwa luar biasa")  # a fresh page: switching the radio must not disturb the shared ones
+        self.assertEqual(self.chart_with_both_series(at), [], "the attendance view has no forecast")
+        self.assertIn("kolekte aktual dengan perkiraan kolekte pada grafik yang sama", page_text(at))
+        at.radio(key="ukuran_peristiwa").set_value("Kolekte per pekan").run()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        self.assertEqual(len(self.chart_with_both_series(at)), 1)
+        self.assertTrue(any("perkiraan belum mengetahui peristiwa itu" in str(c.value) for c in at.caption))
+
+    def test_weeks_before_the_first_forecast_keep_their_actual_value_and_have_no_forecast(self):
+        weekly = app.complete_weeks(app._normalise(app_support.run_query(
+            f"SELECT * FROM {app.DATABASE}.ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA")))
+        forecasts = app._normalise(app_support.run_query(f"SELECT * FROM {app.DATABASE}.ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN"))
+        merged = app.weekly_with_forecast(weekly, forecasts)
+        self.assertEqual(len(merged), len(weekly))
+        self.assertEqual(merged["KOLEKTE_AKTUAL"].tolist(), weekly["TOTAL_KOLEKTE"].tolist())
+        first_forecast = forecasts["AWAL_PEKAN"].min()
+        early = merged[merged["AWAL_PEKAN"] < first_forecast]
+        self.assertGreater(len(early), 20)
+        self.assertTrue(early["JUMLAH_PERKIRAAN"].isna().all())
+        later = merged[merged["AWAL_PEKAN"] >= first_forecast].merge(forecasts, on="AWAL_PEKAN", suffixes=("", "_v"))
+        self.assertTrue((later["JUMLAH_PERKIRAAN"] == later["JUMLAH_PERKIRAAN_v"]).all())
+        data, long, struck = app.forecast_frames(merged)
+        self.assertEqual(long[long["Seri"] == app.SERIES_ACTUAL]["AWAL_PEKAN"].min(), weekly["AWAL_PEKAN"].min())
+        self.assertGreaterEqual(long[long["Seri"] == app.SERIES_FORECAST]["AWAL_PEKAN"].min(), first_forecast)
+
+    def test_the_weekly_chart_opens_on_the_last_year_so_that_forecast_and_actual_can_be_read_week_by_week(self):
+        frame = app._normalise(app_support.run_query(f"SELECT * FROM {app.DATABASE}.ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN"))
+        recent = app.recent_window(frame)
+        self.assertEqual(len(recent[recent["STATUS_PEKAN"] == "Lengkap"]), app.RECENT_WEEKS)
+        self.assertEqual(len(recent[recent["STATUS_PEKAN"] != "Lengkap"]), 5, "the weeks ahead stay in view")
+        self.assertEqual(recent["AWAL_PEKAN"].min(), pd.Timestamp("2025-09-29"))
+        earlier = frame[frame["AWAL_PEKAN"] < pd.Timestamp("2025-01-01")]
+        self.assertEqual(app.recent_window(earlier)["AWAL_PEKAN"].max(), earlier["AWAL_PEKAN"].max(), "relative to the selected years")
+        for label, key in (("Kolekte dan kehadiran", "jangka_grafik_kolekte"), ("Perkiraan kolekte", "jangka_grafik_perkiraan")):
+            at = self.pages[label]
+            self.assertEqual(at.radio(key=key).value, app.VIEW_RECENT, label)
+            self.assertEqual(list(at.radio(key=key).options), [app.VIEW_RECENT, app.VIEW_ALL])
+
+    def test_forecast_and_actual_are_also_offered_side_by_side_as_a_table(self):
+        for label in ("Kolekte dan kehadiran", "Perkiraan kolekte"):
+            at = self.pages[label]
+            table = next(d.value for d in at.dataframe if "Perkiraan kolekte" in d.value.columns and "Kolekte aktual" in d.value.columns)
+            self.assertGreater(len(table), 100, label)
+            self.assertIn("Selisih", table.columns)
+            done = table[table["Kolekte aktual"] != "-"]
+            self.assertTrue(done["Perkiraan kolekte"].str.startswith("Rp ").all(), label)
 
     def test_event_chart_lists_events_by_date_not_by_size(self):
         at = self.pages["Perkiraan kolekte"]
@@ -471,6 +536,16 @@ class InteractionTests(unittest.TestCase):
             for question in list(at.selectbox[1].options):
                 at.selectbox[1].select(question).run()
                 self.assertEqual([str(e.value) for e in at.exception], [], question)
+
+    def test_the_weekly_forecast_chart_can_show_the_whole_range_on_both_pages(self):
+        for label, key in (("Kolekte dan kehadiran", "jangka_grafik_kolekte"), ("Perkiraan kolekte", "jangka_grafik_perkiraan")):
+            at = open_page(label)
+            def main_chart():
+                return next(c for c in charts(at) if app.SERIES_ACTUAL in c.proto.spec and app.SERIES_FORECAST in c.proto.spec)
+            self.assertIn('"type": "point"', main_chart().proto.spec, f"{label}: the zoomed chart marks every week")
+            at.radio(key=key).set_value(app.VIEW_ALL).run()
+            self.assertEqual([str(e.value) for e in at.exception], [], label)
+            self.assertNotIn('"type": "point"', main_chart().proto.spec, f"{label}: 270 weeks are drawn as lines only")
 
     def test_every_event_can_be_opened_on_the_forecast_page_and_the_year_filter_changes_the_tiles(self):
         at = open_page("Perkiraan kolekte")
