@@ -393,7 +393,7 @@ true effect built into the data.
   event log is used to keep those weeks out of training.
 * **The forecast for the weeks ahead is not a promise.** The week in progress and the next four have a forecast but no actual value yet (`STATUS_PEKAN`).
 
-The dashboard page **Perkiraan kolekte** draws the actual offertory (solid) against the forecast (dashed) with its range, shades the weeks hit by an event, never ranks anything,
+The same chart (actual offertory solid, forecast dashed, 80% range as a band) is shown on the **Kolekte** tab of "Kolekte dan kehadiran" and, for the offertory, on "Peristiwa luar biasa". The dashboard page **Perkiraan kolekte** adds the accuracy figures and the event gaps around it. It draws the actual offertory against the forecast with its range, shades the weeks hit by an event, never ranks anything,
 and shows each event's gap beside the usual error. Offertory figures are administrative; they say nothing about faith or commitment.
 
 ## 7. Public service guides
