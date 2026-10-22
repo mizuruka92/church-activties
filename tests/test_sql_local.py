@@ -205,6 +205,32 @@ class MutationTests(unittest.TestCase):
         self.assertDetected("INSERT INTO MASTER_DATA.MASTER_WILAYAH SELECT * FROM MASTER_DATA.MASTER_WILAYAH WHERE ID_WILAYAH = 'WIL-01'",
                             "KEYS", "Duplicate primary key")
 
+    def test_source_file_that_does_not_belong_to_its_report(self):
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.LAPORAN_KEGIATAN SET NAMA_BERKAS_SUMBER = 'LPK-9999_salah.pdf' "
+                            f"WHERE ID_LAPORAN = '{FIRST_FINAL_REPORT}'",
+                            "PLANNING", "Source file name does not start with the report number")
+
+    def test_source_file_that_is_not_a_pdf_or_names_a_folder(self):
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.LAPORAN_KEGIATAN SET NAMA_BERKAS_SUMBER = ID_LAPORAN || '_laporan.docx' "
+                            f"WHERE ID_LAPORAN = '{FIRST_FINAL_REPORT}'",
+                            "PLANNING", "Source file is not a PDF or names a folder")
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.LAPORAN_KEGIATAN SET NAMA_BERKAS_SUMBER = 'data/documents/' || ID_LAPORAN || '_x.pdf' "
+                            f"WHERE ID_LAPORAN = '{FIRST_FINAL_REPORT}'",
+                            "PLANNING", "Source file name does not start with the report number")
+
+    def test_two_reports_cannot_share_one_source_file(self):
+        other = next(r["ID_LAPORAN"] for r in DATA["DATA_OPERASIONAL.LAPORAN_KEGIATAN"] if r["ID_LAPORAN"] != FIRST_FINAL_REPORT)
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.LAPORAN_KEGIATAN SET NAMA_BERKAS_SUMBER = "
+                            f"(SELECT NAMA_BERKAS_SUMBER FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE ID_LAPORAN = '{FIRST_FINAL_REPORT}') "
+                            f"WHERE ID_LAPORAN = '{other}'",
+                            "KEYS", "Duplicate unique key UQ_LAPORAN_KEGIATAN_BERKAS")
+
+    def test_a_report_without_a_source_document_is_only_a_warning(self):
+        failed, rows = self.failing(f"UPDATE DATA_OPERASIONAL.LAPORAN_KEGIATAN SET NAMA_BERKAS_SUMBER = NULL WHERE ID_LAPORAN = '{FIRST_FINAL_REPORT}'")
+        self.assertEqual(failed, set())
+        warned = [r for r in rows if r["CHECK_NAME"] == "Reports without a source document"]
+        self.assertEqual([(r["RESULT"], r["FOUND_COUNT"]) for r in warned], [("WARN", 1)])
+
     def test_duplicate_unique_key(self):
         self.assertDetected(
             "INSERT INTO DATA_OPERASIONAL.KEHADIRAN_MISA SELECT 'KHD-999999', ID_KEJADIAN_MISA, JUMLAH_UMAT, METODE_PENGHITUNGAN, "
@@ -405,6 +431,15 @@ class ViewTests(unittest.TestCase):
         self.assertEqual(self.value("SELECT SUM(ANGGARAN_TERPAKAI_SEMUA_PROGRAM) FROM ANALISIS.ANGGARAN_VS_REALISASI_SEKSI"), spent)
         states = {r[0] for r in self.connection.execute("SELECT DISTINCT STATUS_PENYERAPAN FROM ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM").fetchall()}
         self.assertTrue({"Belum ada pengeluaran", "Terpakai sebagian", "Melebihi anggaran"} <= states)
+
+    def test_events_and_reports_view_names_the_source_document_of_every_report(self):
+        rows = self.connection.execute(
+            "SELECT ID_LAPORAN, NAMA_BERKAS_LAPORAN FROM ANALISIS.KEGIATAN_DAN_LAPORAN WHERE ID_LAPORAN IS NOT NULL").fetchall()
+        self.assertEqual(len(rows), len(DATA["DATA_OPERASIONAL.LAPORAN_KEGIATAN"]))
+        for report_id, file in rows:
+            self.assertTrue(file.startswith(report_id + "_") and file.endswith(".pdf"), file)
+        unreported = self.value("SELECT COUNT(*) FROM ANALISIS.KEGIATAN_DAN_LAPORAN WHERE ID_LAPORAN IS NULL AND NAMA_BERKAS_LAPORAN IS NOT NULL")
+        self.assertEqual(unreported, 0, "an event without a report has no document")
 
     def test_events_and_reports_view_covers_every_event(self):
         self.assertEqual(self.value("SELECT COUNT(*) FROM ANALISIS.KEGIATAN_DAN_LAPORAN"), len(DATA["DATA_OPERASIONAL.KEGIATAN"]))

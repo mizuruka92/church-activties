@@ -1,6 +1,6 @@
 """Assembles every domain into one {qualified table: rows} dictionary."""
 
-from . import donations, liturgy, parish, planning, reference, surveys
+from . import documents, donations, liturgy, parish, planning, reference, surveys
 from .ddl import parse_ddl
 
 
@@ -17,6 +17,7 @@ def build_all():
     data.update(liturgy.build())
     data.update(parish.build())
     data.update(planning.build())
+    documents.attach_file_names(data)  # each report row names the PDF it was extracted from
     data.update(donations.build(data))  # needs households (parish) and the funded plans (planning)
     data.update(surveys.build())
     return data

@@ -108,10 +108,27 @@ demo does not need. The Git-to-Snowflake route is not tested here.
 | Row counts show `WARN` (count differs from the bundled data) | The data was only partly loaded or was changed after loading. Re-run steps 3 and 4a to 4f to restore the bundled rows. |
 | `Report participants differ from the event` shows `WARN` | Expected. It is the one deliberate inconsistency. |
 | The validation statement runs for a long time | It is one query with about 300 branches. Give it a moment. A larger warehouse is not needed. |
+| A load fails with "invalid identifier NAMA_BERKAS_SUMBER" | The demo database was created before the column that links each report to its PDF existed. Either reset the demo (below) and run the setup again, or add just the column (see *Adding the source-file column without a reset* below) and re-run steps 4e, 5 and 6. |
 | You edited `02_create_tables.sql` and nothing changed | `CREATE TABLE IF NOT EXISTS` never alters an existing table. Reset the demo (below) and run the setup again, or write an `ALTER TABLE`. |
 | A column or table named in the views or loads "does not exist" after pulling a newer version | The tables changed (event log, campaigns, household gifts, economic profile) and the database was created by an older version. Reset the demo (below) and run the setup again. |
 | A view fails with an unknown function | The new views use `MEDIAN`, `CORR`, `REGR_SLOPE`, `REGR_INTERCEPT`, `REGR_R2` and `DATEADD`. These are standard Snowflake functions but were only tested on the DuckDB stand-in. Report the view name and the message. |
 | A 4x file fails with a foreign-key or missing-parent style message | Run the files in order: 4b needs 4a, and 4f needs 4c and 4e. Foreign keys are not enforced, so more likely a validation check reports the problem. |
+
+### Adding the source-file column without a reset
+
+`CREATE TABLE IF NOT EXISTS` never changes an existing table, so a database set up before `LAPORAN_KEGIATAN` had the column
+`NAMA_BERKAS_SUMBER` will not get it from step 2. You can add it without deleting any data, then run step 4e (which fills it) and steps 5 and 6:
+
+```sql
+ALTER TABLE PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.LAPORAN_KEGIATAN
+  ADD COLUMN NAMA_BERKAS_SUMBER VARCHAR(200)
+  COMMENT 'Nama berkas PDF dokumen sumber laporan, tanpa folder dan diawali nomor laporan, kosong jika laporan tidak berasal dari dokumen';
+-- optional, to match the table definition (a declared key, not enforced by Snowflake)
+ALTER TABLE PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.LAPORAN_KEGIATAN
+  ADD CONSTRAINT UQ_LAPORAN_KEGIATAN_BERKAS UNIQUE (NAMA_BERKAS_SUMBER);
+```
+
+These two statements were not run in Snowflake. The unique key is metadata only; step 6 checks duplicates explicitly.
 
 ## 6. Resetting the demo (destructive)
 

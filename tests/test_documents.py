@@ -101,6 +101,24 @@ class FileSetTests(unittest.TestCase):
             self.assertEqual(path.name, documents.file_name(REPORTS[report_id], event))
             self.assertRegex(path.name, r"^LPK-\d{4}_[A-Za-z0-9_]+_\d{4}-\d{2}-\d{2}\.pdf$")
 
+    def test_every_report_row_names_its_own_file_and_the_file_exists(self):
+        """The column NAMA_BERKAS_SUMBER is the link from a row to its document."""
+        names = [row["NAMA_BERKAS_SUMBER"] for row in REPORTS.values()]
+        self.assertEqual(len(set(names)), len(names), "one file per report")
+        for report_id, row in REPORTS.items():
+            self.assertEqual(row["NAMA_BERKAS_SUMBER"], FILES[report_id].name, report_id)
+            self.assertTrue(row["NAMA_BERKAS_SUMBER"].startswith(report_id + "_"))
+            self.assertNotIn("/", row["NAMA_BERKAS_SUMBER"], "the folder differs between a repository and a stage")
+        self.assertEqual(set(names), {p.name for p in FOLDER.glob("*.pdf")})
+
+    def test_the_column_is_declared_in_the_table_definition_with_a_unique_key(self):
+        ddl = (ROOT / "sql" / "02_create_tables.sql").read_text(encoding="utf-8")
+        self.assertIn("NAMA_BERKAS_SUMBER VARCHAR(200) COMMENT", ddl)
+        self.assertIn("CONSTRAINT UQ_LAPORAN_KEGIATAN_BERKAS UNIQUE (NAMA_BERKAS_SUMBER)", ddl)
+        loads = (ROOT / "sql" / "04e_load_plans_and_events.sql").read_text(encoding="utf-8")
+        self.assertIn("NAMA_BERKAS_SUMBER", loads)
+        self.assertIn(next(iter(FILES.values())).name, loads, "the load file carries the file names")
+
     def test_not_every_event_has_a_report_and_so_not_every_event_has_a_pdf(self):
         held = [e for e in EVENTS.values() if e["STATUS_KEGIATAN"] == "Terlaksana"]
         self.assertGreater(len(held), len(FILES))

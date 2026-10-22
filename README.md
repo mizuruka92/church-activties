@@ -194,7 +194,7 @@ duplicate identifiers and orphaned references explicitly.
 
 * Steps 0 to 6 and `full_setup.sql` never drop, truncate or delete anything.
 * Step 2 uses `CREATE TABLE IF NOT EXISTS`. It does **not** change an existing table. If you edit a table definition later, reset the demo (below) and run the setup again.
-* **If you already ran an earlier version of this repository in Snowflake**, reset it first. The tables for donations, attendance and regions changed (a new event log, campaigns, household gifts, an economic profile), and `IF NOT EXISTS` will not alter the old ones. See `sql/99_reset_demo.sql`, option B or C.
+* **If you already ran an earlier version of this repository in Snowflake**, reset it first (or, for the one column `LAPORAN_KEGIATAN.NAMA_BERKAS_SUMBER` added with the mock PDF reports, add just that column: see [docs/SETUP_SNOWFLAKE.md](docs/SETUP_SNOWFLAKE.md)). The tables for donations, attendance and regions changed (a new event log, campaigns, household gifts, an economic profile), and `IF NOT EXISTS` will not alter the old ones. See `sql/99_reset_demo.sql`, option B or C.
 * [`sql/99_reset_demo.sql`](sql/99_reset_demo.sql) is the only destructive file. All its statements are commented out, it names only the demo objects, and it is excluded from `full_setup.sql`.
 * No credentials, tokens or account names are stored anywhere in this repository. Keep Snowflake connection files (`config.toml`, `connections.toml`, key files) outside the repository. `.gitignore` blocks the common ones.
 

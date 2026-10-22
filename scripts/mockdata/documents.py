@@ -64,6 +64,13 @@ def file_name(report, event):
     return f"{report['ID_LAPORAN']}_{slug(event['NAMA_KEGIATAN'])}_{event['TANGGAL_MULAI'].isoformat()}.pdf"
 
 
+def attach_file_names(data):
+    """Record on every report row the file its document is saved as: the row was 'extracted' from that file."""
+    events = {e["ID_KEGIATAN"]: e for e in data["DATA_OPERASIONAL.KEGIATAN"]}
+    for report in data["DATA_OPERASIONAL.LAPORAN_KEGIATAN"]:
+        report["NAMA_BERKAS_SUMBER"] = file_name(report, events[report["ID_KEGIATAN"]])
+
+
 def officers():
     """A fictional chair and secretary per section, the same in every year."""
     rng = Rng(config.SEED, "documents")
@@ -328,6 +335,6 @@ def build(data):
         event = events[report["ID_KEGIATAN"]]
         plan = plans.get(event["ID_RENCANA"])
         own = sorted(allocations.get(event["ID_RENCANA"], []), key=lambda a: a["ID_ALOKASI"])
-        files[f"{FOLDER}/{file_name(report, event)}"] = render(
+        files[f"{FOLDER}/{report['NAMA_BERKAS_SUMBER']}"] = render(
             report, event, plan, own, spent, categories, SEKSI_NAMA[event["ID_SEKSI"]], staff[event["ID_SEKSI"]])
     return files

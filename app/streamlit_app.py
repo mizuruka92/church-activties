@@ -1236,6 +1236,7 @@ def page_plans():
             ("NAMA_KEGIATAN", "Kegiatan", text), ("NAMA_SEKSI", "Seksi", text), ("TANGGAL_MULAI", "Mulai", long_date),
             ("STATUS_KEGIATAN", "Status", text), ("TARGET_PESERTA", "Target peserta", whole),
             ("JUMLAH_PESERTA_AKTUAL", "Peserta aktual", whole), ("STATUS_PELAPORAN", "Laporan", text),
+            ("NAMA_BERKAS_LAPORAN", "Berkas laporan", text),
         ])
 
 

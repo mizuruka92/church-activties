@@ -343,6 +343,17 @@ def _business_arms(views):
         "A plan still marked Direncanakan after its date is overdue and should be updated.")
     add("PLANNING", "Upcoming activities", up, f"SELECT COUNT(*) FROM {up}", "INFO",
         "Deliberate demo scenario: scheduled events, plan-only activities and postponed ones.")
+    add("PLANNING", "Source file name does not start with the report number", r,
+        f"SELECT COUNT(*) FROM {r} WHERE NAMA_BERKAS_SUMBER IS NOT NULL "
+        f"AND LEFT(NAMA_BERKAS_SUMBER, LENGTH(ID_LAPORAN) + 1) <> ID_LAPORAN || '_'", "ZERO_FAIL",
+        "The report number at the start of the file name is how a document is matched to its row.")
+    add("PLANNING", "Source file is not a PDF or names a folder", r,
+        f"SELECT COUNT(*) FROM {r} WHERE NAMA_BERKAS_SUMBER IS NOT NULL "
+        f"AND (LOWER(NAMA_BERKAS_SUMBER) NOT LIKE '%.pdf' OR NAMA_BERKAS_SUMBER LIKE '%/%')", "ZERO_FAIL",
+        "Only the file name is stored, never a folder, because the folder differs between a repository and a stage.")
+    add("PLANNING", "Reports without a source document", r,
+        f"SELECT COUNT(*) FROM {r} WHERE NAMA_BERKAS_SUMBER IS NULL", "ZERO_WARN",
+        "Every report in the demo was extracted from a PDF, so a report entered by hand would show here.")
     add("PLANNING", "Expenditure outside the plan year", rl,
         f"SELECT COUNT(*) FROM {rl} x JOIN {alk} a ON a.ID_ALOKASI = x.ID_ALOKASI JOIN {plan} p ON p.ID_RENCANA = a.ID_RENCANA "
         f"JOIN {hdr} h ON h.ID_RENCANA_KERJA = p.ID_RENCANA_KERJA WHERE EXTRACT(YEAR FROM x.TANGGAL_PENGELUARAN) <> h.TAHUN_RENCANA",

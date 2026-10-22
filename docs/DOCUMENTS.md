@@ -14,8 +14,10 @@ value in a row can be found in its PDF, and a PDF never contradicts its row.
 * **132 PDFs**, one per report row (123 *Final*, 8 *Draf*, 1 *Perlu Revisi*), about 1 MB in total. 116 are one page long, 16 are two
   pages (the large Easter and Christmas reports and the unsigned ones with a reviewer's note).
 * File names are `<ID_LAPORAN>_<event name>_<start date>.pdf`, for example `LPK-0001_Pelatihan_Lektor_dan_Pemazmur_2021-02-14.pdf`.
-  The part before the first underscore is the key that joins a file to its row. There is no index file and no column pointing at the
-  file; the name is the link.
+* **Each row names its file.** The column `LAPORAN_KEGIATAN.NAMA_BERKAS_SUMBER` holds the file name, without a folder (the folder
+  differs between a repository and a stage). It is unique, always starts with the report number, and ends in `.pdf`. The part before the
+  first underscore is the same report number, so a file can also be matched to its row from the name alone. The view
+  `ANALISIS.KEGIATAN_DAN_LAPORAN` shows the name as `NAMA_BERKAS_LAPORAN`, and the dashboard's event list as "Berkas laporan".
 * Events without a report have no PDF, exactly as in the table (the data deliberately has completed events without a report).
 * The PDFs are text PDFs, not scans, so any extraction tool can read them without OCR. They use the two standard Helvetica fonts, are not
   compressed, and carry a fixed creation date equal to the report date, so the files are byte-identical every time they are generated.
@@ -30,6 +32,7 @@ One template for all sections: a letterhead with the parish name, a title, then
 | Nomor kegiatan | `ID_KEGIATAN` | |
 | Status laporan | `STATUS_LAPORAN` | *Final*, *Draf* or *Perlu Revisi* |
 | Tanggal laporan | `TANGGAL_LAPORAN` | long Indonesian date, for example "26 Februari 2021" |
+| (the file itself) | `NAMA_BERKAS_SUMBER` | the file name, for example `LPK-0001_Pelatihan_Lektor_dan_Pemazmur_2021-02-14.pdf` |
 | B. Ringkasan pelaksanaan | `RINGKASAN_PELAKSANAAN` | |
 | C. Jumlah peserta | `JUMLAH_PESERTA` | "29 orang" |
 | D. Total realisasi biaya | `REALISASI_BIAYA` | "Rp 1.740.000", written with dots as thousands separators |
@@ -65,8 +68,10 @@ They mirror the situations the data was built to contain.
 `tests/test_documents.py` reads the committed PDFs back with a small reader that needs only the standard library
 (`mockdata/pdfdoc.py`) and checks, for all 132 files, that the identifiers, status, dates, event name, place, target, participants, cost, the
 four narrative sections and the empty markers equal the database rows, that each cost table adds up to the reported total and to the plan's
-budget, that watermarks, notes and signatures appear exactly for the statuses that should have them, and that no file carries a contact
-detail or an identity number. If `pypdf` is installed, the same files are also opened with that independent reader.
+budget, that every row's `NAMA_BERKAS_SUMBER` is the name of an existing file (and every file is named by exactly one row), that
+watermarks, notes and signatures appear exactly for the statuses that should have them, and that no file carries a contact detail or an
+identity number. The validation script (`sql/06_validate_data.sql`) checks the column itself: the name starts with the report number, is a
+PDF, names no folder, and is not used twice. If `pypdf` is installed, the same files are also opened with that independent reader.
 
 You can try the same on any file with a command-line tool such as `pdftotext -layout <file>`.
 
@@ -78,7 +83,8 @@ that a later step can show how documents become rows. In outline:
 1. Upload the PDFs to an internal stage (for example with the Snowsight file upload or `PUT`).
 2. Run a document-extraction feature on them (Snowflake offers several, such as Cortex functions and Document AI; names, availability and syntax
    change between releases, so check the current documentation) and compare the result with `LAPORAN_KEGIATAN`, which acts as the answer key.
-3. Join on the report number taken from the file name.
+3. Join on `NAMA_BERKAS_SUMBER` (or on the report number at the start of the file name). Only the file name is stored; on a stage the same
+   name sits under the stage's own path.
 
 Things a real extraction will meet in these files, on purpose or by nature: the report number, status, and date sit in two columns on the same line;
 unfinished reports have a watermark whose letters can appear in the extracted text; values are written in Indonesian formats ("Rp 1.740.000",
@@ -101,3 +107,5 @@ unfinished reports have a watermark whose letters can appear in the extracted te
   not modelled.
 * The reviewer's note and the cost breakdown exist only in the documents. If you want them in the model, the cost breakdown is already derivable
   from `ALOKASI_ANGGARAN` and `REALISASI_PENGELUARAN`.
+* The database cannot check that a named file exists. SQL has no access to the repository folder, so that check is a Python test
+  (`tests/test_documents.py`). In Snowflake, once the PDFs are on a stage, a directory table could be compared with the column.
