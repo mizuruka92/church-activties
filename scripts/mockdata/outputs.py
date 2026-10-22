@@ -8,11 +8,12 @@ Generated files (never edit by hand):
     sql/99_reset_demo.sql            DESTRUCTIVE reset, every statement commented out
     docs/DATA_DICTIONARY.md          Bahasa Indonesia data dictionary
     data/documents/laporan_kegiatan/*.pdf   one mock PDF post-event report per report row (see render_documents)
+    app/public_documents/*.pdf              one public service guide (SOP) per service, shown by the dashboard
 """
 
 from pathlib import Path
 
-from . import config, dictionary, documents, sqlwriter, validation
+from . import config, dictionary, documents, layanan, sqlwriter, validation
 from .build import build_all, load_tables
 from .checks import check_integrity, check_scenarios
 
@@ -33,6 +34,8 @@ OPERATIONAL_LOADS = [
       "LAPORAN_KEGIATAN"], "steps 2 and 3"),
     ("04f_load_donations.sql", "Load donation campaigns, household gifts and regional summaries",
      ["KAMPANYE_SUMBANGAN", "SUMBANGAN_KESEMPATAN_KHUSUS", "SUMBANGAN_KELUARGA"], "steps 4c (households) and 4e (plans)"),
+    ("04g_load_forecast.sql", "Load the shadow forecast of the weekly offertory",
+     ["PERKIRAAN_KOLEKTE_MINGGUAN"], "steps 2 and 3 (includes the forecast model), and 4a and 4b to compare with the offertory"),
 ]
 
 SQL_SOURCES = (
@@ -136,9 +139,15 @@ def render_full_setup(files):
     return "\n".join(parts)
 
 
+PDF_FOLDERS = (documents.FOLDER, layanan.FOLDER)
+
+
 def render_documents(data):
-    """{relative path: PDF bytes}: the mock source documents of the post-event reports. Deterministic."""
-    return documents.build(data)
+    """{relative path: PDF bytes}: the mock source documents of the post-event reports and the public
+    service guides. Deterministic."""
+    files = dict(documents.build(data))
+    files.update(layanan.build_documents(data))
+    return files
 
 
 def generate(root):

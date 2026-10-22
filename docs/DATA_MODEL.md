@@ -1,6 +1,6 @@
 # Data model
 
-Technical description of the Parish Information Hub model: schemas, the nine business domains, how
+Technical description of the Parish Information Hub model: schemas, the nine business domains (plus one added domain), how
 the tables relate, and why the model looks the way it does. Column-level detail is in the Bahasa
 Indonesia [data dictionary](DATA_DICTIONARY.md). The authoritative definition is
 [`sql/02_create_tables.sql`](../sql/02_create_tables.sql).
@@ -13,17 +13,17 @@ All data is synthetic. This document describes structure only.
 |---|---|---|
 | `MASTER_DATA` | Reference lists and master data: regions, communities, sections, Mass schedule rules, survey definitions, controlled vocabularies, reporting calendar, access policy, illustrative geometry, the economic profile of each community and the dataset snapshot information. | Internal users |
 | `DATA_OPERASIONAL` | Records and transactions: Mass occurrences, attendance, offertory, the log of unforeseen events, donation campaigns and household gifts, parishioners, survey responses, plans, budgets, expenditure, events, reports. Includes personal and household-level data (fictional) classified *Terbatas* or *Sangat Terbatas*. | Authorised staff only |
-| `ANALISIS` | 23 views with aggregated or operational summaries for reporting and the future dashboard. No names, person identifiers or household gift identifiers. | Dashboards and report readers |
+| `ANALISIS` | 29 views with aggregated or operational summaries for reporting and the future dashboard. No names, person identifiers or household gift identifiers. | Dashboards and report readers |
 
 Naming: uppercase snake case, Bahasa Indonesia domain terms, technical English only where it is
 standard (`ID`). Identifiers are readable and stable (`MIS-000001`, `LNG-03`, `SEK-05`), and are
 deterministic, so reloading never changes a key.
 
-## 2. The nine domains
+## 2. The domains
 
 | # | Domain | Tables | Grain (one row per ...) |
 |---|---|---|---|
-| 1 | Offertory collections | `PENERIMAAN_KOLEKTE`, `REFERENSI_JENIS_KOLEKTE` | Mass occurrence and collection type |
+| 1 | Offertory collections | `PENERIMAAN_KOLEKTE`, `REFERENSI_JENIS_KOLEKTE`, `PERKIRAAN_KOLEKTE_MINGGUAN`, `REFERENSI_MODEL_PERKIRAAN` | Mass occurrence and collection type; forecast of one week by one model; forecast model |
 | 2 | Mass attendance | `KEHADIRAN_MISA`, `PERISTIWA_LUAR_BIASA` | Mass occurrence; unforeseen event (rain, haze, ash, power cut) |
 | 3 | Parishioner database (BIDUK simulation) | `UMAT`, `KELUARGA`, `PENUGASAN_KELUARGA`, `PENUGASAN_LINGKUNGAN`, `REFERENSI_KLASIFIKASI_DATA`, `KEBIJAKAN_AKSES_DATA`, `REFERENSI_KATEGORI_INFORMASI` | person; household; person-household period; household-community period |
 | 4 | Special occasion donations | `KAMPANYE_SUMBANGAN`, `SUMBANGAN_KESEMPATAN_KHUSUS`, `SUMBANGAN_KELUARGA`, `REFERENSI_KESEMPATAN_KHUSUS` | campaign (occasion and year); region and campaign; household gift in a campaign; occasion |
@@ -32,6 +32,7 @@ deterministic, so reloading never changes a key.
 | 7 | Annual plans, budgets, actuals | `RENCANA_KERJA_TAHUNAN`, `RENCANA_KEGIATAN`, `ALOKASI_ANGGARAN`, `REALISASI_PENGELUARAN`, `REFERENSI_KATEGORI_BIAYA` | section and year; planned activity; activity and cost category; expenditure transaction |
 | 8 | Events and post-event reports | `KEGIATAN`, `LAPORAN_KEGIATAN` | event; report |
 | 9 | Regional master data and GIS | `MASTER_WILAYAH`, `MASTER_LINGKUNGAN`, `PROFIL_EKONOMI_LINGKUNGAN`, `GEOMETRI_ILUSTRATIF_LINGKUNGAN` | region; community; community economic profile; community polygon |
+| 10 | Public service guides (added) | `LAYANAN_PAROKI`, `LANGKAH_LAYANAN`, `PERSYARATAN_LAYANAN` | service; step of a service; requirement of a service |
 | - | Shared reference | `INFO_DATASET`, `MASTER_SEKSI`, `REFERENSI_DAFTAR_NILAI`, `REFERENSI_PERIODE_PELAPORAN` | dataset snapshot; section; vocabulary value; month |
 
 ## 3. Relationships
@@ -64,6 +65,19 @@ erDiagram
     KEJADIAN_MISA ||--o{ PENERIMAAN_KOLEKTE : "ID_KEJADIAN_MISA"
     REFERENSI_JENIS_KOLEKTE ||--o{ PENERIMAAN_KOLEKTE : "ID_JENIS_KOLEKTE"
     REFERENSI_PERIODE_PELAPORAN }o..o{ KEJADIAN_MISA : "joined by date in views"
+    REFERENSI_MODEL_PERKIRAAN ||--o{ PERKIRAAN_KOLEKTE_MINGGUAN : "ID_MODEL"
+```
+
+The stored forecast (`PERKIRAAN_KOLEKTE_MINGGUAN`) has no foreign key to the Mass tables on purpose: one row covers a **week**, and the comparison with the offertory is made by the view `KOLEKTE_AKTUAL_VS_PERKIRAAN`, which sums the held Masses of that week.
+
+### Public service guides
+
+```mermaid
+erDiagram
+    MASTER_SEKSI ||--o{ LAYANAN_PAROKI : "ID_SEKSI_PENGELOLA"
+    REFERENSI_KLASIFIKASI_DATA ||--o{ LAYANAN_PAROKI : "ID_KLASIFIKASI_DATA"
+    LAYANAN_PAROKI ||--o{ LANGKAH_LAYANAN : "ID_LAYANAN"
+    LAYANAN_PAROKI ||--o{ PERSYARATAN_LAYANAN : "ID_LAYANAN"
 ```
 
 ### Parishioners
@@ -150,6 +164,9 @@ erDiagram
 21. **Upcoming means "after the data date", never "after today".** `ANALISIS.KEGIATAN_MENDATANG` has one row per plan that has not been carried out: `Direncanakan`, plus activities postponed (`Ditunda`) in the year of the snapshot. It carries three stages: *Sudah dijadwalkan* (an event row exists, with date, place and participant target), *Masih rencana tahunan* (only the annual plan and budget exist) and *Ditunda, perlu jadwal baru*. This is the missing step between the plan and the post-event report, and it is where the plan-to-event link (`KEGIATAN.ID_RENCANA`) becomes visible. Days are counted from `INFO_DATASET.TANGGAL_SNAPSHOT`, so the demo gives the same answer on any day; with real data that column would be replaced by `CURRENT_DATE`. Where a campaign pays for the activity (Advent for Christmas), the view also shows the campaign target against the planned budget.
 22. **The report table is what was extracted from documents.** Every row of `LAPORAN_KEGIATAN` has a mock PDF (`data/documents/laporan_kegiatan/`) written from the same rows, so each value can be found in its document and the document never contradicts the row. Unfinished reports show their gaps as "(belum diisi)". The link is the column `NAMA_BERKAS_SUMBER`: the file name only, never a folder (a repository folder and a stage path differ), unique, starting with the report number and ending in `.pdf`. It is nullable, so a report entered by hand without a document is possible and shows up as a validation warning. The PDFs themselves are not loaded by any setup step, and SQL cannot check that a named file exists, so a Python test does. See [DOCUMENTS.md](DOCUMENTS.md).
 
+23. **A shadow forecast is a record, not a calculation.** `PERKIRAAN_KOLEKTE_MINGGUAN` stores the weekly offertory forecast exactly as it was issued, four weeks before each week (`TANGGAL_PERKIRAAN` is always the Monday 28 days earlier), with an 80% range. It is never recomputed, so the comparison with what was actually collected stays honest; a view that recalculated the forecast from today's data would quietly include the future. The model (`REFERENSI_MODEL_PERKIRAAN`, id `MDL-01`) is a straight line over the last 52 undisturbed weeks plus a payday term and a liturgical-calendar adjustment (Easter, feast days and special collections, whose size is a rule of thumb and deliberately not the generator's true factor). Weeks already marked by an unforeseen event are left out of what it learns from, so a past disaster does not drag later forecasts down. It cannot know about an event that has not happened, so an event shows up as a large gap, and `BIAS_PERKIRAAN_PER_PERISTIWA` sets each event's gap against the ordinary error. About one ordinary week in five still falls outside the 80% range, and the dashboard says so instead of hiding it. The generator proves that no forecast reads anything from its own origin onwards (`tests/test_forecast.py` changes every later week and checks that nothing moves). Only complete weeks are compared, and the forecasts for the week in progress and four weeks ahead have no actual value yet. The table is a demonstration of the idea: the model is deliberately simple, and `MDL-01` could be joined by other models in the same table.
+24. **Service guides are master data, published twice.** The steps and requirements of six services (adult baptism, infant baptism, confirmation, marriage, registering in a neighbourhood community, and the bereavement guide) are rows in `LAYANAN_PAROKI`, `LANGKAH_LAYANAN` and `PERSYARATAN_LAYANAN`, classified *Publik*, and the PDFs in `app/public_documents/` are generated from those same rows, so the page and the document cannot disagree. Each row of `LAYANAN_PAROKI` names its file (`NAMA_BERKAS_PANDUAN`, a name only, never a folder). The public views (`LAYANAN_PUBLIK` and the two views that read it) show a service only if its classification may appear in public (`REFERENSI_KLASIFIKASI_DATA.DAPAT_DITAMPILKAN_PUBLIK`), so reclassifying a service hides it with all its steps. The content is **fictional and generic**: no diocesan rule was consulted, every guide says it is an example, and it carries no telephone number or other contact detail. "Baptis Batuta" is read as the baptism of babies and children under seven. This domain is an addition to the nine domains of `CLAUDE.md`.
+
 ## 5. Where the suggested attributes of `CLAUDE.md` went
 
 The model keeps every suggested attribute. These were deliberately placed differently:
@@ -165,13 +182,13 @@ The model keeps every suggested attribute. These were deliberately placed differ
 | `NAMA_WILAYAH, NAMA_LINGKUNGAN` in one table | Two tables, joined in `ANALISIS.STRUKTUR_WILAYAH` | See decision 2. |
 | `REALISASI_BIAYA` on the post-event report | Kept on `LAPORAN_KEGIATAN`, but understood as the cost *claimed by the report* and compared with the recorded expenditure by a warning check | A report can disagree with the books. |
 | `tests/validation_queries.sql` | Validation SQL lives only in `sql/06_validate_data.sql`; `tests/` holds Python tests | Avoids two copies of the same checks. |
-| `app/README.md` | Not created | Phase 2 has not started. |
+| `app/README.md` | Created in Phase 2 | Developer notes for the dashboard. |
 
 ## 6. Data classification and access
 
 | Level | Examples | Dashboard use |
 |---|---|---|
-| Publik | Mass schedule, region list | Allowed |
+| Publik | Mass schedule, region list, public service guides | Allowed |
 | Internal | Attendance, offertory, plans, budgets, aggregated survey results | Internal reporting only |
 | Terbatas | Households, individuals, assignments, anonymous survey answers | Never as detail |
 | Sangat Terbatas | Individuals under 17, household donation gifts | Never |
@@ -189,7 +206,8 @@ exposes a name, a person or household identifier, a household gift identifier, o
 * Primary, unique and foreign keys are declarative metadata; consistency is verified, not enforced.
 * Table definitions are created with `IF NOT EXISTS`, so there is no migration mechanism yet.
 * The parish is deliberately small (about 650 simulated parishioners in 227 households), so attendance and counts are in proportion. The numbers describe nobody.
-* The forecast is a straight line through five complete years. It is a demonstration of the idea, not a forecasting method.
+* The projection of income versus outcome is a straight line through five complete years, and the weekly shadow forecast is a deliberately simple regression. Both are demonstrations of the idea, not forecasting methods.
+* The service guides are generic examples, not official procedures of any church body.
 * Only programme spending is modelled as outcome; the running costs of a real parish are outside this dataset.
 * The economic profile and the large-donor pattern are invented to make the analysis visible. They say nothing about any real community.
 * The SQL has been tested on a stand-in engine, not on Snowflake itself.

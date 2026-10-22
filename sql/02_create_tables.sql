@@ -212,6 +212,60 @@ CREATE TABLE IF NOT EXISTS MASTER_DATA.OPSI_JAWABAN_SURVEI (
     CONSTRAINT FK_OPSI_JAWABAN_PERTANYAAN FOREIGN KEY (ID_PERTANYAAN) REFERENCES MASTER_DATA.PERTANYAAN_SURVEI (ID_PERTANYAAN)
 ) COMMENT = 'Opsi jawaban yang tersedia untuk setiap pertanyaan | Granularitas: satu baris per opsi jawaban | Klasifikasi: Internal';
 
+CREATE TABLE IF NOT EXISTS MASTER_DATA.REFERENSI_MODEL_PERKIRAAN (
+    ID_MODEL VARCHAR(30) NOT NULL COMMENT 'Pengenal model perkiraan (contoh: MDL-01)',
+    NAMA_MODEL VARCHAR(150) NOT NULL COMMENT 'Nama model untuk tampilan',
+    DESKRIPSI_METODE VARCHAR(1000) NOT NULL COMMENT 'Penjelasan metode dalam bahasa awam, termasuk apa yang diketahui dan tidak diketahui model',
+    HORIZON_HARI NUMBER(3,0) NOT NULL COMMENT 'Berapa hari sebelum awal pekan sasaran perkiraan dibuat',
+    MINIMAL_RIWAYAT_MINGGU NUMBER(3,0) NOT NULL COMMENT 'Jumlah pekan riwayat minimal sebelum model mulai membuat perkiraan',
+    JENDELA_PELATIHAN_MINGGU NUMBER(3,0) NOT NULL COMMENT 'Jumlah pekan terakhir yang dipakai model untuk belajar',
+    LEBAR_RENTANG_PERSEN NUMBER(3,0) NOT NULL COMMENT 'Peluang yang diharapkan agar kolekte sebenarnya jatuh di dalam rentang perkiraan, dalam persen',
+    STATUS_AKTIF BOOLEAN NOT NULL COMMENT 'TRUE jika model masih dipakai membuat perkiraan baru',
+    CONSTRAINT PK_REFERENSI_MODEL_PERKIRAAN PRIMARY KEY (ID_MODEL)
+) COMMENT = 'Daftar model perkiraan kolekte beserta ketentuannya. Setiap perkiraan tersimpan menyebut model yang membuatnya | Granularitas: satu baris per model perkiraan | Klasifikasi: Publik';
+
+CREATE TABLE IF NOT EXISTS MASTER_DATA.LAYANAN_PAROKI (
+    ID_LAYANAN VARCHAR(30) NOT NULL COMMENT 'Pengenal layanan (contoh: LYN-01)',
+    NAMA_LAYANAN VARCHAR(150) NOT NULL COMMENT 'Nama layanan untuk umat, misalnya Baptis Dewasa',
+    KATEGORI_LAYANAN VARCHAR(100) NOT NULL COMMENT 'Kelompok layanan: Sakramen, Administrasi Umat, atau Pelayanan Duka',
+    RINGKASAN VARCHAR(500) NOT NULL COMMENT 'Untuk siapa layanan ini, dalam satu atau dua kalimat',
+    PERKIRAAN_WAKTU_PROSES VARCHAR(200) NOT NULL COMMENT 'Perkiraan lama proses dari pendaftaran sampai selesai',
+    CATATAN_PENTING VARCHAR(1000) NOT NULL COMMENT 'Hal yang perlu diketahui pemohon, misalnya biaya dan waktu pendaftaran',
+    ID_SEKSI_PENGELOLA VARCHAR(30) NOT NULL COMMENT 'Seksi yang bertanggung jawab atas layanan dan isi panduannya',
+    ID_KLASIFIKASI_DATA VARCHAR(30) NOT NULL COMMENT 'Klasifikasi informasi. Hanya klasifikasi yang boleh tampil publik muncul di dasbor umum',
+    NAMA_BERKAS_PANDUAN VARCHAR(200) NOT NULL COMMENT 'Nama berkas PDF panduan, tanpa folder dan diawali pengenal layanan',
+    TANGGAL_REVISI DATE NOT NULL COMMENT 'Tanggal terakhir isi panduan ditinjau',
+    CONSTRAINT PK_LAYANAN_PAROKI PRIMARY KEY (ID_LAYANAN),
+    CONSTRAINT UQ_LAYANAN_PAROKI_BERKAS UNIQUE (NAMA_BERKAS_PANDUAN),
+    CONSTRAINT FK_LAYANAN_PAROKI_SEKSI FOREIGN KEY (ID_SEKSI_PENGELOLA) REFERENCES MASTER_DATA.MASTER_SEKSI (ID_SEKSI),
+    CONSTRAINT FK_LAYANAN_PAROKI_KLASIFIKASI FOREIGN KEY (ID_KLASIFIKASI_DATA) REFERENCES MASTER_DATA.REFERENSI_KLASIFIKASI_DATA (ID_KLASIFIKASI_DATA)
+) COMMENT = 'Layanan paroki untuk umat beserta panduan PDF-nya. Isi panduan fiktif dan bukan ketentuan resmi | Granularitas: satu baris per layanan | Klasifikasi: Publik';
+
+CREATE TABLE IF NOT EXISTS MASTER_DATA.LANGKAH_LAYANAN (
+    ID_LANGKAH VARCHAR(30) NOT NULL COMMENT 'Pengenal langkah (contoh: LGK-0101)',
+    ID_LAYANAN VARCHAR(30) NOT NULL COMMENT 'Layanan pemilik langkah',
+    NOMOR_URUT NUMBER(2,0) NOT NULL COMMENT 'Urutan langkah dalam layanan, dimulai dari 1 tanpa lompatan',
+    JUDUL_LANGKAH VARCHAR(150) NOT NULL COMMENT 'Judul singkat langkah',
+    URAIAN VARCHAR(1000) NOT NULL COMMENT 'Penjelasan apa yang dilakukan pada langkah ini',
+    PELAKU VARCHAR(100) NOT NULL COMMENT 'Siapa yang melakukan langkah ini: pemohon, sekretariat, pastor, seksi, atau ketua lingkungan',
+    CONSTRAINT PK_LANGKAH_LAYANAN PRIMARY KEY (ID_LANGKAH),
+    CONSTRAINT UQ_LANGKAH_LAYANAN_URUT UNIQUE (ID_LAYANAN, NOMOR_URUT),
+    CONSTRAINT FK_LANGKAH_LAYANAN FOREIGN KEY (ID_LAYANAN) REFERENCES MASTER_DATA.LAYANAN_PAROKI (ID_LAYANAN)
+) COMMENT = 'Langkah-langkah berurutan untuk setiap layanan | Granularitas: satu baris per langkah dalam satu layanan | Klasifikasi: Publik';
+
+CREATE TABLE IF NOT EXISTS MASTER_DATA.PERSYARATAN_LAYANAN (
+    ID_PERSYARATAN VARCHAR(30) NOT NULL COMMENT 'Pengenal persyaratan (contoh: PSY-0101)',
+    ID_LAYANAN VARCHAR(30) NOT NULL COMMENT 'Layanan pemilik persyaratan',
+    NOMOR_URUT NUMBER(2,0) NOT NULL COMMENT 'Urutan persyaratan dalam layanan, dimulai dari 1 tanpa lompatan',
+    NAMA_PERSYARATAN VARCHAR(200) NOT NULL COMMENT 'Nama persyaratan, misalnya Fotokopi surat baptis',
+    JENIS_PERSYARATAN VARCHAR(50) NOT NULL COMMENT 'Jenis: Dokumen, Pembinaan, atau Ketentuan Umum',
+    WAJIB_DIPENUHI BOOLEAN NOT NULL COMMENT 'TRUE jika selalu wajib, FALSE jika hanya berlaku pada keadaan tertentu',
+    KETERANGAN VARCHAR(500) COMMENT 'Penjelasan tambahan, kosong jika tidak ada',
+    CONSTRAINT PK_PERSYARATAN_LAYANAN PRIMARY KEY (ID_PERSYARATAN),
+    CONSTRAINT UQ_PERSYARATAN_LAYANAN_URUT UNIQUE (ID_LAYANAN, NOMOR_URUT),
+    CONSTRAINT FK_PERSYARATAN_LAYANAN FOREIGN KEY (ID_LAYANAN) REFERENCES MASTER_DATA.LAYANAN_PAROKI (ID_LAYANAN)
+) COMMENT = 'Persyaratan untuk setiap layanan | Granularitas: satu baris per persyaratan dalam satu layanan | Klasifikasi: Publik';
+
 -- =============================================================================
 -- DATA_OPERASIONAL : operational records and transactions
 -- =============================================================================
@@ -269,6 +323,22 @@ CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.PENERIMAAN_KOLEKTE (
     CONSTRAINT FK_PENERIMAAN_KOLEKTE_KEJADIAN FOREIGN KEY (ID_KEJADIAN_MISA) REFERENCES DATA_OPERASIONAL.KEJADIAN_MISA (ID_KEJADIAN_MISA),
     CONSTRAINT FK_PENERIMAAN_KOLEKTE_JENIS FOREIGN KEY (ID_JENIS_KOLEKTE) REFERENCES MASTER_DATA.REFERENSI_JENIS_KOLEKTE (ID_JENIS_KOLEKTE)
 ) COMMENT = 'Ringkasan kolekte per Misa dan jenis kolekte, membedakan jumlah tercatat, hasil penghitungan, dan status rekonsiliasi. Bukan ukuran iman atau komitmen rohani | Granularitas: satu baris per kejadian Misa dan jenis kolekte | Klasifikasi: Internal';
+
+CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN (
+    ID_PERKIRAAN VARCHAR(30) NOT NULL COMMENT 'Pengenal perkiraan (contoh: PKR-0001)',
+    ID_MODEL VARCHAR(30) NOT NULL COMMENT 'Model yang membuat perkiraan',
+    AWAL_PEKAN_SASARAN DATE NOT NULL COMMENT 'Hari Senin awal pekan yang diperkirakan (pekan berjalan dari Senin sampai Minggu)',
+    TANGGAL_PERKIRAAN DATE NOT NULL COMMENT 'Tanggal perkiraan dibuat. Hanya data sebelum tanggal ini yang dipakai, sehingga peristiwa sesudahnya tidak diketahui',
+    JUMLAH_PEKAN_PELATIHAN NUMBER(3,0) NOT NULL COMMENT 'Jumlah pekan riwayat yang dipakai model untuk belajar, tidak termasuk pekan hari raya dan pekan terganggu peristiwa',
+    JUMLAH_PERKIRAAN NUMBER(18,0) NOT NULL COMMENT 'Perkiraan total kolekte pekan itu, dalam rupiah dan dibulatkan ke ribuan',
+    BATAS_BAWAH NUMBER(18,0) NOT NULL COMMENT 'Batas bawah rentang perkiraan, dalam rupiah',
+    BATAS_ATAS NUMBER(18,0) NOT NULL COMMENT 'Batas atas rentang perkiraan, dalam rupiah',
+    PENYESUAIAN_KALENDER NUMBER(6,3) NOT NULL COMMENT 'Pengali kalender liturgi untuk pekan sasaran, 1.000 berarti tanpa penyesuaian',
+    KETERANGAN VARCHAR(500) COMMENT 'Hari raya atau kolekte khusus yang dipertimbangkan, kosong jika tidak ada',
+    CONSTRAINT PK_PERKIRAAN_KOLEKTE_MINGGUAN PRIMARY KEY (ID_PERKIRAAN),
+    CONSTRAINT UQ_PERKIRAAN_KOLEKTE_MODEL_PEKAN UNIQUE (ID_MODEL, AWAL_PEKAN_SASARAN),
+    CONSTRAINT FK_PERKIRAAN_KOLEKTE_MODEL FOREIGN KEY (ID_MODEL) REFERENCES MASTER_DATA.REFERENSI_MODEL_PERKIRAAN (ID_MODEL)
+) COMMENT = 'Perkiraan bayangan kolekte mingguan, disimpan persis seperti dibuat empat pekan sebelumnya dan tidak pernah diperbarui sesudah kolekte sebenarnya diketahui. Dipakai untuk membandingkan perkiraan dengan kenyataan. Bukan ukuran iman atau komitmen rohani | Granularitas: satu baris per model dan pekan sasaran | Klasifikasi: Internal';
 
 CREATE TABLE IF NOT EXISTS DATA_OPERASIONAL.KELUARGA (
     ID_KELUARGA VARCHAR(30) NOT NULL COMMENT 'Pengenal keluarga fiktif (contoh: KEL-0001)',

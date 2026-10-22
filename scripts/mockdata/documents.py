@@ -151,7 +151,7 @@ def _footer(pdf, report):
         page.artifact_text(PDF_RIGHT - note_width, 820, SIMULATION_NOTE)
 
 
-def _letterhead(flow):
+def letterhead(flow):
     page = flow.page
     # a small Latin cross as the parish mark
     page.line(LEFT + 12, 52, LEFT + 12, 86, 3.0, 0.2)
@@ -256,7 +256,7 @@ def render(report, event, plan, allocations, spent_by_allocation, category_names
         subject="Laporan pascakegiatan (data simulasi, fiktif)",
         created=report["TANGGAL_LAPORAN"])
     flow = Flow(pdf)
-    _letterhead(flow)
+    letterhead(flow)
     _title(flow, section_name)
 
     status = report["STATUS_LAPORAN"]

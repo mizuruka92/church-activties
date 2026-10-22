@@ -379,6 +379,97 @@ class MutationTests(unittest.TestCase):
     def test_an_empty_table_fails_the_row_count(self):
         self.assertDetected("DELETE FROM DATA_OPERASIONAL.KELUARGA", "STRUCTURE", "Row count")
 
+    # --- shadow forecast ---------------------------------------------------------------------------------------------
+    def test_forecast_for_a_week_that_does_not_start_on_monday(self):
+        self.assertDetected("UPDATE DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN SET AWAL_PEKAN_SASARAN = DATE '2022-03-02' "
+                            "WHERE ID_PERKIRAAN = 'PKR-0001'", "FORECAST", "Target week does not start on a Monday")
+
+    def test_forecast_issued_too_late_or_after_the_snapshot(self):
+        self.assertDetected("UPDATE DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN SET TANGGAL_PERKIRAAN = TANGGAL_PERKIRAAN + 7 "
+                            "WHERE ID_PERKIRAAN = 'PKR-0010'", "FORECAST", "Forecast not issued exactly one horizon before its week")
+        self.assertDetected("UPDATE DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN SET TANGGAL_PERKIRAAN = DATE '2026-10-05' "
+                            "WHERE ID_PERKIRAAN = 'PKR-0274'", "FORECAST", "Forecast issued after the as-of date")
+
+    def test_forecast_range_that_does_not_contain_the_forecast(self):
+        self.assertDetected("UPDATE DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN SET BATAS_BAWAH = JUMLAH_PERKIRAAN + 1000 "
+                            "WHERE ID_PERKIRAAN = 'PKR-0020'", "FORECAST", "Range does not contain the point forecast")
+
+    def test_a_missing_forecast_week_is_a_gap_and_a_complete_week_without_forecast(self):
+        failed, _ = self.failing("DELETE FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE ID_PERKIRAAN = 'PKR-0100'")
+        self.assertIn(("FORECAST", "Gap in the weekly forecast series"), failed)
+        self.assertIn(("FORECAST", "Complete week without a forecast"), failed)
+
+    def test_forecast_beyond_the_last_complete_week_is_not_a_missing_forecast(self):
+        failed, _ = self.failing("DELETE FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN WHERE ID_PERKIRAAN = 'PKR-0274'")
+        self.assertNotIn(("FORECAST", "Gap in the weekly forecast series"), failed)
+
+    def test_forecast_that_learned_from_too_few_weeks(self):
+        self.assertDetected("UPDATE DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN SET JUMLAH_PEKAN_PELATIHAN = 3 WHERE ID_PERKIRAAN = 'PKR-0030'",
+                            "FORECAST", "Too little history behind a forecast")
+
+    def test_forecast_pointing_at_an_unknown_model(self):
+        self.assertDetected("UPDATE DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN SET ID_MODEL = 'MDL-99' WHERE ID_PERKIRAAN = 'PKR-0030'",
+                            "REFERENCES", "Orphaned reference")
+
+    def test_new_actuals_change_the_comparison_but_never_the_stored_forecast(self):
+        """The forecast is a record of what was said: a corrected collection moves the actual, not the forecast."""
+        week = next(f["AWAL_PEKAN_SASARAN"] for f in DATA["DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN"] if f["AWAL_PEKAN_SASARAN"].year == 2024)
+        mass = self.connection.execute(
+            "SELECT c.ID_KOLEKTE FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE c JOIN DATA_OPERASIONAL.KEJADIAN_MISA k "
+            "ON k.ID_KEJADIAN_MISA = c.ID_KEJADIAN_MISA WHERE k.TANGGAL_MISA BETWEEN ? AND CAST(? AS DATE) + 6 "
+            "AND c.JUMLAH_HASIL_PENGHITUNGAN IS NOT NULL LIMIT 1", [week, week]).fetchone()[0]
+        query = ("SELECT KOLEKTE_AKTUAL, JUMLAH_PERKIRAAN, TANGGAL_PERKIRAAN FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN "
+                 "WHERE AWAL_PEKAN = ?")
+        before = self.connection.execute(query, [week]).fetchone()
+        self.connection.execute("BEGIN TRANSACTION")
+        try:
+            self.connection.execute(f"UPDATE DATA_OPERASIONAL.PENERIMAAN_KOLEKTE SET JUMLAH_HASIL_PENGHITUNGAN = "
+                                    f"JUMLAH_HASIL_PENGHITUNGAN + 1000000 WHERE ID_KOLEKTE = '{mass}'")
+            after = self.connection.execute(query, [week]).fetchone()
+        finally:
+            self.connection.execute("ROLLBACK")
+        self.assertEqual(after[0] - before[0], 1_000_000)
+        self.assertEqual(after[1:], before[1:])
+
+
+    # --- public service guides ---------------------------------------------------------------------------------------
+    def test_a_service_without_steps(self):
+        self.assertDetected("DELETE FROM MASTER_DATA.LANGKAH_LAYANAN WHERE ID_LAYANAN = 'LYN-05'",
+                            "SERVICES", "Service without steps or without requirements")
+
+    def test_a_gap_in_the_numbering_of_steps_or_requirements(self):
+        self.assertDetected("DELETE FROM MASTER_DATA.LANGKAH_LAYANAN WHERE ID_LANGKAH = 'LGK-0203'",
+                            "SERVICES", "Step numbers have gaps or do not start at 1")
+        self.assertDetected("DELETE FROM MASTER_DATA.PERSYARATAN_LAYANAN WHERE ID_PERSYARATAN = 'PSY-0401'",
+                            "SERVICES", "Requirement numbers have gaps or do not start at 1")
+
+    def test_a_guide_file_that_does_not_belong_to_its_service(self):
+        self.assertDetected("UPDATE MASTER_DATA.LAYANAN_PAROKI SET NAMA_BERKAS_PANDUAN = 'LYN-99_salah.pdf' WHERE ID_LAYANAN = 'LYN-01'",
+                            "SERVICES", "Guide file name does not start with the service id or is not a PDF")
+        self.assertDetected("UPDATE MASTER_DATA.LAYANAN_PAROKI SET NAMA_BERKAS_PANDUAN = 'app/' || NAMA_BERKAS_PANDUAN WHERE ID_LAYANAN = 'LYN-01'",
+                            "SERVICES", "Guide file name does not start with the service id or is not a PDF")
+
+    def test_a_guide_with_an_email_address_is_rejected(self):
+        self.assertDetected("UPDATE MASTER_DATA.LANGKAH_LAYANAN SET URAIAN = URAIAN || ' Tulis ke seseorang@contoh.id' WHERE ID_LANGKAH = 'LGK-0101'",
+                            "SERVICES", "Guide text containing an email address")
+
+    def test_two_services_cannot_share_one_guide_file(self):
+        self.assertDetected("UPDATE MASTER_DATA.LAYANAN_PAROKI SET NAMA_BERKAS_PANDUAN = "
+                            "(SELECT NAMA_BERKAS_PANDUAN FROM MASTER_DATA.LAYANAN_PAROKI WHERE ID_LAYANAN = 'LYN-01') WHERE ID_LAYANAN = 'LYN-02'",
+                            "KEYS", "Duplicate unique key UQ_LAYANAN_PAROKI_BERKAS")
+
+    def test_hiding_a_service_by_classification_is_a_warning_not_a_failure(self):
+        failed, rows = self.failing("UPDATE MASTER_DATA.LAYANAN_PAROKI SET ID_KLASIFIKASI_DATA = 'KLS-02' WHERE ID_LAYANAN = 'LYN-06'")
+        self.assertEqual(failed, set())
+        warned = [r for r in rows if r["CHECK_NAME"] == "Service guide with a classification that may not be public"]
+        self.assertEqual([(r["RESULT"], r["FOUND_COUNT"]) for r in warned], [("WARN", 1)])
+
+    def test_an_unknown_actor_or_category_is_rejected_by_the_vocabulary_check(self):
+        self.assertDetected("UPDATE MASTER_DATA.LANGKAH_LAYANAN SET PELAKU = 'Siapa saja' WHERE ID_LANGKAH = 'LGK-0101'",
+                            "VOCABULARY", "Value not in list PELAKU_LANGKAH")
+        self.assertDetected("UPDATE MASTER_DATA.LAYANAN_PAROKI SET KATEGORI_LAYANAN = 'Lain-lain' WHERE ID_LAYANAN = 'LYN-01'",
+                            "VOCABULARY", "Value not in list KATEGORI_LAYANAN")
+
 
 @unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
 class ViewTests(unittest.TestCase):
@@ -737,6 +828,217 @@ class UpcomingViewTests(unittest.TestCase):
         for forbidden in ("ID_UMAT", "ID_KELUARGA", "NAMA_FIKTIF", "TAHUN_LAHIR"):
             self.assertNotIn(forbidden, self.rows[0])
         self.assertEqual({r["SUMBER_DATA"] for r in self.rows}, {"Data simulasi (fiktif)"})
+
+
+@unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
+class ForecastViewTests(unittest.TestCase):
+    """KOLEKTE_AKTUAL_VS_PERKIRAAN, BIAS_PERKIRAAN_PER_PERISTIWA and AKURASI_PERKIRAAN_TAHUNAN."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.connection = shim.build_database(keep_constraints=False)
+        cls.weeks = cls.load("SELECT * FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN ORDER BY AWAL_PEKAN")
+        cls.events = {r["ID_PERISTIWA"]: r for r in cls.load("SELECT * FROM ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA")}
+        cls.accuracy = cls.load("SELECT * FROM ANALISIS.AKURASI_PERKIRAAN_TAHUNAN")
+
+    @classmethod
+    def load(cls, sql):
+        cursor = cls.connection.execute(sql)
+        names = [d[0] for d in cursor.description]
+        return [dict(zip(names, row)) for row in cursor.fetchall()]
+
+    def complete(self):
+        return [r for r in self.weeks if r["STATUS_PEKAN"] == "Lengkap"]
+
+    def test_one_row_per_stored_forecast_and_the_columns_are_copied_unchanged(self):
+        stored = {f["AWAL_PEKAN_SASARAN"]: f for f in DATA["DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN"]}
+        self.assertEqual(len(self.weeks), len(stored))
+        for r in self.weeks:
+            f = stored[r["AWAL_PEKAN"]]
+            self.assertEqual((r["JUMLAH_PERKIRAAN"], r["BATAS_BAWAH"], r["BATAS_ATAS"]),
+                             (f["JUMLAH_PERKIRAAN"], f["BATAS_BAWAH"], f["BATAS_ATAS"]))
+            self.assertEqual(r["TANGGAL_PERKIRAAN"], f["TANGGAL_PERKIRAAN"])
+            self.assertEqual(r["SUMBER_DATA"], "Data simulasi (fiktif)")
+
+    def test_only_complete_weeks_are_compared_and_the_rest_is_labelled(self):
+        from datetime import timedelta
+        for r in self.weeks:
+            ended = r["AWAL_PEKAN"] + timedelta(days=6) <= config.AS_OF
+            started = r["AWAL_PEKAN"] <= config.AS_OF
+            expected = "Lengkap" if ended else ("Sedang berjalan" if started else "Mendatang")
+            self.assertEqual(r["STATUS_PEKAN"], expected, r["AWAL_PEKAN"])
+            self.assertEqual(r["KOLEKTE_AKTUAL"] is None, expected != "Lengkap", r["AWAL_PEKAN"])
+            self.assertEqual(r["SELISIH_PERSEN"] is None, expected != "Lengkap")
+        self.assertEqual(sorted(r["STATUS_PEKAN"] for r in self.weeks if r["STATUS_PEKAN"] != "Lengkap"),
+                         ["Mendatang"] * 4 + ["Sedang berjalan"])
+
+    def test_actuals_equal_the_offertory_computed_in_python(self):
+        from mockdata import forecast
+        _, weekly, _, _, _ = forecast.inputs(DATA)
+        for r in self.complete():
+            self.assertEqual(r["KOLEKTE_AKTUAL"], weekly[r["AWAL_PEKAN"]], r["AWAL_PEKAN"])
+
+    def test_gap_and_position_follow_the_range(self):
+        for r in self.complete():
+            self.assertEqual(r["SELISIH"], r["KOLEKTE_AKTUAL"] - r["JUMLAH_PERKIRAAN"])
+            self.assertAlmostEqual(r["SELISIH_PERSEN"], 100.0 * float(r["SELISIH"]) / float(r["JUMLAH_PERKIRAAN"]), delta=0.051)
+            if r["KOLEKTE_AKTUAL"] < r["BATAS_BAWAH"]:
+                self.assertEqual(r["POSISI_TERHADAP_RENTANG"], "Di bawah rentang")
+            elif r["KOLEKTE_AKTUAL"] > r["BATAS_ATAS"]:
+                self.assertEqual(r["POSISI_TERHADAP_RENTANG"], "Di atas rentang")
+            else:
+                self.assertEqual(r["POSISI_TERHADAP_RENTANG"], "Dalam rentang")
+                self.assertEqual(r["PENJELASAN_SELISIH"], "Dalam rentang perkiraan")
+
+    def test_every_gap_outside_the_range_is_explained_by_an_event_or_honestly_left_unexplained(self):
+        outside = [r for r in self.complete() if r["POSISI_TERHADAP_RENTANG"] != "Dalam rentang"]
+        explained = [r for r in outside if r["ID_PERISTIWA"]]
+        unexplained = [r for r in outside if not r["ID_PERISTIWA"]]
+        self.assertGreaterEqual(len(explained), 18)
+        self.assertGreater(len(unexplained), 0, "an 80% range misses one ordinary week in five, and the view must not hide that")
+        for r in explained:
+            self.assertEqual(r["PENJELASAN_SELISIH"], "Di luar rentang, dijelaskan peristiwa luar biasa")
+            self.assertEqual(r["JENIS_PEKAN"], "Peristiwa luar biasa")
+            self.assertLess(r["SELISIH"], 0, "events lower the offertory")
+            self.assertTrue(r["NAMA_PERISTIWA"] and r["TINGKAT_GANGGUAN"])
+        for r in unexplained:
+            self.assertEqual(r["PENJELASAN_SELISIH"], "Di luar rentang, tanpa peristiwa tercatat")
+            self.assertIsNone(r["NAMA_PERISTIWA"])
+
+    def test_the_kind_of_week_comes_from_the_event_log_and_the_calendar(self):
+        for r in self.weeks:
+            if r["ID_PERISTIWA"]:
+                self.assertEqual(r["JENIS_PEKAN"], "Peristiwa luar biasa")
+            elif r["CATATAN_KALENDER"]:
+                self.assertEqual(r["JENIS_PEKAN"], "Hari raya atau kolekte khusus")
+                self.assertGreater(r["PENYESUAIAN_KALENDER"], 1)
+            else:
+                self.assertEqual(r["JENIS_PEKAN"], "Pekan biasa")
+        self.assertEqual({r["JENIS_PEKAN"] for r in self.weeks},
+                         {"Pekan biasa", "Hari raya atau kolekte khusus", "Peristiwa luar biasa"})
+
+    def test_the_power_cut_hidden_by_payday_is_a_week_the_forecast_got_right(self):
+        row = next(r for r in self.weeks if r["ID_PERISTIWA"] == "PRS-05")
+        self.assertEqual(row["POSISI_TERHADAP_RENTANG"], "Dalam rentang")
+        self.assertLess(abs(row["SELISIH_PERSEN"]), 3)
+
+    def test_event_bias_view_has_the_nine_events_the_forecast_could_cover(self):
+        self.assertEqual(sorted(self.events), [f"PRS-{n:02d}" for n in range(2, 11)])
+        for event_id, r in self.events.items():
+            weeks = [w for w in self.complete() if w["ID_PERISTIWA"] == event_id]
+            self.assertEqual(r["JUMLAH_PEKAN_TERDAMPAK"], len(weeks), event_id)
+            self.assertEqual(r["PERKIRAAN_TOTAL"], sum(w["JUMLAH_PERKIRAAN"] for w in weeks))
+            self.assertEqual(r["KOLEKTE_AKTUAL_TOTAL"], sum(w["KOLEKTE_AKTUAL"] for w in weeks))
+            self.assertEqual(r["SELISIH_TOTAL"], r["KOLEKTE_AKTUAL_TOTAL"] - r["PERKIRAAN_TOTAL"])
+            self.assertEqual(r["JUMLAH_PEKAN_DI_LUAR_RENTANG"], sum(w["POSISI_TERHADAP_RENTANG"] != "Dalam rentang" for w in weeks))
+
+    def test_the_big_events_explain_the_big_misses(self):
+        ash, haze, power = self.events["PRS-08"], self.events["PRS-06"], self.events["PRS-05"]
+        self.assertLess(ash["SELISIH_PERSEN"], -45)
+        self.assertLess(haze["SELISIH_PERSEN"], -40)
+        self.assertGreater(ash["KELIPATAN_GALAT_BIASA"], 5)
+        self.assertGreater(haze["KELIPATAN_GALAT_BIASA"], 5)
+        self.assertLess(power["KELIPATAN_GALAT_BIASA"], 1)
+        self.assertEqual(ash["JUMLAH_PEKAN_DI_LUAR_RENTANG"], ash["JUMLAH_PEKAN_TERDAMPAK"])
+        by_gap = sorted(self.events.values(), key=lambda r: r["SELISIH_PERSEN"])
+        self.assertEqual({by_gap[0]["TINGKAT_GANGGUAN"], by_gap[1]["TINGKAT_GANGGUAN"]}, {"Berat"})
+        self.assertTrue(all(r["SELISIH_PERSEN"] < 0 for r in self.events.values()))
+
+    def test_typical_error_is_measured_on_ordinary_weeks_only(self):
+        ordinary = [abs(r["SELISIH_PERSEN"]) for r in self.complete() if r["JENIS_PEKAN"] == "Pekan biasa"]
+        typical = {r["GALAT_PEKAN_BIASA_PERSEN"] for r in self.events.values()}
+        self.assertEqual(len(typical), 1)
+        self.assertAlmostEqual(typical.pop(), sum(ordinary) / len(ordinary), delta=0.1)
+
+    def test_accuracy_view_adds_up_to_the_compared_weeks(self):
+        self.assertEqual(sum(r["JUMLAH_PEKAN"] for r in self.accuracy), len(self.complete()))
+        self.assertEqual({r["JENIS_PEKAN"] for r in self.accuracy},
+                         {"Pekan biasa", "Hari raya atau kolekte khusus", "Peristiwa luar biasa"})
+        self.assertEqual({r["TAHUN"] for r in self.accuracy}, set(range(2021, 2027)))
+        for r in self.accuracy:
+            self.assertEqual(r["PERSEN_DALAM_RENTANG"], round(100.0 * r["JUMLAH_DALAM_RENTANG"] / r["JUMLAH_PEKAN"], 1))
+            self.assertEqual(r["LEBAR_RENTANG_PERSEN"], 80)
+
+    def test_accuracy_is_good_on_ordinary_weeks_and_poor_when_an_event_struck(self):
+        def pooled(kind, column):
+            rows = [r for r in self.accuracy if r["JENIS_PEKAN"] == kind]
+            return sum(r[column] * r["JUMLAH_PEKAN"] for r in rows) / sum(r["JUMLAH_PEKAN"] for r in rows)
+
+        self.assertLess(pooled("Pekan biasa", "GALAT_RATA_RATA_PERSEN"), 10)
+        self.assertGreater(pooled("Pekan biasa", "PERSEN_DALAM_RENTANG"), 72)
+        self.assertGreater(pooled("Peristiwa luar biasa", "GALAT_RATA_RATA_PERSEN"), 25)
+        self.assertLess(pooled("Peristiwa luar biasa", "PERSEN_DALAM_RENTANG"), 35)
+        self.assertLess(pooled("Peristiwa luar biasa", "SELISIH_RATA_RATA_PERSEN"), -20)
+
+    def test_the_forecast_views_never_rank_anything_and_expose_no_personal_columns(self):
+        for view in ("KOLEKTE_AKTUAL_VS_PERKIRAAN", "BIAS_PERKIRAAN_PER_PERISTIWA", "AKURASI_PERKIRAAN_TAHUNAN"):
+            columns = {r[0] for r in self.connection.execute(f"DESCRIBE ANALISIS.{view}").fetchall()}
+            self.assertIn("SUMBER_DATA", columns)
+            for name in columns:
+                self.assertNotIn("PERINGKAT", name)
+                self.assertNotIn("RANK", name)
+            self.assertTrue(columns.isdisjoint({"ID_UMAT", "ID_KELUARGA", "NAMA_FIKTIF", "TAHUN_LAHIR"}))
+
+
+@unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
+class ServiceViewTests(unittest.TestCase):
+    """LAYANAN_PUBLIK, LANGKAH_LAYANAN_PUBLIK and PERSYARATAN_LAYANAN_PUBLIK."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.connection = shim.build_database(keep_constraints=False)
+
+    def rows(self, sql):
+        cursor = self.connection.execute(sql)
+        names = [d[0] for d in cursor.description]
+        return [dict(zip(names, row)) for row in cursor.fetchall()]
+
+    def test_every_public_service_is_listed_with_its_counts_and_file(self):
+        services = {r["ID_LAYANAN"]: r for r in self.rows("SELECT * FROM ANALISIS.LAYANAN_PUBLIK")}
+        self.assertEqual(sorted(services), [r["ID_LAYANAN"] for r in DATA["MASTER_DATA.LAYANAN_PAROKI"]])
+        for source in DATA["MASTER_DATA.LAYANAN_PAROKI"]:
+            row = services[source["ID_LAYANAN"]]
+            self.assertEqual(row["NAMA_BERKAS_PANDUAN"], source["NAMA_BERKAS_PANDUAN"])
+            self.assertEqual(row["JUMLAH_LANGKAH"], sum(1 for s in DATA["MASTER_DATA.LANGKAH_LAYANAN"] if s["ID_LAYANAN"] == source["ID_LAYANAN"]))
+            requirements = [r for r in DATA["MASTER_DATA.PERSYARATAN_LAYANAN"] if r["ID_LAYANAN"] == source["ID_LAYANAN"]]
+            self.assertEqual(row["JUMLAH_PERSYARATAN"], len(requirements))
+            self.assertEqual(row["JUMLAH_PERSYARATAN_WAJIB"], sum(1 for r in requirements if r["WAJIB_DIPENUHI"]))
+            self.assertTrue(row["SEKSI_PENGELOLA"].startswith("Seksi "))
+            self.assertIn("bukan ketentuan resmi", row["CATATAN_PENGGUNAAN"])
+            self.assertEqual(row["SUMBER_DATA"], "Data simulasi (fiktif)")
+
+    def test_steps_and_requirements_come_back_complete_and_in_order(self):
+        steps = self.rows("SELECT * FROM ANALISIS.LANGKAH_LAYANAN_PUBLIK ORDER BY ID_LAYANAN, NOMOR_URUT")
+        requirements = self.rows("SELECT * FROM ANALISIS.PERSYARATAN_LAYANAN_PUBLIK ORDER BY ID_LAYANAN, NOMOR_URUT")
+        self.assertEqual(len(steps), len(DATA["MASTER_DATA.LANGKAH_LAYANAN"]))
+        self.assertEqual(len(requirements), len(DATA["MASTER_DATA.PERSYARATAN_LAYANAN"]))
+        for sid in {r["ID_LAYANAN"] for r in steps}:
+            numbers = [r["NOMOR_URUT"] for r in steps if r["ID_LAYANAN"] == sid]
+            self.assertEqual(numbers, list(range(1, len(numbers) + 1)))
+        self.assertEqual({r["STATUS_PERSYARATAN"] for r in requirements}, {"Wajib", "Jika berlaku"})
+        for r in requirements:
+            source = next(x for x in DATA["MASTER_DATA.PERSYARATAN_LAYANAN"] if x["ID_PERSYARATAN"] == f"PSY-{r['ID_LAYANAN'][4:]}{int(r['NOMOR_URUT']):02d}")
+            self.assertEqual(r["STATUS_PERSYARATAN"] == "Wajib", source["WAJIB_DIPENUHI"])
+
+    def test_a_service_that_may_not_be_public_disappears_with_all_its_steps(self):
+        self.connection.execute("BEGIN TRANSACTION")
+        try:
+            self.connection.execute("UPDATE MASTER_DATA.LAYANAN_PAROKI SET ID_KLASIFIKASI_DATA = 'KLS-03' WHERE ID_LAYANAN = 'LYN-04'")
+            listed = {r[0] for r in self.connection.execute("SELECT ID_LAYANAN FROM ANALISIS.LAYANAN_PUBLIK").fetchall()}
+            steps = {r[0] for r in self.connection.execute("SELECT DISTINCT ID_LAYANAN FROM ANALISIS.LANGKAH_LAYANAN_PUBLIK").fetchall()}
+            requirements = {r[0] for r in self.connection.execute("SELECT DISTINCT ID_LAYANAN FROM ANALISIS.PERSYARATAN_LAYANAN_PUBLIK").fetchall()}
+        finally:
+            self.connection.execute("ROLLBACK")
+        self.assertNotIn("LYN-04", listed | steps | requirements)
+        self.assertEqual(len(listed), 5)
+        self.assertEqual(steps, listed)
+        self.assertEqual(requirements, listed)
+
+    def test_the_service_views_hold_no_personal_data_columns(self):
+        for view in ("LAYANAN_PUBLIK", "LANGKAH_LAYANAN_PUBLIK", "PERSYARATAN_LAYANAN_PUBLIK"):
+            columns = {r[0] for r in self.connection.execute(f"DESCRIBE ANALISIS.{view}").fetchall()}
+            self.assertIn("SUMBER_DATA", columns)
+            self.assertTrue(columns.isdisjoint({"ID_UMAT", "ID_KELUARGA", "NAMA_FIKTIF", "TAHUN_LAHIR", "ID_RESPONDEN"}))
 
 
 @unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")

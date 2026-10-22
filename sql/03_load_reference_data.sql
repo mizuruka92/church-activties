@@ -2,7 +2,7 @@
 -- Step 3: Load reference and master data
 --
 -- GENERATED FILE. Do not edit by hand: run  python scripts/generate_mock_data.py
--- Content  : 18 tables, 421 rows in schema MASTER_DATA. All data is synthetic
+-- Content  : 22 tables, 534 rows in schema MASTER_DATA. All data is synthetic
 --            (fictional) and reproducible (seed 20260930, snapshot date 2026-09-30).
 -- Requires : step 2 (tables)
 -- Safe to re-run: yes. Every table is loaded with MERGE on its primary key, so existing
@@ -94,7 +94,7 @@ WHEN MATCHED THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT (ID_SEKSI, NAMA_SEKSI, DESKRIPSI, STATUS_AKTIF, TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU)
     VALUES (s.ID_SEKSI, s.NAMA_SEKSI, s.DESKRIPSI, s.STATUS_AKTIF, s.TANGGAL_MULAI_BERLAKU, s.TANGGAL_AKHIR_BERLAKU);
 
--- MASTER_DATA.REFERENSI_KATEGORI_INFORMASI: 9 rows
+-- MASTER_DATA.REFERENSI_KATEGORI_INFORMASI: 10 rows
 MERGE INTO MASTER_DATA.REFERENSI_KATEGORI_INFORMASI AS t
 USING (
     SELECT
@@ -112,7 +112,8 @@ USING (
             ('KIN-06', 'Survei', 'Definisi survei, pertanyaan, jawaban, dan hasil agregat.', 'KLS-02', 'SEK-06'),
             ('KIN-07', 'Rencana dan Anggaran', 'Rencana kerja tahunan, anggaran, dan realisasi pengeluaran.', 'KLS-02', 'SEK-09'),
             ('KIN-08', 'Kegiatan dan Laporan', 'Kegiatan seksi dan laporan pascakegiatan.', 'KLS-02', 'SEK-09'),
-            ('KIN-09', 'Wilayah dan Peta', 'Struktur wilayah dan lingkungan serta geometri ilustratif.', 'KLS-01', 'SEK-09')
+            ('KIN-09', 'Wilayah dan Peta', 'Struktur wilayah dan lingkungan serta geometri ilustratif.', 'KLS-01', 'SEK-09'),
+            ('KIN-10', 'Layanan dan Prosedur', 'Panduan langkah dan persyaratan layanan paroki untuk umum, misalnya baptis, krisma, dan pelayanan duka.', 'KLS-01', 'SEK-09')
     ) AS v (ID_KATEGORI_INFORMASI, NAMA_KATEGORI, DESKRIPSI, ID_KLASIFIKASI_DATA, ID_SEKSI_PENGELOLA)
 ) AS s
 ON t.ID_KATEGORI_INFORMASI = s.ID_KATEGORI_INFORMASI
@@ -124,7 +125,7 @@ WHEN MATCHED THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT (ID_KATEGORI_INFORMASI, NAMA_KATEGORI, DESKRIPSI, ID_KLASIFIKASI_DATA, ID_SEKSI_PENGELOLA)
     VALUES (s.ID_KATEGORI_INFORMASI, s.NAMA_KATEGORI, s.DESKRIPSI, s.ID_KLASIFIKASI_DATA, s.ID_SEKSI_PENGELOLA);
 
--- MASTER_DATA.REFERENSI_DAFTAR_NILAI: 82 rows
+-- MASTER_DATA.REFERENSI_DAFTAR_NILAI: 93 rows
 MERGE INTO MASTER_DATA.REFERENSI_DAFTAR_NILAI AS t
 USING (
     SELECT
@@ -207,6 +208,17 @@ USING (
             ('KATEGORI_EKONOMI', 'Menengah Bawah', 2, 'Kapasitas ekonomi umum lingkungan agak di bawah rata-rata paroki.'),
             ('KATEGORI_EKONOMI', 'Menengah Atas', 3, 'Kapasitas ekonomi umum lingkungan agak di atas rata-rata paroki.'),
             ('KATEGORI_EKONOMI', 'Tinggi', 4, 'Kapasitas ekonomi umum lingkungan di atas rata-rata paroki.'),
+            ('KATEGORI_LAYANAN', 'Sakramen', 1, 'Layanan sakramen: baptis, krisma, dan perkawinan.'),
+            ('KATEGORI_LAYANAN', 'Administrasi Umat', 2, 'Layanan pencatatan umat, misalnya pendaftaran ke lingkungan.'),
+            ('KATEGORI_LAYANAN', 'Pelayanan Duka', 3, 'Pendampingan keluarga yang kehilangan anggota keluarga.'),
+            ('JENIS_PERSYARATAN', 'Dokumen', 1, 'Berkas yang perlu diserahkan atau ditunjukkan.'),
+            ('JENIS_PERSYARATAN', 'Pembinaan', 2, 'Pertemuan, kursus, atau wawancara yang perlu diikuti.'),
+            ('JENIS_PERSYARATAN', 'Ketentuan Umum', 3, 'Ketentuan yang perlu dipenuhi, misalnya usia dan wali.'),
+            ('PELAKU_LANGKAH', 'Pemohon atau keluarga', 1, 'Orang yang mengajukan layanan atau keluarganya.'),
+            ('PELAKU_LANGKAH', 'Sekretariat paroki', 2, 'Petugas sekretariat dan administrasi paroki.'),
+            ('PELAKU_LANGKAH', 'Pastor paroki', 3, 'Pastor paroki atau imam yang ditugaskan.'),
+            ('PELAKU_LANGKAH', 'Seksi terkait', 4, 'Seksi paroki yang mengelola layanan itu.'),
+            ('PELAKU_LANGKAH', 'Ketua lingkungan', 5, 'Pengurus lingkungan tempat tinggal pemohon.'),
             ('KELOMPOK_PENGGUNA', 'Pastor Paroki dan Pengurus Harian', 1, 'Pimpinan paroki.'),
             ('KELOMPOK_PENGGUNA', 'Ketua Seksi', 2, 'Ketua seksi pelayanan.'),
             ('KELOMPOK_PENGGUNA', 'Ketua Wilayah dan Lingkungan', 3, 'Pengurus wilayah dan lingkungan.'),
@@ -831,3 +843,210 @@ WHEN MATCHED THEN UPDATE SET
     NILAI_SKOR = s.NILAI_SKOR
 WHEN NOT MATCHED THEN INSERT (ID_OPSI, ID_PERTANYAAN, NOMOR_URUT, KATEGORI_JAWABAN, NILAI_SKOR)
     VALUES (s.ID_OPSI, s.ID_PERTANYAAN, s.NOMOR_URUT, s.KATEGORI_JAWABAN, s.NILAI_SKOR);
+
+-- MASTER_DATA.REFERENSI_MODEL_PERKIRAAN: 1 rows
+MERGE INTO MASTER_DATA.REFERENSI_MODEL_PERKIRAAN AS t
+USING (
+    SELECT
+        v.ID_MODEL AS ID_MODEL,
+        v.NAMA_MODEL AS NAMA_MODEL,
+        v.DESKRIPSI_METODE AS DESKRIPSI_METODE,
+        CAST(v.HORIZON_HARI AS NUMBER(3,0)) AS HORIZON_HARI,
+        CAST(v.MINIMAL_RIWAYAT_MINGGU AS NUMBER(3,0)) AS MINIMAL_RIWAYAT_MINGGU,
+        CAST(v.JENDELA_PELATIHAN_MINGGU AS NUMBER(3,0)) AS JENDELA_PELATIHAN_MINGGU,
+        CAST(v.LEBAR_RENTANG_PERSEN AS NUMBER(3,0)) AS LEBAR_RENTANG_PERSEN,
+        CAST(v.STATUS_AKTIF AS BOOLEAN) AS STATUS_AKTIF
+    FROM (VALUES
+            ('MDL-01', 'Garis tren dengan kalender liturgi dan hari gajian', 'Perkiraan kolekte satu pekan (Senin sampai Minggu) yang dibuat empat pekan sebelum pekan itu dimulai. Dasarnya garis tren dari 52 pekan terakhir yang tidak terganggu, kenaikan pada pekan yang berakhir pada awal bulan (setelah hari gajian), dan penyesuaian untuk hari raya dan kolekte khusus menurut kalender liturgi. Pekan yang sudah tercatat terganggu peristiwa luar biasa tidak dipakai untuk belajar. Model tidak mengetahui peristiwa yang belum terjadi, sehingga peristiwa luar biasa tampak sebagai selisih besar antara perkiraan dan kolekte sebenarnya.', 28, 26, 52, 80, TRUE)
+    ) AS v (ID_MODEL, NAMA_MODEL, DESKRIPSI_METODE, HORIZON_HARI, MINIMAL_RIWAYAT_MINGGU, JENDELA_PELATIHAN_MINGGU, LEBAR_RENTANG_PERSEN, STATUS_AKTIF)
+) AS s
+ON t.ID_MODEL = s.ID_MODEL
+WHEN MATCHED THEN UPDATE SET
+    NAMA_MODEL = s.NAMA_MODEL,
+    DESKRIPSI_METODE = s.DESKRIPSI_METODE,
+    HORIZON_HARI = s.HORIZON_HARI,
+    MINIMAL_RIWAYAT_MINGGU = s.MINIMAL_RIWAYAT_MINGGU,
+    JENDELA_PELATIHAN_MINGGU = s.JENDELA_PELATIHAN_MINGGU,
+    LEBAR_RENTANG_PERSEN = s.LEBAR_RENTANG_PERSEN,
+    STATUS_AKTIF = s.STATUS_AKTIF
+WHEN NOT MATCHED THEN INSERT (ID_MODEL, NAMA_MODEL, DESKRIPSI_METODE, HORIZON_HARI, MINIMAL_RIWAYAT_MINGGU, JENDELA_PELATIHAN_MINGGU, LEBAR_RENTANG_PERSEN, STATUS_AKTIF)
+    VALUES (s.ID_MODEL, s.NAMA_MODEL, s.DESKRIPSI_METODE, s.HORIZON_HARI, s.MINIMAL_RIWAYAT_MINGGU, s.JENDELA_PELATIHAN_MINGGU, s.LEBAR_RENTANG_PERSEN, s.STATUS_AKTIF);
+
+-- MASTER_DATA.LAYANAN_PAROKI: 6 rows
+MERGE INTO MASTER_DATA.LAYANAN_PAROKI AS t
+USING (
+    SELECT
+        v.ID_LAYANAN AS ID_LAYANAN,
+        v.NAMA_LAYANAN AS NAMA_LAYANAN,
+        v.KATEGORI_LAYANAN AS KATEGORI_LAYANAN,
+        v.RINGKASAN AS RINGKASAN,
+        v.PERKIRAAN_WAKTU_PROSES AS PERKIRAAN_WAKTU_PROSES,
+        v.CATATAN_PENTING AS CATATAN_PENTING,
+        v.ID_SEKSI_PENGELOLA AS ID_SEKSI_PENGELOLA,
+        v.ID_KLASIFIKASI_DATA AS ID_KLASIFIKASI_DATA,
+        v.NAMA_BERKAS_PANDUAN AS NAMA_BERKAS_PANDUAN,
+        CAST(v.TANGGAL_REVISI AS DATE) AS TANGGAL_REVISI
+    FROM (VALUES
+            ('LYN-01', 'Baptis Dewasa', 'Sakramen', 'Untuk orang berusia 17 tahun ke atas yang ingin menjadi Katolik melalui Sakramen Baptis, setelah mengikuti masa pembinaan calon baptis.', 'Sekitar 9 sampai 12 bulan, dari pendaftaran sampai penerimaan Sakramen Baptis.', 'Pendaftaran dapat dilakukan sepanjang tahun dan pembinaan dimulai setiap awal semester. Baptis dewasa biasanya dirayakan pada Malam Paskah. Tidak ada tarif wajib, persembahan bersifat sukarela.', 'SEK-02', 'KLS-01', 'LYN-01_Baptis_Dewasa.pdf', '2026-02-10'),
+            ('LYN-02', 'Baptis Batuta (Bayi dan Anak di Bawah 7 Tahun)', 'Sakramen', 'Untuk orang tua yang ingin membaptis bayi atau anak di bawah tujuh tahun dalam iman Katolik.', 'Sekitar 3 sampai 6 minggu sejak pendaftaran.', 'Baptis bayi dan anak dirayakan bersama pada hari Minggu yang ditetapkan paroki. Daftarkan anak paling lambat satu bulan sebelum tanggal yang diinginkan. Tidak ada tarif wajib, persembahan bersifat sukarela.', 'SEK-03', 'KLS-01', 'LYN-02_Baptis_Batuta_Bayi_dan_Anak_di_Bawah_7_Tahun.pdf', '2026-03-02'),
+            ('LYN-03', 'Krisma', 'Sakramen', 'Untuk umat Katolik yang sudah dibaptis dan menerima Komuni Pertama dan ingin dikuatkan imannya melalui Sakramen Krisma.', 'Sekitar 4 sampai 6 bulan pembinaan, mengikuti jadwal kunjungan Uskup atau imam yang diberi wewenang.', 'Pendaftaran Krisma dibuka sekali setahun dan diumumkan di Misa serta papan pengumuman. Tidak ada tarif wajib, persembahan bersifat sukarela.', 'SEK-02', 'KLS-01', 'LYN-03_Krisma.pdf', '2026-01-15'),
+            ('LYN-04', 'Pernikahan', 'Sakramen', 'Untuk pasangan yang ingin menerima Sakramen Perkawinan di paroki ini.', 'Sekurang-kurangnya 3 bulan, dianjurkan 6 bulan sebelum tanggal pemberkatan.', 'Datanglah bersama sebelum menentukan tanggal dan tempat resepsi, agar jadwal gereja dan jadwal kursus persiapan dapat diatur lebih dulu. Pencatatan sipil dilakukan sesuai ketentuan pemerintah.', 'SEK-03', 'KLS-01', 'LYN-04_Pernikahan.pdf', '2026-04-20'),
+            ('LYN-05', 'Pendaftaran Lingkungan', 'Administrasi Umat', 'Untuk keluarga Katolik yang baru tinggal di wilayah paroki atau belum tercatat pada sebuah lingkungan.', 'Sekitar 3 sampai 5 hari kerja setelah berkas lengkap.', 'Tidak ada biaya pendaftaran. Data keluarga hanya dilihat petugas yang berwenang dan tidak ditampilkan di dasbor umum.', 'SEK-09', 'KLS-01', 'LYN-05_Pendaftaran_Lingkungan.pdf', '2026-05-12'),
+            ('LYN-06', 'Pelayanan Kematian (Tutup Usia)', 'Pelayanan Duka', 'Untuk keluarga yang kehilangan anggota keluarga Katolik. Memuat hal yang perlu dilakukan sejak masa sakit parah sampai peringatan sesudah pemakaman.', 'Dimulai segera. Perayaan pemakaman biasanya dalam 1 sampai 3 hari, sesuai kesiapan keluarga.', 'Pelayanan tidak dipungut tarif. Keluarga yang membutuhkan bantuan duka dapat menyampaikannya kepada ketua lingkungan. Hubungi pastor lebih dulu bila anggota keluarga sakit parah.', 'SEK-01', 'KLS-01', 'LYN-06_Pelayanan_Kematian_Tutup_Usia.pdf', '2026-06-08')
+    ) AS v (ID_LAYANAN, NAMA_LAYANAN, KATEGORI_LAYANAN, RINGKASAN, PERKIRAAN_WAKTU_PROSES, CATATAN_PENTING, ID_SEKSI_PENGELOLA, ID_KLASIFIKASI_DATA, NAMA_BERKAS_PANDUAN, TANGGAL_REVISI)
+) AS s
+ON t.ID_LAYANAN = s.ID_LAYANAN
+WHEN MATCHED THEN UPDATE SET
+    NAMA_LAYANAN = s.NAMA_LAYANAN,
+    KATEGORI_LAYANAN = s.KATEGORI_LAYANAN,
+    RINGKASAN = s.RINGKASAN,
+    PERKIRAAN_WAKTU_PROSES = s.PERKIRAAN_WAKTU_PROSES,
+    CATATAN_PENTING = s.CATATAN_PENTING,
+    ID_SEKSI_PENGELOLA = s.ID_SEKSI_PENGELOLA,
+    ID_KLASIFIKASI_DATA = s.ID_KLASIFIKASI_DATA,
+    NAMA_BERKAS_PANDUAN = s.NAMA_BERKAS_PANDUAN,
+    TANGGAL_REVISI = s.TANGGAL_REVISI
+WHEN NOT MATCHED THEN INSERT (ID_LAYANAN, NAMA_LAYANAN, KATEGORI_LAYANAN, RINGKASAN, PERKIRAAN_WAKTU_PROSES, CATATAN_PENTING, ID_SEKSI_PENGELOLA, ID_KLASIFIKASI_DATA, NAMA_BERKAS_PANDUAN, TANGGAL_REVISI)
+    VALUES (s.ID_LAYANAN, s.NAMA_LAYANAN, s.KATEGORI_LAYANAN, s.RINGKASAN, s.PERKIRAAN_WAKTU_PROSES, s.CATATAN_PENTING, s.ID_SEKSI_PENGELOLA, s.ID_KLASIFIKASI_DATA, s.NAMA_BERKAS_PANDUAN, s.TANGGAL_REVISI);
+
+-- MASTER_DATA.LANGKAH_LAYANAN: 46 rows
+MERGE INTO MASTER_DATA.LANGKAH_LAYANAN AS t
+USING (
+    SELECT
+        v.ID_LANGKAH AS ID_LANGKAH,
+        v.ID_LAYANAN AS ID_LAYANAN,
+        CAST(v.NOMOR_URUT AS NUMBER(2,0)) AS NOMOR_URUT,
+        v.JUDUL_LANGKAH AS JUDUL_LANGKAH,
+        v.URAIAN AS URAIAN,
+        v.PELAKU AS PELAKU
+    FROM (VALUES
+            ('LGK-0101', 'LYN-01', 1, 'Berkonsultasi di sekretariat', 'Datanglah ke Sekretariat Paroki pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00) untuk menyampaikan niat Anda dan mengambil formulir pendaftaran.', 'Pemohon atau keluarga'),
+            ('LGK-0102', 'LYN-01', 2, 'Mengisi formulir dan menyerahkan berkas', 'Lengkapi formulir dan serahkan berkas persyaratan. Sekretariat memeriksa kelengkapannya dan memberikan tanda terima.', 'Pemohon atau keluarga'),
+            ('LGK-0103', 'LYN-01', 3, 'Bertemu pastor', 'Pastor berbincang dengan calon tentang alasan dan kesiapannya, lalu menyetujui masuknya calon ke masa pembinaan.', 'Pastor paroki'),
+            ('LGK-0104', 'LYN-01', 4, 'Mengikuti pembinaan calon baptis', 'Pertemuan mingguan selama sekitar satu tahun yang dipandu Seksi Katekese. Calon didampingi seorang pendamping dari lingkungan tempat tinggalnya.', 'Seksi terkait'),
+            ('LGK-0105', 'LYN-01', 5, 'Ritus penerimaan calon baptis', 'Calon diterima secara resmi sebagai calon baptis dalam perayaan pada Misa hari Minggu, disaksikan umat dan keluarga.', 'Pastor paroki'),
+            ('LGK-0106', 'LYN-01', 6, 'Rekoleksi dan wawancara akhir', 'Menjelang perayaan, calon mengikuti rekoleksi satu hari dan wawancara terakhir dengan pastor.', 'Pastor paroki'),
+            ('LGK-0107', 'LYN-01', 7, 'Menerima Sakramen Baptis', 'Biasanya dirayakan pada Malam Paskah. Calon hadir bersama wali baptis dan keluarga sejak awal perayaan.', 'Pastor paroki'),
+            ('LGK-0108', 'LYN-01', 8, 'Pencatatan dan surat baptis', 'Nama baptisan baru dicatat di buku baptis. Surat baptis dapat diambil di Sekretariat sekitar dua minggu kemudian.', 'Sekretariat paroki'),
+            ('LGK-0109', 'LYN-01', 9, 'Pendampingan sesudah baptis', 'Selama beberapa bulan, baptisan baru didampingi agar mengenal kehidupan paroki dan bergabung dengan lingkungannya.', 'Seksi terkait'),
+            ('LGK-0201', 'LYN-02', 1, 'Mendaftar di sekretariat', 'Daftarkan anak paling lambat satu bulan sebelum tanggal yang diinginkan, pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00). Ambil formulir dan jadwal baptis bersama.', 'Pemohon atau keluarga'),
+            ('LGK-0202', 'LYN-02', 2, 'Melengkapi berkas', 'Serahkan berkas persyaratan dan surat pernyataan orang tua. Sekretariat memeriksa kelengkapannya dan memberikan tanda terima.', 'Pemohon atau keluarga'),
+            ('LGK-0203', 'LYN-02', 3, 'Mengikuti pembekalan orang tua dan wali baptis', 'Satu kali pertemuan sekitar dua jam yang dipandu Seksi Kerasulan Keluarga tentang arti baptis dan peran orang tua serta wali baptis.', 'Seksi terkait'),
+            ('LGK-0204', 'LYN-02', 4, 'Konfirmasi tanggal baptis', 'Sekretariat menetapkan tanggal pada hari Minggu yang disediakan paroki dan memberi tahu keluarga.', 'Sekretariat paroki'),
+            ('LGK-0205', 'LYN-02', 5, 'Merayakan Sakramen Baptis', 'Anak dibaptis dalam perayaan bersama. Orang tua dan wali baptis hadir sejak awal perayaan.', 'Pastor paroki'),
+            ('LGK-0206', 'LYN-02', 6, 'Pencatatan dan surat baptis', 'Nama anak dicatat di buku baptis. Surat baptis dapat diambil di Sekretariat sekitar dua minggu kemudian.', 'Sekretariat paroki'),
+            ('LGK-0207', 'LYN-02', 7, 'Menyambut anak di lingkungan', 'Ketua lingkungan menyambut anak yang baru dibaptis dan memastikan data keluarga pada lingkungan sudah benar.', 'Ketua lingkungan'),
+            ('LGK-0301', 'LYN-03', 1, 'Mendaftar pada masa pendaftaran', 'Pendaftaran dibuka sekali setahun dan diumumkan di Misa serta papan pengumuman. Daftar di Sekretariat pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00).', 'Pemohon atau keluarga'),
+            ('LGK-0302', 'LYN-03', 2, 'Menyerahkan berkas', 'Serahkan surat permohonan, fotokopi surat baptis, dan pas foto. Sekretariat memberikan tanda terima.', 'Pemohon atau keluarga'),
+            ('LGK-0303', 'LYN-03', 3, 'Mengikuti pembinaan Krisma', 'Sekitar sepuluh pertemuan yang dipandu Seksi Katekese. Kehadiran dicatat agar pendamping dapat membantu bila ada pertemuan yang terlewat.', 'Seksi terkait'),
+            ('LGK-0304', 'LYN-03', 4, 'Rekoleksi dan wawancara', 'Calon mengikuti rekoleksi satu hari dan bertemu pastor atau pendamping untuk wawancara singkat.', 'Pastor paroki'),
+            ('LGK-0305', 'LYN-03', 5, 'Menerima Sakramen Krisma', 'Dilayani oleh Uskup atau imam yang diberi wewenang, dalam Misa yang ditetapkan. Calon didampingi pendamping Krisma.', 'Pastor paroki'),
+            ('LGK-0306', 'LYN-03', 6, 'Pencatatan', 'Krisma dicatat pada buku baptis. Bila calon dibaptis di paroki lain, paroki itu diberi tahu agar catatannya diperbarui.', 'Sekretariat paroki'),
+            ('LGK-0401', 'LYN-04', 1, 'Konsultasi awal', 'Datanglah bersama ke Sekretariat pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00) untuk menyampaikan niat dan menjajaki tanggal pemberkatan.', 'Pemohon atau keluarga'),
+            ('LGK-0402', 'LYN-04', 2, 'Mendaftar dan menyerahkan berkas', 'Isi formulir pendaftaran dan serahkan berkas persyaratan. Sekretariat memeriksa kelengkapannya dan memberikan tanda terima.', 'Pemohon atau keluarga'),
+            ('LGK-0403', 'LYN-04', 3, 'Mengikuti kursus persiapan perkawinan', 'Beberapa pertemuan bersama pasangan lain yang dipandu Seksi Kerasulan Keluarga tentang hidup berkeluarga dan arti Sakramen Perkawinan.', 'Seksi terkait'),
+            ('LGK-0404', 'LYN-04', 4, 'Penyelidikan kanonik', 'Pastor atau petugas mewawancarai kedua calon secara terpisah untuk memastikan keduanya bebas dan siap menikah.', 'Pastor paroki'),
+            ('LGK-0405', 'LYN-04', 5, 'Pengumuman rencana perkawinan', 'Rencana perkawinan diumumkan di paroki selama beberapa hari Minggu agar umat dapat menyampaikan bila mengetahui adanya halangan.', 'Sekretariat paroki'),
+            ('LGK-0406', 'LYN-04', 6, 'Menyusun tata perayaan dan gladi', 'Memilih bacaan dan lagu, mengatur petugas bersama Seksi Liturgi, dan mengadakan gladi satu atau dua hari sebelum pemberkatan.', 'Seksi terkait'),
+            ('LGK-0407', 'LYN-04', 7, 'Merayakan Sakramen Perkawinan', 'Pemberkatan dilakukan di gereja dengan dua orang saksi. Pastor atau imam yang ditugaskan memimpin perayaan.', 'Pastor paroki'),
+            ('LGK-0408', 'LYN-04', 8, 'Pencatatan dan surat nikah gereja', 'Perkawinan dicatat di buku perkawinan dan paroki tempat kedua mempelai dibaptis diberi tahu. Surat nikah gereja dapat diambil sekitar dua minggu kemudian.', 'Sekretariat paroki'),
+            ('LGK-0409', 'LYN-04', 9, 'Mengurus pencatatan sipil', 'Pencatatan sipil dilakukan di kantor catatan sipil sesuai ketentuan pemerintah dan urutan yang disepakati dengan pastor.', 'Pemohon atau keluarga'),
+            ('LGK-0501', 'LYN-05', 1, 'Mencari lingkungan yang sesuai', 'Tanyakan lingkungan menurut alamat tinggal Anda di Sekretariat pada jam layanan (Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00) atau lihat daftar wilayah paroki.', 'Pemohon atau keluarga'),
+            ('LGK-0502', 'LYN-05', 2, 'Mengisi formulir dan menyerahkan berkas', 'Kepala keluarga mengisi formulir pendaftaran dan menyerahkan berkas persyaratan.', 'Pemohon atau keluarga'),
+            ('LGK-0503', 'LYN-05', 3, 'Memeriksa berkas', 'Sekretariat memeriksa kelengkapan berkas dan memberikan tanda terima.', 'Sekretariat paroki'),
+            ('LGK-0504', 'LYN-05', 4, 'Memberi tahu ketua lingkungan', 'Sekretariat menyampaikan kepada ketua lingkungan bahwa ada keluarga baru yang akan bergabung.', 'Sekretariat paroki'),
+            ('LGK-0505', 'LYN-05', 5, 'Menyambut keluarga baru', 'Ketua lingkungan menghubungi keluarga dan mengundangnya pada doa lingkungan terdekat.', 'Ketua lingkungan'),
+            ('LGK-0506', 'LYN-05', 6, 'Mencatat di data umat', 'Data keluarga dicatat dalam basis data paroki dengan akses terbatas. Pemberitahuan bahwa pendaftaran selesai disampaikan kepada keluarga.', 'Sekretariat paroki'),
+            ('LGK-0601', 'LYN-06', 1, 'Memanggil imam saat sakit parah', 'Bila anggota keluarga sakit parah atau mendekati ajal, segera hubungi pastor untuk Sakramen Pengurapan Orang Sakit dan Komuni bekal, sebaiknya selagi yang bersangkutan masih sadar.', 'Pemohon atau keluarga'),
+            ('LGK-0602', 'LYN-06', 2, 'Memberi kabar kepada ketua lingkungan dan sekretariat', 'Setelah meninggal dunia, segera kabari ketua lingkungan dan Sekretariat Paroki (jam layanan: Senin sampai Jumat pukul 08.00 sampai 15.00 dan Sabtu pukul 08.00 sampai 12.00). Di luar jam layanan, kabari ketua lingkungan.', 'Pemohon atau keluarga'),
+            ('LGK-0603', 'LYN-06', 3, 'Mengurus surat keterangan kematian', 'Mintalah surat keterangan kematian dari dokter, rumah sakit, atau kelurahan. Surat ini diperlukan untuk pemakaman dan pencatatan.', 'Pemohon atau keluarga'),
+            ('LGK-0604', 'LYN-06', 4, 'Doa bersama di rumah duka', 'Ketua lingkungan mengoordinasi ibadat atau doa arwah bersama umat setempat, biasanya pada malam hari sampai hari pemakaman.', 'Ketua lingkungan'),
+            ('LGK-0605', 'LYN-06', 5, 'Menetapkan waktu Misa atau ibadat pemakaman', 'Sekretariat dan pastor menetapkan waktu bersama keluarga agar tidak bertabrakan dengan jadwal Misa lain.', 'Sekretariat paroki'),
+            ('LGK-0606', 'LYN-06', 6, 'Menyiapkan petugas liturgi', 'Seksi Liturgi menyiapkan lektor, pemazmur, dan pemimpin lagu, serta tata ibadat sesuai permintaan keluarga.', 'Seksi terkait'),
+            ('LGK-0607', 'LYN-06', 7, 'Merayakan pemakaman', 'Misa requiem atau ibadat sabda, ritus pelepasan jenazah, dan pemakaman.', 'Pastor paroki'),
+            ('LGK-0608', 'LYN-06', 8, 'Pencatatan di buku kematian', 'Kematian dicatat di buku kematian. Status keanggotaan umat diperbarui oleh petugas yang berwenang tanpa menampilkan data pribadi di dasbor umum.', 'Sekretariat paroki'),
+            ('LGK-0609', 'LYN-06', 9, 'Misa peringatan', 'Keluarga dapat mengajukan Misa peringatan melalui Sekretariat, misalnya pada hari ketiga, ketujuh, keempat puluh, keseratus, dan keseribu menurut kebiasaan setempat.', 'Pemohon atau keluarga')
+    ) AS v (ID_LANGKAH, ID_LAYANAN, NOMOR_URUT, JUDUL_LANGKAH, URAIAN, PELAKU)
+) AS s
+ON t.ID_LANGKAH = s.ID_LANGKAH
+WHEN MATCHED THEN UPDATE SET
+    ID_LAYANAN = s.ID_LAYANAN,
+    NOMOR_URUT = s.NOMOR_URUT,
+    JUDUL_LANGKAH = s.JUDUL_LANGKAH,
+    URAIAN = s.URAIAN,
+    PELAKU = s.PELAKU
+WHEN NOT MATCHED THEN INSERT (ID_LANGKAH, ID_LAYANAN, NOMOR_URUT, JUDUL_LANGKAH, URAIAN, PELAKU)
+    VALUES (s.ID_LANGKAH, s.ID_LAYANAN, s.NOMOR_URUT, s.JUDUL_LANGKAH, s.URAIAN, s.PELAKU);
+
+-- MASTER_DATA.PERSYARATAN_LAYANAN: 48 rows
+MERGE INTO MASTER_DATA.PERSYARATAN_LAYANAN AS t
+USING (
+    SELECT
+        v.ID_PERSYARATAN AS ID_PERSYARATAN,
+        v.ID_LAYANAN AS ID_LAYANAN,
+        CAST(v.NOMOR_URUT AS NUMBER(2,0)) AS NOMOR_URUT,
+        v.NAMA_PERSYARATAN AS NAMA_PERSYARATAN,
+        v.JENIS_PERSYARATAN AS JENIS_PERSYARATAN,
+        CAST(v.WAJIB_DIPENUHI AS BOOLEAN) AS WAJIB_DIPENUHI,
+        v.KETERANGAN AS KETERANGAN
+    FROM (VALUES
+            ('PSY-0101', 'LYN-01', 1, 'Berusia 17 tahun ke atas', 'Ketentuan Umum', TRUE, 'Calon yang belum berusia 17 tahun mengikuti pembinaan calon baptis remaja yang dilayani Seksi Katekese.'),
+            ('PSY-0102', 'LYN-01', 2, 'Permohonan atas kemauan sendiri', 'Ketentuan Umum', TRUE, 'Calon menulis surat permohonan baptis dengan tulisan tangan, tanpa paksaan dari pihak mana pun.'),
+            ('PSY-0103', 'LYN-01', 3, 'Fotokopi kartu identitas', 'Dokumen', TRUE, 'Satu lembar, dipakai hanya untuk pencatatan di buku baptis.'),
+            ('PSY-0104', 'LYN-01', 4, 'Fotokopi akta kelahiran atau dokumen pengganti', 'Dokumen', TRUE, 'Memuat nama lengkap dan tanggal lahir yang akan dicatat di buku baptis.'),
+            ('PSY-0105', 'LYN-01', 5, 'Pas foto berwarna ukuran 3x4', 'Dokumen', TRUE, 'Dua lembar.'),
+            ('PSY-0106', 'LYN-01', 6, 'Keterangan status perkawinan', 'Dokumen', FALSE, 'Hanya bagi calon yang sudah menikah. Status perkawinan dibicarakan dengan pastor sebelum pembinaan dimulai.'),
+            ('PSY-0107', 'LYN-01', 7, 'Wali baptis', 'Ketentuan Umum', TRUE, 'Satu umat Katolik yang sudah menerima Sakramen Baptis, Ekaristi, dan Krisma, berusia sekurang-kurangnya 16 tahun. Bila bukan umat paroki ini, wali membawa keterangan dari paroki asalnya.'),
+            ('PSY-0108', 'LYN-01', 8, 'Mengikuti pembinaan calon baptis', 'Pembinaan', TRUE, 'Pertemuan mingguan selama sekitar satu tahun yang dipandu Seksi Katekese.'),
+            ('PSY-0109', 'LYN-01', 9, 'Wawancara dengan pastor dan rekoleksi persiapan', 'Pembinaan', TRUE, 'Dilakukan menjelang perayaan untuk memastikan calon siap dan mantap.'),
+            ('PSY-0201', 'LYN-02', 1, 'Orang tua bersedia mendidik anak dalam iman Katolik', 'Ketentuan Umum', TRUE, 'Salah satu atau kedua orang tua menandatangani surat pernyataan kesediaan di sekretariat.'),
+            ('PSY-0202', 'LYN-02', 2, 'Fotokopi akta kelahiran anak', 'Dokumen', TRUE, 'Satu lembar.'),
+            ('PSY-0203', 'LYN-02', 3, 'Fotokopi surat nikah orang tua', 'Dokumen', TRUE, 'Surat nikah gereja bila ada. Bila tidak ada, sekretariat menjelaskan dokumen pengganti yang dapat diterima.'),
+            ('PSY-0204', 'LYN-02', 4, 'Fotokopi kartu keluarga', 'Dokumen', TRUE, 'Untuk mencatat lingkungan tempat tinggal dan mengaitkan anak dengan keluarganya.'),
+            ('PSY-0205', 'LYN-02', 5, 'Wali baptis', 'Ketentuan Umum', TRUE, 'Satu umat Katolik yang sudah menerima Sakramen Baptis, Ekaristi, dan Krisma, berusia sekurang-kurangnya 16 tahun, dan bukan ayah atau ibu anak.'),
+            ('PSY-0206', 'LYN-02', 6, 'Keterangan wali baptis dari paroki asal', 'Dokumen', FALSE, 'Hanya bila wali baptis bukan umat paroki ini.'),
+            ('PSY-0207', 'LYN-02', 7, 'Pembekalan orang tua dan wali baptis', 'Pembinaan', TRUE, 'Satu kali pertemuan sekitar dua jam yang dipandu Seksi Kerasulan Keluarga.'),
+            ('PSY-0208', 'LYN-02', 8, 'Nama baptis anak', 'Ketentuan Umum', FALSE, 'Orang tua dapat memilih nama baptis. Bila belum ada pilihan, nama pelindung dipilih bersama pastor.'),
+            ('PSY-0301', 'LYN-03', 1, 'Sudah dibaptis Katolik dan menerima Komuni Pertama', 'Ketentuan Umum', TRUE, 'Dibuktikan dengan surat baptis. Komuni Pertama dicatat oleh paroki asal.'),
+            ('PSY-0302', 'LYN-03', 2, 'Berusia sekurang-kurangnya 14 tahun', 'Ketentuan Umum', TRUE, 'Atau duduk di kelas 8. Calon dewasa mendaftar pada kelompok pembinaan dewasa.'),
+            ('PSY-0303', 'LYN-03', 3, 'Fotokopi surat baptis', 'Dokumen', TRUE, 'Dari paroki tempat dibaptis. Bila dibaptis di paroki lain, sekretariat dapat memintakan keterangan baptis.'),
+            ('PSY-0304', 'LYN-03', 4, 'Surat permohonan dan pas foto berwarna ukuran 3x4', 'Dokumen', TRUE, 'Surat ditulis tangan oleh calon, pas foto dua lembar.'),
+            ('PSY-0305', 'LYN-03', 5, 'Pendamping Krisma', 'Ketentuan Umum', TRUE, 'Satu umat Katolik yang sudah menerima Krisma dan menjalani hidup beriman dengan baik, yang menemani calon pada perayaan.'),
+            ('PSY-0306', 'LYN-03', 6, 'Mengikuti pembinaan Krisma', 'Pembinaan', TRUE, 'Sekitar sepuluh pertemuan dengan kehadiran sekurang-kurangnya 80 persen.'),
+            ('PSY-0307', 'LYN-03', 7, 'Mengikuti rekoleksi persiapan', 'Pembinaan', TRUE, 'Satu hari bersama, sebelum perayaan.'),
+            ('PSY-0308', 'LYN-03', 8, 'Nama Krisma', 'Ketentuan Umum', FALSE, 'Calon boleh memilih nama pelindung baru, boleh juga tetap memakai nama baptisnya.'),
+            ('PSY-0401', 'LYN-04', 1, 'Surat baptis terbaru kedua calon', 'Dokumen', TRUE, 'Diterbitkan paling lama enam bulan sebelum pendaftaran, dengan catatan Krisma bila sudah menerimanya.'),
+            ('PSY-0402', 'LYN-04', 2, 'Fotokopi kartu identitas dan kartu keluarga', 'Dokumen', TRUE, 'Masing-masing satu lembar untuk setiap calon.'),
+            ('PSY-0403', 'LYN-04', 3, 'Fotokopi akta kelahiran', 'Dokumen', TRUE, 'Masing-masing satu lembar untuk setiap calon.'),
+            ('PSY-0404', 'LYN-04', 4, 'Surat keterangan belum menikah', 'Dokumen', TRUE, 'Dari kelurahan atau surat pengantar lain sesuai ketentuan setempat.'),
+            ('PSY-0405', 'LYN-04', 5, 'Pas foto berdampingan ukuran 4x6', 'Dokumen', TRUE, 'Dua lembar.'),
+            ('PSY-0406', 'LYN-04', 6, 'Kursus persiapan perkawinan', 'Pembinaan', TRUE, 'Beberapa pertemuan bersama pasangan lain yang dipandu Seksi Kerasulan Keluarga.'),
+            ('PSY-0407', 'LYN-04', 7, 'Penyelidikan kanonik', 'Pembinaan', TRUE, 'Wawancara terpisah dengan pastor atau petugas untuk memastikan kedua calon bebas dan siap menikah.'),
+            ('PSY-0408', 'LYN-04', 8, 'Dua orang saksi', 'Ketentuan Umum', TRUE, 'Berusia dewasa dan membawa kartu identitas pada hari pemberkatan.'),
+            ('PSY-0409', 'LYN-04', 9, 'Izin atau dispensasi dari Keuskupan', 'Dokumen', FALSE, 'Hanya bila salah satu calon bukan Katolik atau ada halangan lain. Sekretariat membantu mengurusnya.'),
+            ('PSY-0410', 'LYN-04', 10, 'Pencatatan sipil', 'Ketentuan Umum', TRUE, 'Dilakukan di kantor catatan sipil sesuai ketentuan pemerintah.'),
+            ('PSY-0501', 'LYN-05', 1, 'Formulir pendaftaran keluarga', 'Dokumen', TRUE, 'Diisi kepala keluarga: nama anggota keluarga, hubungan keluarga, dan alamat tinggal sekarang.'),
+            ('PSY-0502', 'LYN-05', 2, 'Fotokopi kartu keluarga', 'Dokumen', TRUE, 'Untuk memastikan alamat tinggal berada di wilayah paroki.'),
+            ('PSY-0503', 'LYN-05', 3, 'Fotokopi surat baptis anggota keluarga yang Katolik', 'Dokumen', TRUE, 'Satu lembar untuk setiap anggota. Bila belum ada, cukup keterangan tempat dan tahun baptis.'),
+            ('PSY-0504', 'LYN-05', 4, 'Surat pindah dari paroki asal', 'Dokumen', FALSE, 'Hanya bila sebelumnya tercatat di paroki lain.'),
+            ('PSY-0505', 'LYN-05', 5, 'Persetujuan pengelolaan data keluarga', 'Ketentuan Umum', TRUE, 'Kepala keluarga menyetujui bahwa data keluarga dicatat dengan klasifikasi terbatas dan hanya dilihat petugas yang berwenang.'),
+            ('PSY-0506', 'LYN-05', 6, 'Tempat tinggal berada di wilayah paroki', 'Ketentuan Umum', TRUE, 'Lingkungan ditentukan menurut tempat tinggal. Sekretariat membantu mencari lingkungan yang sesuai.'),
+            ('PSY-0601', 'LYN-06', 1, 'Surat keterangan kematian', 'Dokumen', TRUE, 'Dari dokter, rumah sakit, atau kelurahan.'),
+            ('PSY-0602', 'LYN-06', 2, 'Fotokopi surat baptis almarhum atau almarhumah', 'Dokumen', FALSE, 'Untuk pencatatan di buku kematian. Bila tidak ada, cukup sebutkan nama baptis kepada sekretariat.'),
+            ('PSY-0603', 'LYN-06', 3, 'Fotokopi kartu identitas almarhum atau almarhumah', 'Dokumen', FALSE, 'Untuk melengkapi pencatatan.'),
+            ('PSY-0604', 'LYN-06', 4, 'Pemberitahuan kepada ketua lingkungan dan sekretariat', 'Ketentuan Umum', TRUE, 'Agar doa bersama dan jadwal pemakaman dapat diatur secepatnya.'),
+            ('PSY-0605', 'LYN-06', 5, 'Penghubung dari pihak keluarga', 'Ketentuan Umum', FALSE, 'Satu anggota keluarga menjadi penghubung dengan paroki dan lingkungan agar informasi tidak simpang siur.'),
+            ('PSY-0606', 'LYN-06', 6, 'Pilihan tempat dan waktu pemakaman', 'Ketentuan Umum', TRUE, 'Dibicarakan dengan sekretariat dan pastor agar tidak bertabrakan dengan jadwal Misa.'),
+            ('PSY-0607', 'LYN-06', 7, 'Permintaan bantuan duka', 'Ketentuan Umum', FALSE, 'Keluarga yang membutuhkan dapat menyampaikannya kepada ketua lingkungan untuk diteruskan ke Seksi Pengembangan Sosial Ekonomi.')
+    ) AS v (ID_PERSYARATAN, ID_LAYANAN, NOMOR_URUT, NAMA_PERSYARATAN, JENIS_PERSYARATAN, WAJIB_DIPENUHI, KETERANGAN)
+) AS s
+ON t.ID_PERSYARATAN = s.ID_PERSYARATAN
+WHEN MATCHED THEN UPDATE SET
+    ID_LAYANAN = s.ID_LAYANAN,
+    NOMOR_URUT = s.NOMOR_URUT,
+    NAMA_PERSYARATAN = s.NAMA_PERSYARATAN,
+    JENIS_PERSYARATAN = s.JENIS_PERSYARATAN,
+    WAJIB_DIPENUHI = s.WAJIB_DIPENUHI,
+    KETERANGAN = s.KETERANGAN
+WHEN NOT MATCHED THEN INSERT (ID_PERSYARATAN, ID_LAYANAN, NOMOR_URUT, NAMA_PERSYARATAN, JENIS_PERSYARATAN, WAJIB_DIPENUHI, KETERANGAN)
+    VALUES (s.ID_PERSYARATAN, s.ID_LAYANAN, s.NOMOR_URUT, s.NAMA_PERSYARATAN, s.JENIS_PERSYARATAN, s.WAJIB_DIPENUHI, s.KETERANGAN);

@@ -311,6 +311,89 @@ def _business_arms(views):
         f"SELECT COUNT(*) FROM {k} WHERE STATUS_PELAKSANAAN = 'Dibatalkan' AND KETERANGAN IS NOT NULL", "INFO",
         "Cancellations, some caused by events.")
 
+    # --- shadow forecast ---------------------------------------------------------------------------------
+    fc, fm, fv = f"{O}.PERKIRAAN_KOLEKTE_MINGGUAN", f"{M}.REFERENSI_MODEL_PERKIRAAN", f"{A}.KOLEKTE_AKTUAL_VS_PERKIRAAN"
+    add("FORECAST", "Target week does not start on a Monday", fc,
+        f"SELECT COUNT(*) FROM {fc} WHERE MOD(DATEDIFF('day', DATE '1900-01-01', AWAL_PEKAN_SASARAN), 7) <> 0",
+        "ZERO_FAIL", "Weeks run from Monday to Sunday, like the weekly offertory view (1900-01-01 was a Monday).")
+    add("FORECAST", "Forecast not issued exactly one horizon before its week", fc,
+        f"SELECT COUNT(*) FROM {fc} f JOIN {fm} m ON m.ID_MODEL = f.ID_MODEL "
+        f"WHERE DATEDIFF('day', f.TANGGAL_PERKIRAAN, f.AWAL_PEKAN_SASARAN) <> m.HORIZON_HARI",
+        "ZERO_FAIL", "Every forecast is made the number of days ahead that the model declares.")
+    add("FORECAST", "Forecast issued after the as-of date", fc,
+        f"SELECT COUNT(*) FROM {fc} WHERE TANGGAL_PERKIRAAN > {AS_OF}", "ZERO_FAIL",
+        "A forecast cannot be dated in the future of the snapshot.")
+    add("FORECAST", "Range does not contain the point forecast", fc,
+        f"SELECT COUNT(*) FROM {fc} WHERE BATAS_BAWAH > JUMLAH_PERKIRAAN OR JUMLAH_PERKIRAAN > BATAS_ATAS OR PENYESUAIAN_KALENDER < 0.5",
+        "ZERO_FAIL", "Lower bound <= forecast <= upper bound, and the calendar multiplier must be plausible.")
+    add("FORECAST", "Too little history behind a forecast", fc,
+        f"SELECT COUNT(*) FROM {fc} f JOIN {fm} m ON m.ID_MODEL = f.ID_MODEL "
+        f"WHERE f.JUMLAH_PEKAN_PELATIHAN < 10 OR f.JUMLAH_PEKAN_PELATIHAN > m.JENDELA_PELATIHAN_MINGGU",
+        "ZERO_FAIL", "The model learns from at least 10 undisturbed weeks and at most its training window.")
+    add("FORECAST", "Gap in the weekly forecast series", fc,
+        f"SELECT COUNT(*) FROM (SELECT ID_MODEL, COUNT(*) AS N, MIN(AWAL_PEKAN_SASARAN) AS A, MAX(AWAL_PEKAN_SASARAN) AS B "
+        f"FROM {fc} GROUP BY ID_MODEL) g WHERE DATEDIFF('day', g.A, g.B) / 7 + 1 <> g.N",
+        "ZERO_FAIL", "A forecast exists for every week between the first and the last one.")
+    add("FORECAST", "Complete week without a forecast", f"{A}.KOLEKTE_MINGGUAN_DAN_PERISTIWA",
+        f"SELECT COUNT(*) FROM {A}.KOLEKTE_MINGGUAN_DAN_PERISTIWA w CROSS JOIN {M}.INFO_DATASET i "
+        f"WHERE DATEADD('day', 6, w.AWAL_PEKAN) <= i.TANGGAL_SNAPSHOT "
+        f"AND w.AWAL_PEKAN >= (SELECT MIN(AWAL_PEKAN_SASARAN) FROM {fc}) "
+        f"AND NOT EXISTS (SELECT 1 FROM {fc} f WHERE f.AWAL_PEKAN_SASARAN = w.AWAL_PEKAN)",
+        "ZERO_FAIL", "After the first forecast every complete week with a collection must have been forecast.")
+    add("FORECAST", "Forecast view differs from the forecast table", fv,
+        f"SELECT ABS((SELECT COUNT(*) FROM {fv}) - (SELECT COUNT(*) FROM {fc}))", "ZERO_FAIL",
+        "The comparison view shows exactly one row per stored forecast.")
+    add("FORECAST", "Actual offertory in the view differs from the Mass data", fv,
+        f"SELECT COUNT(*) FROM {fv} v WHERE v.STATUS_PEKAN = 'Lengkap' AND v.KOLEKTE_AKTUAL <> "
+        f"(SELECT COALESCE(SUM(COALESCE(c.JUMLAH_HASIL_PENGHITUNGAN, c.JUMLAH_PENERIMAAN)), 0) FROM {c} c "
+        f"JOIN {k} k ON k.ID_KEJADIAN_MISA = c.ID_KEJADIAN_MISA WHERE k.STATUS_PELAKSANAAN = 'Terlaksana' "
+        f"AND k.TANGGAL_MISA BETWEEN v.AWAL_PEKAN AND DATEADD('day', 6, v.AWAL_PEKAN))",
+        "ZERO_FAIL", "Recomputes the actual weekly offertory from the collections themselves.")
+    add("FORECAST", "Weeks with an actual result outside the forecast range", fv,
+        f"SELECT COUNT(*) FROM {fv} WHERE POSISI_TERHADAP_RENTANG IN ('Di bawah rentang', 'Di atas rentang')", "INFO",
+        "Expected to be about one week in five for ordinary weeks, because the range is an 80% range.")
+    add("FORECAST", "Gaps explained by an unforeseen event", fv,
+        f"SELECT COUNT(*) FROM {fv} WHERE PENJELASAN_SELISIH = 'Di luar rentang, dijelaskan peristiwa luar biasa'", "INFO",
+        "Deliberate demo scenario: the event log explains why the forecast missed.")
+    add("FORECAST", "Forecast weeks still to come", fv,
+        f"SELECT COUNT(*) FROM {fv} WHERE STATUS_PEKAN <> 'Lengkap'", "INFO",
+        "Forecasts for the current week and the weeks ahead, which have no complete actual result yet.")
+
+    # --- public service guides ----------------------------------------------------------------------------
+    sv, st, rq, sp = f"{M}.LAYANAN_PAROKI", f"{M}.LANGKAH_LAYANAN", f"{M}.PERSYARATAN_LAYANAN", f"{A}.LAYANAN_PUBLIK"
+    add("SERVICES", "Service without steps or without requirements", sv,
+        f"SELECT COUNT(*) FROM {sv} l WHERE NOT EXISTS (SELECT 1 FROM {st} g WHERE g.ID_LAYANAN = l.ID_LAYANAN) "
+        f"OR NOT EXISTS (SELECT 1 FROM {rq} r WHERE r.ID_LAYANAN = l.ID_LAYANAN)", "ZERO_FAIL",
+        "A guide without steps or without requirements is not a guide.")
+    add("SERVICES", "Step numbers have gaps or do not start at 1", st,
+        f"SELECT COUNT(*) FROM (SELECT ID_LAYANAN FROM {st} GROUP BY ID_LAYANAN HAVING MIN(NOMOR_URUT) <> 1 OR MAX(NOMOR_URUT) <> COUNT(*)) d",
+        "ZERO_FAIL", "Steps are numbered 1, 2, 3 and so on without gaps, so the order is unambiguous.")
+    add("SERVICES", "Requirement numbers have gaps or do not start at 1", rq,
+        f"SELECT COUNT(*) FROM (SELECT ID_LAYANAN FROM {rq} GROUP BY ID_LAYANAN HAVING MIN(NOMOR_URUT) <> 1 OR MAX(NOMOR_URUT) <> COUNT(*)) d",
+        "ZERO_FAIL", "Requirements are numbered 1, 2, 3 and so on without gaps.")
+    add("SERVICES", "Guide file name does not start with the service id or is not a PDF", sv,
+        f"SELECT COUNT(*) FROM {sv} WHERE LEFT(NAMA_BERKAS_PANDUAN, LENGTH(ID_LAYANAN) + 1) <> ID_LAYANAN || '_' "
+        f"OR LOWER(NAMA_BERKAS_PANDUAN) NOT LIKE '%.pdf' OR NAMA_BERKAS_PANDUAN LIKE '%/%'", "ZERO_FAIL",
+        "Only the file name is stored. The service id at the start of the name is how a file is matched to its row.")
+    add("SERVICES", "Service guide with a classification that may not be public", sv,
+        f"SELECT COUNT(*) FROM {sv} l JOIN {M}.REFERENSI_KLASIFIKASI_DATA k ON k.ID_KLASIFIKASI_DATA = l.ID_KLASIFIKASI_DATA "
+        f"WHERE k.DAPAT_DITAMPILKAN_PUBLIK = FALSE", "ZERO_WARN",
+        "Such a service is hidden from the public views. That is allowed, but not what the demo expects.")
+    add("SERVICES", "Public view differs from the service tables", sp,
+        f"SELECT ABS((SELECT COUNT(*) FROM {sp}) - (SELECT COUNT(*) FROM {sv} l JOIN {M}.REFERENSI_KLASIFIKASI_DATA k "
+        f"ON k.ID_KLASIFIKASI_DATA = l.ID_KLASIFIKASI_DATA WHERE k.DAPAT_DITAMPILKAN_PUBLIK = TRUE)) "
+        f"+ ABS((SELECT COUNT(*) FROM {A}.LANGKAH_LAYANAN_PUBLIK) - (SELECT SUM(JUMLAH_LANGKAH) FROM {sp})) "
+        f"+ ABS((SELECT COUNT(*) FROM {A}.PERSYARATAN_LAYANAN_PUBLIK) - (SELECT SUM(JUMLAH_PERSYARATAN) FROM {sp}))",
+        "ZERO_FAIL", "The public views show every step and requirement of every public service, and nothing else.")
+    add("SERVICES", "Guide text containing an email address", sv,
+        f"SELECT (SELECT COUNT(*) FROM {sv} WHERE RINGKASAN LIKE '%@%' OR CATATAN_PENTING LIKE '%@%') "
+        f"+ (SELECT COUNT(*) FROM {st} WHERE URAIAN LIKE '%@%') + (SELECT COUNT(*) FROM {rq} WHERE KETERANGAN LIKE '%@%')",
+        "ZERO_FAIL", "Public guides must not carry contact details of individuals.")
+    add("SERVICES", "Revision date after the as-of date", sv,
+        f"SELECT COUNT(*) FROM {sv} WHERE TANGGAL_REVISI > {AS_OF}", "ZERO_FAIL", "A guide cannot be reviewed in the future of the snapshot.")
+    add("SERVICES", "Public services", sp, f"SELECT COUNT(*) FROM {sp}", "INFO",
+        "Services whose guide is shown on the public dashboard page.")
+
     # --- planning, events, reports -------------------------------------------------------------------
     e, r, plan, hdr = f"{O}.KEGIATAN", f"{O}.LAPORAN_KEGIATAN", f"{O}.RENCANA_KEGIATAN", f"{O}.RENCANA_KERJA_TAHUNAN"
     alk, rl = f"{O}.ALOKASI_ANGGARAN", f"{O}.REALISASI_PENGELUARAN"

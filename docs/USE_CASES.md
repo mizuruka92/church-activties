@@ -1,6 +1,6 @@
-# Use cases: income versus outcome, unforeseen events, community donations, Easter and Christmas
+# Use cases: income versus outcome, unforeseen events, community donations, Easter and Christmas, a shadow forecast, public service guides
 
-This guide describes five analysis stories that the simulated data was shaped to support, the views
+This guide describes seven stories that the simulated data was shaped to support, the views
 that answer them, and what to look at. It exists so that the next phase (the Streamlit dashboard) can
 be built on questions that already have answers.
 
@@ -17,6 +17,8 @@ be built on questions that already have answers.
 | 3 | What did an unforeseen event (rain, haze, ash) do, and how does it bias a forecast? | `KOLEKTE_MINGGUAN_DAN_PERISTIWA`, `DAMPAK_PERISTIWA_LUAR_BIASA` |
 | 4 | How do Lent and Advent gifts differ between communities, and do they cover the Easter and Christmas celebrations? | `SUMBANGAN_KELUARGA_PER_LINGKUNGAN`, `TITIK_IMPAS_KAMPANYE` |
 | 5 | What is coming up, and which activities still need a date, a place or a decision? | `KEGIATAN_MENDATANG` |
+| 6 | How good is a forecast of the weekly offertory made four weeks ahead, and which unforeseen events explain its misses? | `KOLEKTE_AKTUAL_VS_PERKIRAAN`, `BIAS_PERKIRAAN_PER_PERISTIWA`, `AKURASI_PERKIRAAN_TAHUNAN` |
+| 7 | What do I need, and what do I do, to be baptised, confirmed, married, to join a community or when someone dies? | `LAYANAN_PUBLIK`, `LANGKAH_LAYANAN_PUBLIK`, `PERSYARATAN_LAYANAN_PUBLIK` |
 
 All views carry the column `SUMBER_DATA = 'Data simulasi (fiktif)'`. The queries below use fully
 qualified names, so they work in any worksheet once the setup has run.
@@ -35,6 +37,8 @@ knobs, in case you want a different story. After changing one, run
 | Payday effect | `liturgy.payday_factor` | 1.20 on the 1st of the month, falling in a straight line to 0.80 on the 31st |
 | Noise | `liturgy.py` | Attendance about 11 %, amount per attendee about 3 % |
 | Unforeseen events | `peristiwa.EVENTS`, `ATTENDANCE_FACTOR` | 10 events, attendance factor 0.90 / 0.78 / 0.60 for light / medium / severe |
+| Shadow forecast | `forecast.py` | 4 weeks ahead, 52-week window (at least 26), 80% range widened by 20%, calendar rule of thumb `FEAST_RULE_OF_THUMB` |
+| Service guides | `layanan.py` | 6 services with 6 to 9 steps and 6 to 10 requirements each |
 | Number of programmes per year | `planning.ACTIVITY_COUNT` | 14, 19, 25, 31, 36 for 2021 to 2025, then the hand-written 2026 plan |
 | Programme spending per year | `planning.SPEND_TARGET` | Rp 55 M, 90 M, 125 M, 165 M, 210 M for 2021 to 2025 |
 | Easter and Christmas budgets | `planning.BIG_BUDGET` | Easter Rp 7 M rising to 17.5 M, Christmas Rp 9.5 M rising to 29 M |
@@ -343,6 +347,90 @@ What it shows:
 real data that date would be replaced by `CURRENT_DATE`. The Masses scheduled after the snapshot are in `PELAKSANAAN_MISA` with the status
 *Terjadwal* (25 in October 2026) and appear on the second tab of the dashboard page.
 
+## 6. A shadow forecast of the weekly offertory
+
+A **shadow** forecast runs next to the real process and never changes it. Every week from August 2021, a simple model forecasts the offertory of
+the week that begins four weeks later, using only what was known that day, and the forecast is **stored as issued** (`PERKIRAAN_KOLEKTE_MINGGUAN`).
+Later, once the week has been collected, the stored forecast can be set against the real total without any chance of having peeked.
+
+```sql
+-- Week by week: forecast, range and actual, with the event that explains a big miss
+SELECT AWAL_PEKAN, JUMLAH_PERKIRAAN, BATAS_BAWAH, BATAS_ATAS, KOLEKTE_AKTUAL, SELISIH_PERSEN, POSISI_TERHADAP_RENTANG, JENIS_PEKAN, NAMA_PERISTIWA
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN
+ORDER BY AWAL_PEKAN;
+
+-- Each unforeseen event: how far did it pull the offertory below the forecast?
+SELECT NAMA_PERISTIWA, TINGKAT_GANGGUAN, JUMLAH_PEKAN_TERDAMPAK, PERKIRAAN_TOTAL, KOLEKTE_AKTUAL_TOTAL, SELISIH_PERSEN, KELIPATAN_GALAT_BIASA
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA
+ORDER BY TANGGAL_MULAI;
+
+-- Accuracy per year and kind of week
+SELECT TAHUN, JENIS_PEKAN, JUMLAH_PEKAN, GALAT_RATA_RATA_PERSEN, SELISIH_RATA_RATA_PERSEN, PERSEN_DALAM_RENTANG
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.AKURASI_PERKIRAAN_TAHUNAN
+ORDER BY TAHUN, JENIS_PEKAN;
+```
+
+**What the model knows and does not know.** It sees the offertory of every complete week before its origin (a rolling window of 52 weeks), the
+public liturgical calendar (Easter, feast days, the special collections), and the events already logged. The weeks those events disturbed are left
+out of what it learns from, so a past disaster does not pull later forecasts down. It cannot know an event that has not started, which is exactly why
+an event shows up as a large gap. The size of the calendar adjustments is a rule of thumb of the parish staff, deliberately a little different from the
+true effect built into the data.
+
+**What it shows (data date 30 September 2026).** 269 weeks can be compared, from August 2021:
+
+| Kind of week | Weeks | Average error | Weeks inside the 80% range |
+|---|---:|---:|---:|
+| Ordinary week | 205 | 7.4 % | 82 % |
+| Feast or special-collection week (calendar adjustment) | 36 | 7.8 % | 86 % |
+| Week hit by an unforeseen event | 28 | 31.2 % | 21 % |
+
+* **Ordinary weeks are forecast well, and not perfectly.** 41 weeks with no logged event still fall outside the 80% range (about one in six), as an 80% range allows. The dashboard lists them in a table instead of hiding them.
+* **Events explain the big misses.** The 2025 volcanic ash (`PRS-08`) left the five affected weeks 55 % below the forecast (7.5 times the usual error) and the
+  thick haze of autumn 2023 (`PRS-06`) 51 % below (6.9 times). In both, every affected week was outside the range. The flood of July 2026 was 34 % below.
+* **A dip can be invisible in money.** The one-day power cut of March 2023 (`PRS-05`) is only 0.4 % off: the week fell just after payday, and the forecast already
+  counts the payday bonus. Attendance fell, but the offertory did not move enough to show. This is the same masking effect described in use case 3.
+* **A forecast must not learn from the disaster.** Fitting on the disturbed weeks as well biases later forecasts more than 8 % low (a test shows it), which is why the
+  event log is used to keep those weeks out of training.
+* **The forecast for the weeks ahead is not a promise.** The week in progress and the next four have a forecast but no actual value yet (`STATUS_PEKAN`).
+
+The dashboard page **Perkiraan kolekte** draws the actual offertory (solid) against the forecast (dashed) with its range, shades the weeks hit by an event, never ranks anything,
+and shows each event's gap beside the usual error. Offertory figures are administrative; they say nothing about faith or commitment.
+
+## 7. Public service guides
+
+The parish answers the same questions again and again: *what do I need for an adult baptism? how do I register in a community? what do we do now that
+Grandpa has died?* The guides put the **requirements** and the **steps** of six services in tables and in PDFs that anyone may read:
+
+| Service | Category | Steps | Requirements |
+|---|---|---:|---:|
+| Baptis Dewasa | Sakramen | 9 | 9 |
+| Baptis Batuta (bayi dan anak di bawah 7 tahun) | Sakramen | 7 | 8 |
+| Krisma | Sakramen | 6 | 8 |
+| Pernikahan | Sakramen | 9 | 10 |
+| Pendaftaran Lingkungan | Administrasi Umat | 6 | 6 |
+| Pelayanan Kematian (Tutup Usia) | Pelayanan Duka | 9 | 7 |
+
+```sql
+SELECT NAMA_LAYANAN, KATEGORI_LAYANAN, PERKIRAAN_WAKTU_PROSES, JUMLAH_LANGKAH, JUMLAH_PERSYARATAN, NAMA_BERKAS_PANDUAN
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.LAYANAN_PUBLIK
+ORDER BY ID_LAYANAN;
+
+SELECT NOMOR_URUT, JUDUL_LANGKAH, PELAKU, URAIAN
+FROM PUSAT_INFORMASI_PAROKI.ANALISIS.LANGKAH_LAYANAN_PUBLIK
+WHERE NAMA_LAYANAN LIKE 'Pelayanan Kematian%'
+ORDER BY NOMOR_URUT;
+```
+
+* The tables are *Publik*; the public views show only services whose classification may be shown in public, so reclassifying a service hides the service with all its steps.
+* Every guide says that it is an **example**, written for the demonstration. The wording is generic and does not claim to be the rule of any diocese or parish. No telephone number
+  or other contact detail is included, only the office hours of the fictional secretariat.
+* The bereavement guide starts *before* the death (calling the priest for the anointing of the sick), then covers the notice to the community leader and the secretariat, the death
+  certificate, prayers at home, the funeral Mass, the entry in the register and the memorial Masses.
+* The family registration guide asks for consent to record household data as restricted data, which links the guide to the privacy model.
+* The PDFs in `app/public_documents/` are generated from the same rows, so the page and the document say the same thing (a test reads each PDF back and finds every step and requirement).
+
+The dashboard page **Layanan dan prosedur** lets a visitor pick a service, read its requirements and steps, and download the PDF when the file is next to the app.
+
 ## Judgement calls
 
 These are choices made while implementing the request. Please say if you want any of them changed.
@@ -363,7 +451,12 @@ These are choices made while implementing the request. Please say if you want an
    explainable, which suits the story; it is not a forecasting method.
 6. **"Outcome" is programme spending.** Salaries, utilities and maintenance are not in the dataset.
 7. **No ranking.** No view orders or ranks communities, regions or Mass sessions by amount.
-8. **The curves are designed.** The crossing in 2029 and the Christmas deficit are set by the
+8. **"Baptis Batuta" means babies and children under seven.** The request used the word *batuta*, which usually means a toddler. The guide covers infants and children under seven, who are baptised at their
+   parents' request. If the parish uses the word differently, only the text of `LYN-02` changes.
+9. **The guides are generic examples.** The steps and requirements are plausible but invented. The parish and the diocese decide the real ones, and each guide says so.
+10. **The shadow forecast is simple on purpose.** A straight line, a payday term and a calendar adjustment, with a stored 80% range. It is meant to show how a forecast is kept honest (stored as issued, no peeking,
+    events logged), not to be the best possible model. A second model could be added next to it in the same tables.
+11. **The curves are designed.** The crossing in 2029 and the Christmas deficit are set by the
    assumptions in the table at the top. The tests check the shape of the story, not exact figures.
 
 ## Changing the data model of an existing Snowflake demo
@@ -372,3 +465,6 @@ These use cases added tables and columns (a new donation structure, an event log
 profile, `KEHADIRAN_MISA.ID_PERISTIWA`). Setup step 2 uses `CREATE TABLE IF NOT EXISTS`, which
 never alters an existing table. If you ran an earlier version of this repository in Snowflake, reset
 the demo first (see `sql/99_reset_demo.sql`, option B or C), then run the setup again.
+
+The shadow forecast and the service guides (use cases 6 and 7) only **add** tables and views. A demo that already has the tables above does not need a reset: run steps 2, 3, 4g, 5 and 6
+(see [SETUP_SNOWFLAKE.md](SETUP_SNOWFLAKE.md)).

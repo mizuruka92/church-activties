@@ -37,7 +37,7 @@ selects the database itself, so you can also use one worksheet per file.
 |---|---|---|
 | 0 | `sql/00_setup.sql` | `ACTIVE_ROLE` and `ACTIVE_WAREHOUSE` are filled in. If the warehouse is empty, select one. |
 | 1 | `sql/01_create_schemas.sql` | `SHOW SCHEMAS IN DATABASE PUSAT_INFORMASI_PAROKI;` lists `MASTER_DATA`, `DATA_OPERASIONAL`, `ANALISIS` (plus Snowflake's own `PUBLIC` and `INFORMATION_SCHEMA`). |
-| 2 | `sql/02_create_tables.sql` | `SHOW TABLES IN SCHEMA PUSAT_INFORMASI_PAROKI.MASTER_DATA;` lists 18 tables and the same command for `DATA_OPERASIONAL` lists 20. |
+| 2 | `sql/02_create_tables.sql` | `SHOW TABLES IN SCHEMA PUSAT_INFORMASI_PAROKI.MASTER_DATA;` lists 22 tables and the same command for `DATA_OPERASIONAL` lists 21. |
 | 3 | `sql/03_load_reference_data.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.MASTER_DATA.MASTER_WILAYAH;` returns 6. |
 | 4a | `sql/04a_load_mass_history.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA;` returns 10. |
 | 4b | `sql/04b_load_offertory.sql` | Needs 4a. `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.PENERIMAAN_KOLEKTE;` returns the number listed in the dictionary. |
@@ -45,7 +45,8 @@ selects the database itself, so you can also use one worksheet per file.
 | 4d | `sql/04d_load_surveys.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.JAWABAN_SURVEI;` returns the number listed in the dictionary. |
 | 4e | `sql/04e_load_plans_and_events.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.RENCANA_KEGIATAN;` returns 179. |
 | 4f | `sql/04f_load_donations.sql` | Needs 4c and 4e. `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.KAMPANYE_SUMBANGAN;` returns 14. |
-| 5 | `sql/05_create_views.sql` | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 23 views. |
+| 4g | `sql/04g_load_forecast.sql` | Needs step 3 (the forecast model is reference data). `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN;` returns 274. To compare the forecast with the real offertory, steps 4a and 4b are needed as well. |
+| 5 | `sql/05_create_views.sql` | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 29 views. |
 | 6 | `sql/06_validate_data.sql` | The first two rows say `Checks with result FAIL = 0` and `Checks with result WARN = 1`, both `PASS`. |
 
 The `STRUCTURE` rows of the validation compare every table's row count with the bundled data
@@ -71,6 +72,7 @@ tokens or key files inside the repository.
 for f in sql/01_create_schemas.sql sql/02_create_tables.sql sql/03_load_reference_data.sql \
          sql/04a_load_mass_history.sql sql/04b_load_offertory.sql sql/04c_load_parishioners.sql \
          sql/04d_load_surveys.sql sql/04e_load_plans_and_events.sql sql/04f_load_donations.sql \
+         sql/04g_load_forecast.sql \
          sql/05_create_views.sql sql/06_validate_data.sql; do
   snow sql --connection my_demo -f "$f" || break
 done
@@ -104,8 +106,8 @@ demo does not need. The Git-to-Snowflake route is not tested here.
 | "Database ... does not exist or not authorized" | Run step 1 first, or use the role that created the database. |
 | "Object ... does not exist" for a table | A previous step was skipped. Run the steps in order. |
 | A statement fails with a syntax error | Note the file and statement and report it. The generated files should never be edited by hand. See the verification status above: this SQL has not run in Snowflake yet. |
-| The validation shows `FAIL` rows | Filter `RESULT = 'FAIL'`. Row-count or `VIEWS` failures mean a step did not finish. Re-run steps 3, 4a to 4f and 5. They are safe to repeat. |
-| Row counts show `WARN` (count differs from the bundled data) | The data was only partly loaded or was changed after loading. Re-run steps 3 and 4a to 4f to restore the bundled rows. |
+| The validation shows `FAIL` rows | Filter `RESULT = 'FAIL'`. Row-count or `VIEWS` failures mean a step did not finish. Re-run steps 3, 4a to 4g and 5. They are safe to repeat. |
+| Row counts show `WARN` (count differs from the bundled data) | The data was only partly loaded or was changed after loading. Re-run steps 3 and 4a to 4g to restore the bundled rows. |
 | `Report participants differ from the event` shows `WARN` | Expected. It is the one deliberate inconsistency. |
 | The validation statement runs for a long time | It is one query with about 300 branches. Give it a moment. A larger warehouse is not needed. |
 | A load fails with "invalid identifier NAMA_BERKAS_SUMBER" | The demo database was created before the column that links each report to its PDF existed. Either reset the demo (below) and run the setup again, or add just the column (see *Adding the source-file column without a reset* below) and re-run steps 4e, 5 and 6. |
@@ -129,6 +131,15 @@ ALTER TABLE PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.LAPORAN_KEGIATAN
 ```
 
 These two statements were not run in Snowflake. The unique key is metadata only; step 6 checks duplicates explicitly.
+
+### Adding the forecast and service-guide tables to an existing demo
+
+The shadow forecast and the public service guides added **five new tables** (`REFERENSI_MODEL_PERKIRAAN`, `PERKIRAAN_KOLEKTE_MINGGUAN`,
+`LAYANAN_PAROKI`, `LANGKAH_LAYANAN`, `PERSYARATAN_LAYANAN`) and six new views. No existing table changed, so **no reset is needed**. Run the
+steps that create and fill them, in this order: step 2 (creates only the tables that are missing), step 3 (the model and the guides are reference
+data), step 4g (the forecast rows), step 5 (the views) and step 6 (the checks). Steps 4a and 4b must already be loaded, because the comparison
+views read the offertory. The new dashboard pages **Perkiraan kolekte** and **Layanan dan prosedur** need those views. This was not run in
+Snowflake.
 
 ## 6. Resetting the demo (destructive)
 

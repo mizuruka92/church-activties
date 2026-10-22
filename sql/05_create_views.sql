@@ -19,7 +19,8 @@
 --     depend on a session setting. Years count as complete only when the snapshot date in
 --     MASTER_DATA.INFO_DATASET has passed 31 December.
 --   * Views are listed in dependency order: a view only reads views defined above it
---     (views 8 and 9 read view 7, view 10 reads view 9, view 12 reads view 11, view 23 reads view 7).
+--     (views 8 and 9 read view 7, view 10 reads view 9, view 12 reads view 11, view 23 reads view 7,
+--     view 24 reads view 14, views 25 and 26 read view 24, views 28 and 29 read view 27).
 --   * "Upcoming" is always relative to the snapshot date in MASTER_DATA.INFO_DATASET, never to the
 --     clock, so the demo gives the same answer on any day. With real data, replace it by CURRENT_DATE.
 -- =============================================================================
@@ -1000,3 +1001,233 @@ LEFT JOIN DANA d
     ON d.ID_RENCANA = p.ID_RENCANA
 WHERE p.STATUS_PELAKSANAAN = 'Direncanakan'
    OR (p.STATUS_PELAKSANAAN = 'Ditunda' AND p.TAHUN_RENCANA = EXTRACT(YEAR FROM i.TANGGAL_SNAPSHOT));
+
+-- =============================================================================
+-- Shadow forecast of the weekly offertory: forecast against actual, with the events that explain the gap
+-- =============================================================================
+
+-- 24. Weekly offertory against the shadow forecast ---------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN
+    COMMENT = 'Kolekte mingguan sebenarnya dibandingkan dengan perkiraan bayangan yang dibuat empat pekan sebelumnya, lengkap dengan rentang perkiraan, selisih, dan peristiwa luar biasa yang menjelaskan selisih besar. Hanya pekan yang sudah lengkap pada tanggal data yang dibandingkan. Data simulasi.'
+AS
+WITH DASAR AS (
+    SELECT
+        p.ID_MODEL,
+        p.AWAL_PEKAN_SASARAN,
+        p.TANGGAL_PERKIRAAN,
+        p.JUMLAH_PEKAN_PELATIHAN,
+        p.JUMLAH_PERKIRAAN,
+        p.BATAS_BAWAH,
+        p.BATAS_ATAS,
+        p.PENYESUAIAN_KALENDER,
+        p.KETERANGAN,
+        CASE WHEN DATEADD('day', 6, p.AWAL_PEKAN_SASARAN) <= i.TANGGAL_SNAPSHOT THEN 'Lengkap'
+             WHEN p.AWAL_PEKAN_SASARAN <= i.TANGGAL_SNAPSHOT THEN 'Sedang berjalan'
+             ELSE 'Mendatang'
+        END AS STATUS_PEKAN
+    FROM DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN p
+    CROSS JOIN MASTER_DATA.INFO_DATASET i
+),
+DENGAN_AKTUAL AS (
+    SELECT
+        d.*,
+        CASE WHEN d.STATUS_PEKAN = 'Lengkap' THEN COALESCE(w.TOTAL_KOLEKTE, 0) END AS KOLEKTE_AKTUAL,
+        w.ID_PERISTIWA,
+        w.JENIS_PERISTIWA,
+        w.NAMA_PERISTIWA,
+        w.TINGKAT_GANGGUAN
+    FROM DASAR d
+    LEFT JOIN ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA w
+        ON w.AWAL_PEKAN = d.AWAL_PEKAN_SASARAN
+)
+SELECT
+    a.AWAL_PEKAN_SASARAN AS AWAL_PEKAN,
+    EXTRACT(YEAR FROM a.AWAL_PEKAN_SASARAN) AS TAHUN,
+    a.ID_MODEL,
+    m.NAMA_MODEL,
+    m.LEBAR_RENTANG_PERSEN,
+    a.TANGGAL_PERKIRAAN,
+    a.STATUS_PEKAN,
+    a.JUMLAH_PERKIRAAN,
+    a.BATAS_BAWAH,
+    a.BATAS_ATAS,
+    a.KOLEKTE_AKTUAL,
+    a.KOLEKTE_AKTUAL - a.JUMLAH_PERKIRAAN AS SELISIH,
+    ROUND(100.0 * (a.KOLEKTE_AKTUAL - a.JUMLAH_PERKIRAAN) / NULLIF(a.JUMLAH_PERKIRAAN, 0), 1) AS SELISIH_PERSEN,
+    CASE WHEN a.KOLEKTE_AKTUAL IS NULL THEN NULL
+         WHEN a.KOLEKTE_AKTUAL < a.BATAS_BAWAH THEN 'Di bawah rentang'
+         WHEN a.KOLEKTE_AKTUAL > a.BATAS_ATAS THEN 'Di atas rentang'
+         ELSE 'Dalam rentang'
+    END AS POSISI_TERHADAP_RENTANG,
+    CASE WHEN a.ID_PERISTIWA IS NOT NULL THEN 'Peristiwa luar biasa'
+         WHEN a.KETERANGAN IS NOT NULL THEN 'Hari raya atau kolekte khusus'
+         ELSE 'Pekan biasa'
+    END AS JENIS_PEKAN,
+    CASE WHEN a.KOLEKTE_AKTUAL IS NULL THEN NULL
+         WHEN a.KOLEKTE_AKTUAL BETWEEN a.BATAS_BAWAH AND a.BATAS_ATAS THEN 'Dalam rentang perkiraan'
+         WHEN a.ID_PERISTIWA IS NOT NULL THEN 'Di luar rentang, dijelaskan peristiwa luar biasa'
+         ELSE 'Di luar rentang, tanpa peristiwa tercatat'
+    END AS PENJELASAN_SELISIH,
+    a.PENYESUAIAN_KALENDER,
+    a.KETERANGAN AS CATATAN_KALENDER,
+    a.JUMLAH_PEKAN_PELATIHAN,
+    a.ID_PERISTIWA,
+    a.JENIS_PERISTIWA,
+    a.NAMA_PERISTIWA,
+    a.TINGKAT_GANGGUAN,
+    'Selisih = kolekte sebenarnya dikurangi perkiraan. Negatif berarti kolekte lebih rendah dari perkiraan.' AS CATATAN_METODE,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM DENGAN_AKTUAL a
+JOIN MASTER_DATA.REFERENSI_MODEL_PERKIRAAN m
+    ON m.ID_MODEL = a.ID_MODEL;
+
+-- 25. Gap between forecast and actual for each unforeseen event ----------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA
+    COMMENT = 'Untuk setiap peristiwa luar biasa: seberapa jauh kolekte sebenarnya menyimpang dari perkiraan bayangan selama pekan-pekan peristiwa, dibandingkan dengan galat biasa pada pekan tanpa peristiwa. Menjelaskan mengapa perkiraan meleset. Data simulasi.'
+AS
+WITH GALAT_BIASA AS (
+    SELECT ID_MODEL,
+           AVG(100.0 * ABS(KOLEKTE_AKTUAL - JUMLAH_PERKIRAAN) / NULLIF(JUMLAH_PERKIRAAN, 0)) AS GALAT_PERSEN
+    FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN
+    WHERE STATUS_PEKAN = 'Lengkap' AND JENIS_PEKAN = 'Pekan biasa'
+    GROUP BY ID_MODEL
+),
+PER_PERISTIWA AS (
+    SELECT
+        v.ID_MODEL,
+        v.ID_PERISTIWA,
+        COUNT(*) AS JUMLAH_PEKAN_TERDAMPAK,
+        MIN(v.AWAL_PEKAN) AS PEKAN_PERTAMA,
+        MAX(v.AWAL_PEKAN) AS PEKAN_TERAKHIR,
+        SUM(v.JUMLAH_PERKIRAAN) AS PERKIRAAN_TOTAL,
+        SUM(v.KOLEKTE_AKTUAL) AS KOLEKTE_AKTUAL_TOTAL,
+        SUM(CASE WHEN v.POSISI_TERHADAP_RENTANG <> 'Dalam rentang' THEN 1 ELSE 0 END) AS JUMLAH_PEKAN_DI_LUAR_RENTANG,
+        MIN(v.SELISIH_PERSEN) AS SELISIH_PERSEN_TERBESAR_NEGATIF
+    FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN v
+    WHERE v.STATUS_PEKAN = 'Lengkap' AND v.ID_PERISTIWA IS NOT NULL
+    GROUP BY v.ID_MODEL, v.ID_PERISTIWA
+)
+SELECT
+    e.ID_PERISTIWA,
+    e.JENIS_PERISTIWA,
+    e.NAMA_PERISTIWA,
+    e.TANGGAL_MULAI,
+    e.TANGGAL_SELESAI,
+    e.TINGKAT_GANGGUAN,
+    e.DESKRIPSI,
+    g.ID_MODEL,
+    g.JUMLAH_PEKAN_TERDAMPAK,
+    g.PEKAN_PERTAMA,
+    g.PEKAN_TERAKHIR,
+    g.PERKIRAAN_TOTAL,
+    g.KOLEKTE_AKTUAL_TOTAL,
+    g.KOLEKTE_AKTUAL_TOTAL - g.PERKIRAAN_TOTAL AS SELISIH_TOTAL,
+    ROUND(100.0 * (g.KOLEKTE_AKTUAL_TOTAL - g.PERKIRAAN_TOTAL) / NULLIF(g.PERKIRAAN_TOTAL, 0), 1) AS SELISIH_PERSEN,
+    g.SELISIH_PERSEN_TERBESAR_NEGATIF,
+    g.JUMLAH_PEKAN_DI_LUAR_RENTANG,
+    ROUND(b.GALAT_PERSEN, 1) AS GALAT_PEKAN_BIASA_PERSEN,
+    ROUND(ABS(100.0 * (g.KOLEKTE_AKTUAL_TOTAL - g.PERKIRAAN_TOTAL) / NULLIF(g.PERKIRAAN_TOTAL, 0)) / NULLIF(b.GALAT_PERSEN, 0), 1) AS KELIPATAN_GALAT_BIASA,
+    'Pekan tanpa peristiwa dan tanpa hari raya dipakai sebagai ukuran galat biasa. Peristiwa sebelum perkiraan pertama (Agustus 2021) tidak tercantum.' AS CATATAN_METODE,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM PER_PERISTIWA g
+JOIN DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA e
+    ON e.ID_PERISTIWA = g.ID_PERISTIWA
+LEFT JOIN GALAT_BIASA b
+    ON b.ID_MODEL = g.ID_MODEL;
+
+-- 26. Forecast accuracy per year and kind of week --------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.AKURASI_PERKIRAAN_TAHUNAN
+    COMMENT = 'Ketepatan perkiraan bayangan per tahun dan jenis pekan (pekan biasa, hari raya atau kolekte khusus, peristiwa luar biasa): galat rata-rata, selisih rata-rata, dan persentase pekan yang jatuh di dalam rentang perkiraan. Data simulasi.'
+AS
+SELECT
+    v.TAHUN,
+    v.JENIS_PEKAN,
+    v.ID_MODEL,
+    v.LEBAR_RENTANG_PERSEN,
+    COUNT(*) AS JUMLAH_PEKAN,
+    ROUND(AVG(100.0 * ABS(v.KOLEKTE_AKTUAL - v.JUMLAH_PERKIRAAN) / NULLIF(v.JUMLAH_PERKIRAAN, 0)), 1) AS GALAT_RATA_RATA_PERSEN,
+    ROUND(AVG(100.0 * (v.KOLEKTE_AKTUAL - v.JUMLAH_PERKIRAAN) / NULLIF(v.JUMLAH_PERKIRAAN, 0)), 1) AS SELISIH_RATA_RATA_PERSEN,
+    SUM(CASE WHEN v.POSISI_TERHADAP_RENTANG = 'Dalam rentang' THEN 1 ELSE 0 END) AS JUMLAH_DALAM_RENTANG,
+    ROUND(100.0 * SUM(CASE WHEN v.POSISI_TERHADAP_RENTANG = 'Dalam rentang' THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_DALAM_RENTANG,
+    'Galat = rata-rata selisih mutlak terhadap perkiraan. Selisih rata-rata negatif berarti kolekte lebih rendah dari perkiraan.' AS CATATAN_METODE,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN v
+WHERE v.STATUS_PEKAN = 'Lengkap'
+GROUP BY v.TAHUN, v.JENIS_PEKAN, v.ID_MODEL, v.LEBAR_RENTANG_PERSEN;
+
+-- =============================================================================
+-- Public service guides: what a parishioner may read without logging in
+-- =============================================================================
+
+-- 27. Public services -------------------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.LAYANAN_PUBLIK
+    COMMENT = 'Layanan paroki yang boleh dibaca umum (klasifikasi yang dapat tampil publik): ringkasan, waktu proses, seksi pengelola, nama berkas PDF panduan, dan jumlah langkah serta persyaratan. Isi panduan fiktif dan bukan ketentuan resmi. Data simulasi.'
+AS
+SELECT
+    l.ID_LAYANAN,
+    l.NAMA_LAYANAN,
+    l.KATEGORI_LAYANAN,
+    l.RINGKASAN,
+    l.PERKIRAAN_WAKTU_PROSES,
+    l.CATATAN_PENTING,
+    s.NAMA_SEKSI AS SEKSI_PENGELOLA,
+    l.NAMA_BERKAS_PANDUAN,
+    l.TANGGAL_REVISI,
+    COALESCE(g.JUMLAH_LANGKAH, 0) AS JUMLAH_LANGKAH,
+    COALESCE(p.JUMLAH_PERSYARATAN, 0) AS JUMLAH_PERSYARATAN,
+    COALESCE(p.JUMLAH_WAJIB, 0) AS JUMLAH_PERSYARATAN_WAJIB,
+    'Panduan contoh untuk demonstrasi, bukan ketentuan resmi gereja, keuskupan, atau paroki mana pun.' AS CATATAN_PENGGUNAAN,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM MASTER_DATA.LAYANAN_PAROKI l
+JOIN MASTER_DATA.REFERENSI_KLASIFIKASI_DATA k
+    ON k.ID_KLASIFIKASI_DATA = l.ID_KLASIFIKASI_DATA
+   AND k.DAPAT_DITAMPILKAN_PUBLIK = TRUE
+JOIN MASTER_DATA.MASTER_SEKSI s
+    ON s.ID_SEKSI = l.ID_SEKSI_PENGELOLA
+LEFT JOIN (
+    SELECT ID_LAYANAN, COUNT(*) AS JUMLAH_LANGKAH
+    FROM MASTER_DATA.LANGKAH_LAYANAN
+    GROUP BY ID_LAYANAN
+) g ON g.ID_LAYANAN = l.ID_LAYANAN
+LEFT JOIN (
+    SELECT ID_LAYANAN,
+           COUNT(*) AS JUMLAH_PERSYARATAN,
+           SUM(CASE WHEN WAJIB_DIPENUHI THEN 1 ELSE 0 END) AS JUMLAH_WAJIB
+    FROM MASTER_DATA.PERSYARATAN_LAYANAN
+    GROUP BY ID_LAYANAN
+) p ON p.ID_LAYANAN = l.ID_LAYANAN;
+
+-- 28. Steps of the public services -------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.LANGKAH_LAYANAN_PUBLIK
+    COMMENT = 'Langkah berurutan setiap layanan publik, dengan pelaku langkah (pemohon, sekretariat, pastor, seksi, atau ketua lingkungan). Hanya layanan yang boleh dibaca umum. Data simulasi.'
+AS
+SELECT
+    g.ID_LAYANAN,
+    l.NAMA_LAYANAN,
+    l.KATEGORI_LAYANAN,
+    g.NOMOR_URUT,
+    g.JUDUL_LANGKAH,
+    g.URAIAN,
+    g.PELAKU,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM MASTER_DATA.LANGKAH_LAYANAN g
+JOIN ANALISIS.LAYANAN_PUBLIK l
+    ON l.ID_LAYANAN = g.ID_LAYANAN;
+
+-- 29. Requirements of the public services --------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.PERSYARATAN_LAYANAN_PUBLIK
+    COMMENT = 'Persyaratan setiap layanan publik: dokumen, pembinaan, dan ketentuan umum, ditandai wajib atau hanya jika berlaku. Hanya layanan yang boleh dibaca umum. Data simulasi.'
+AS
+SELECT
+    r.ID_LAYANAN,
+    l.NAMA_LAYANAN,
+    l.KATEGORI_LAYANAN,
+    r.NOMOR_URUT,
+    r.NAMA_PERSYARATAN,
+    r.JENIS_PERSYARATAN,
+    CASE WHEN r.WAJIB_DIPENUHI THEN 'Wajib' ELSE 'Jika berlaku' END AS STATUS_PERSYARATAN,
+    r.KETERANGAN,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM MASTER_DATA.PERSYARATAN_LAYANAN r
+JOIN ANALISIS.LAYANAN_PUBLIK l
+    ON l.ID_LAYANAN = r.ID_LAYANAN;

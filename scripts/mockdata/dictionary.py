@@ -6,7 +6,9 @@ import re
 from .vocab import DAFTAR_NILAI, NILAI_TERKENDALI
 
 DOMAINS = [
-    ("1", "Kolekte", ["DATA_OPERASIONAL.PENERIMAAN_KOLEKTE", "MASTER_DATA.REFERENSI_JENIS_KOLEKTE"]),
+    ("1", "Kolekte", [
+        "DATA_OPERASIONAL.PENERIMAAN_KOLEKTE", "MASTER_DATA.REFERENSI_JENIS_KOLEKTE",
+        "DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN", "MASTER_DATA.REFERENSI_MODEL_PERKIRAAN"]),
     ("2", "Kehadiran Misa", ["DATA_OPERASIONAL.KEHADIRAN_MISA", "DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA"]),
     ("3", "Basis data umat (simulasi BIDUK)", [
         "DATA_OPERASIONAL.KELUARGA", "DATA_OPERASIONAL.UMAT", "DATA_OPERASIONAL.PENUGASAN_KELUARGA",
@@ -27,6 +29,8 @@ DOMAINS = [
     ("9", "Data induk wilayah dan GIS", [
         "MASTER_DATA.MASTER_WILAYAH", "MASTER_DATA.MASTER_LINGKUNGAN", "MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN",
         "MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN"]),
+    ("10", "Layanan dan prosedur publik (tambahan)", [
+        "MASTER_DATA.LAYANAN_PAROKI", "MASTER_DATA.LANGKAH_LAYANAN", "MASTER_DATA.PERSYARATAN_LAYANAN"]),
     ("-", "Referensi bersama", [
         "MASTER_DATA.INFO_DATASET", "MASTER_DATA.MASTER_SEKSI", "MASTER_DATA.REFERENSI_DAFTAR_NILAI",
         "MASTER_DATA.REFERENSI_PERIODE_PELAPORAN"]),
@@ -77,7 +81,9 @@ def render(tables, data, views_sql):
     w("- Klasifikasi data: **Publik**, **Internal**, **Terbatas**, **Sangat Terbatas**. Data umat berklasifikasi "
       "Terbatas atau lebih ketat dan tidak boleh tampil di dasbor publik.")
     w("")
-    w("## Sembilan domain data")
+    w("## Domain data")
+    w("")
+    w("Sembilan domain awal ditambah satu domain tambahan (layanan dan prosedur publik) untuk informasi umum.")
     w("")
     w("| No | Domain | Tabel |")
     w("|---|---|---|")
@@ -174,6 +180,12 @@ def render(tables, data, views_sql):
       "per keluarga, dan keluarga penyumbang besar tidak ditandai pada data mana pun.")
     w("- `PERISTIWA_LUAR_BIASA` mencatat kejadian dan tingkat gangguannya, tetapi sengaja tidak menyimpan besar dampaknya "
       "terhadap kehadiran atau kolekte. Dampak dihitung oleh view analisis dari data.")
+    w("- `PERKIRAAN_KOLEKTE_MINGGUAN` menyimpan perkiraan kolekte apa adanya seperti dibuat empat pekan sebelumnya dan tidak pernah "
+      "dihitung ulang. Perkiraan tidak mengetahui peristiwa yang belum terjadi, sehingga selisih besar dijelaskan oleh catatan "
+      "`PERISTIWA_LUAR_BIASA`. Angka perkiraan adalah alat bantu administrasi, bukan penilaian atas umat.")
+    w("- Panduan layanan (`LAYANAN_PAROKI`, `LANGKAH_LAYANAN`, `PERSYARATAN_LAYANAN`) berisi contoh fiktif untuk demonstrasi, "
+      "bukan ketentuan resmi gereja, keuskupan, atau paroki mana pun. Panduan berklasifikasi Publik dan tidak memuat data pribadi "
+      "maupun nomor telepon.")
     w("- Geometri pada `GEOMETRI_ILUSTRATIF_LINGKUNGAN` sengaja diletakkan di koordinat 0 derajat Lintang dan 0 derajat "
       "Bujur agar tidak disangka batas wilayah paroki yang sebenarnya.")
     w("")

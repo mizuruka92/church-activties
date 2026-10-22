@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the synthetic Parish Information Hub dataset and every derived file.
 
-    python scripts/generate_mock_data.py              write the generated files (SQL, dictionary, report PDFs)
+    python scripts/generate_mock_data.py              write the generated files (SQL, dictionary, report and guide PDFs)
     python scripts/generate_mock_data.py --check      fail if any committed generated file is stale
     python scripts/generate_mock_data.py --csv-dir data/generated   also export CSV files
 
@@ -17,8 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from mockdata import documents, sqlwriter  # noqa: E402
-from mockdata.outputs import generate, render_documents  # noqa: E402
+from mockdata import sqlwriter  # noqa: E402
+from mockdata.outputs import PDF_FOLDERS, generate, render_documents  # noqa: E402
 
 
 def main(argv=None):
@@ -29,9 +29,9 @@ def main(argv=None):
 
     files, data, tables = generate(ROOT)
     pdfs = render_documents(data)
-    pdf_folder = ROOT / documents.FOLDER
-    extra = sorted(str(path.relative_to(ROOT)).replace("\\", "/") for path in pdf_folder.glob("*.pdf")
-                   if str(path.relative_to(ROOT)).replace("\\", "/") not in pdfs) if pdf_folder.exists() else []
+    extra = sorted(relative for relative in (str(path.relative_to(ROOT)).replace("\\", "/")
+                                             for folder in PDF_FOLDERS for path in (ROOT / folder).glob("*.pdf"))
+                   if relative not in pdfs)
 
     if args.check:
         stale = []
@@ -50,7 +50,7 @@ def main(argv=None):
             for relative in stale:
                 print(f"  {relative}")
             return 1
-        print(f"OK: {len(files)} generated files and {len(pdfs)} report PDFs are up to date.")
+        print(f"OK: {len(files)} generated files and {len(pdfs)} PDFs are up to date.")
         return 0
 
     for relative, text in files.items():
@@ -60,12 +60,12 @@ def main(argv=None):
             handle.write(text)
         print(f"wrote {relative}")
 
-    pdf_folder.mkdir(parents=True, exist_ok=True)
     for relative, content in pdfs.items():
+        (ROOT / relative).parent.mkdir(parents=True, exist_ok=True)
         (ROOT / relative).write_bytes(content)
     for relative in extra:
         (ROOT / relative).unlink()
-    print(f"wrote {len(pdfs)} report PDFs to {documents.FOLDER}" + (f" and removed {len(extra)} stale ones" if extra else ""))
+    print(f"wrote {len(pdfs)} PDFs to {', '.join(PDF_FOLDERS)}" + (f" and removed {len(extra)} stale ones" if extra else ""))
 
     if args.csv_dir:
         target = Path(args.csv_dir)
