@@ -1,6 +1,7 @@
 # Setting up the demo in Snowflake
 
-This guide expands the quick start in the [README](../README.md). Nothing in this repository connects
+This guide expands the quick start in the [README](../README.md). If you have never used Snowflake, start with the
+[starter guide](STARTER_GUIDE.md) instead: it also covers creating the account, connecting GitHub and creating the dashboard. Nothing in this repository connects
 to Snowflake for you: you run the SQL files yourself, in Snowsight or from a command line.
 
 > **Verification status.** The SQL was tested locally (DuckDB as a stand-in engine and a syntax lint),
@@ -25,7 +26,7 @@ to Snowflake for you: you run the SQL files yourself, in Snowsight or from a com
 3. Choose a role and a warehouse in the worksheet header.
 4. Use **Run All** (the arrow beside the Run button). Snowsight runs the statements in order. When it ends, it shows the result of the **last** statement, which is the validation table.
 
-The file is about 640 KB. If pasting or running it is slow in your browser, use option B.
+The file is about 1.8 MB. If pasting or running it is slow, or Snowsight refuses it, use option B: the largest step file is about 420 KB. Whether Snowsight accepts the all-in-one file in a single paste has not been verified.
 
 ### Option B: one file at a time
 
@@ -36,10 +37,15 @@ selects the database itself, so you can also use one worksheet per file.
 |---|---|---|
 | 0 | `sql/00_setup.sql` | `ACTIVE_ROLE` and `ACTIVE_WAREHOUSE` are filled in. If the warehouse is empty, select one. |
 | 1 | `sql/01_create_schemas.sql` | `SHOW SCHEMAS IN DATABASE PUSAT_INFORMASI_PAROKI;` lists `MASTER_DATA`, `DATA_OPERASIONAL`, `ANALISIS` (plus Snowflake's own `PUBLIC` and `INFORMATION_SCHEMA`). |
-| 2 | `sql/02_create_tables.sql` | `SHOW TABLES IN SCHEMA PUSAT_INFORMASI_PAROKI.MASTER_DATA;` lists 16 tables and the same command for `DATA_OPERASIONAL` lists 17. |
+| 2 | `sql/02_create_tables.sql` | `SHOW TABLES IN SCHEMA PUSAT_INFORMASI_PAROKI.MASTER_DATA;` lists 18 tables and the same command for `DATA_OPERASIONAL` lists 20. |
 | 3 | `sql/03_load_reference_data.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.MASTER_DATA.MASTER_WILAYAH;` returns 6. |
-| 4 | `sql/04_load_mock_data.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.UMAT;` returns the number listed for `UMAT` in the dictionary. |
-| 5 | `sql/05_create_views.sql` | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 13 views. |
+| 4a | `sql/04a_load_mass_history.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA;` returns 10. |
+| 4b | `sql/04b_load_offertory.sql` | Needs 4a. `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.PENERIMAAN_KOLEKTE;` returns the number listed in the dictionary. |
+| 4c | `sql/04c_load_parishioners.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.UMAT;` returns 653. |
+| 4d | `sql/04d_load_surveys.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.JAWABAN_SURVEI;` returns the number listed in the dictionary. |
+| 4e | `sql/04e_load_plans_and_events.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.RENCANA_KEGIATAN;` returns 179. |
+| 4f | `sql/04f_load_donations.sql` | Needs 4c and 4e. `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.KAMPANYE_SUMBANGAN;` returns 14. |
+| 5 | `sql/05_create_views.sql` | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 22 views. |
 | 6 | `sql/06_validate_data.sql` | The first two rows say `Checks with result FAIL = 0` and `Checks with result WARN = 1`, both `PASS`. |
 
 The `STRUCTURE` rows of the validation compare every table's row count with the bundled data
@@ -63,7 +69,9 @@ tokens or key files inside the repository.
 
 ```bash
 for f in sql/01_create_schemas.sql sql/02_create_tables.sql sql/03_load_reference_data.sql \
-         sql/04_load_mock_data.sql sql/05_create_views.sql sql/06_validate_data.sql; do
+         sql/04a_load_mass_history.sql sql/04b_load_offertory.sql sql/04c_load_parishioners.sql \
+         sql/04d_load_surveys.sql sql/04e_load_plans_and_events.sql sql/04f_load_donations.sql \
+         sql/05_create_views.sql sql/06_validate_data.sql; do
   snow sql --connection my_demo -f "$f" || break
 done
 ```
@@ -96,11 +104,14 @@ demo does not need. The Git-to-Snowflake route is not tested here.
 | "Database ... does not exist or not authorized" | Run step 1 first, or use the role that created the database. |
 | "Object ... does not exist" for a table | A previous step was skipped. Run the steps in order. |
 | A statement fails with a syntax error | Note the file and statement and report it. The generated files should never be edited by hand. See the verification status above: this SQL has not run in Snowflake yet. |
-| The validation shows `FAIL` rows | Filter `RESULT = 'FAIL'`. Row-count or `VIEWS` failures mean a step did not finish. Re-run steps 3, 4 and 5. They are safe to repeat. |
-| Row counts show `WARN` (count differs from the bundled data) | The data was only partly loaded or was changed after loading. Re-run steps 3 and 4 to restore the bundled rows. |
+| The validation shows `FAIL` rows | Filter `RESULT = 'FAIL'`. Row-count or `VIEWS` failures mean a step did not finish. Re-run steps 3, 4a to 4f and 5. They are safe to repeat. |
+| Row counts show `WARN` (count differs from the bundled data) | The data was only partly loaded or was changed after loading. Re-run steps 3 and 4a to 4f to restore the bundled rows. |
 | `Report participants differ from the event` shows `WARN` | Expected. It is the one deliberate inconsistency. |
-| The validation statement runs for a long time | It is one query with about 260 branches. Give it a moment. A larger warehouse is not needed. |
+| The validation statement runs for a long time | It is one query with about 300 branches. Give it a moment. A larger warehouse is not needed. |
 | You edited `02_create_tables.sql` and nothing changed | `CREATE TABLE IF NOT EXISTS` never alters an existing table. Reset the demo (below) and run the setup again, or write an `ALTER TABLE`. |
+| A column or table named in the views or loads "does not exist" after pulling a newer version | The tables changed (event log, campaigns, household gifts, economic profile) and the database was created by an older version. Reset the demo (below) and run the setup again. |
+| A view fails with an unknown function | The new views use `MEDIAN`, `CORR`, `REGR_SLOPE`, `REGR_INTERCEPT`, `REGR_R2` and `DATEADD`. These are standard Snowflake functions but were only tested on the DuckDB stand-in. Report the view name and the message. |
+| A 4x file fails with a foreign-key or missing-parent style message | Run the files in order: 4b needs 4a, and 4f needs 4c and 4e. Foreign keys are not enforced, so more likely a validation check reports the problem. |
 
 ## 6. Resetting the demo (destructive)
 

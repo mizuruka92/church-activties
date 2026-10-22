@@ -19,40 +19,42 @@ Dokumen ini **dihasilkan otomatis** dari komentar pada `sql/02_create_tables.sql
 | No | Domain | Tabel |
 |---|---|---|
 | 1 | Kolekte | `PENERIMAAN_KOLEKTE`, `REFERENSI_JENIS_KOLEKTE` |
-| 2 | Kehadiran Misa | `KEHADIRAN_MISA` |
+| 2 | Kehadiran Misa | `KEHADIRAN_MISA`, `PERISTIWA_LUAR_BIASA` |
 | 3 | Basis data umat (simulasi BIDUK) | `KELUARGA`, `UMAT`, `PENUGASAN_KELUARGA`, `PENUGASAN_LINGKUNGAN`, `REFERENSI_KLASIFIKASI_DATA`, `KEBIJAKAN_AKSES_DATA`, `REFERENSI_KATEGORI_INFORMASI` |
-| 4 | Sumbangan kesempatan khusus per wilayah | `SUMBANGAN_KESEMPATAN_KHUSUS`, `REFERENSI_KESEMPATAN_KHUSUS` |
+| 4 | Sumbangan kesempatan khusus per wilayah | `KAMPANYE_SUMBANGAN`, `SUMBANGAN_KESEMPATAN_KHUSUS`, `SUMBANGAN_KELUARGA`, `REFERENSI_KESEMPATAN_KHUSUS` |
 | 5 | Jadwal Misa | `JADWAL_MISA`, `KEJADIAN_MISA` |
 | 6 | Survei | `SURVEI`, `PERTANYAAN_SURVEI`, `OPSI_JAWABAN_SURVEI`, `RESPONDEN_SURVEI`, `JAWABAN_SURVEI`, `HASIL_SURVEI_AGREGAT` |
 | 7 | Rencana tahunan, anggaran, dan realisasi | `RENCANA_KERJA_TAHUNAN`, `RENCANA_KEGIATAN`, `ALOKASI_ANGGARAN`, `REALISASI_PENGELUARAN`, `REFERENSI_KATEGORI_BIAYA` |
 | 8 | Kegiatan dan laporan pascakegiatan | `KEGIATAN`, `LAPORAN_KEGIATAN` |
-| 9 | Data induk wilayah dan GIS | `MASTER_WILAYAH`, `MASTER_LINGKUNGAN`, `GEOMETRI_ILUSTRATIF_LINGKUNGAN` |
-| - | Referensi bersama | `MASTER_SEKSI`, `REFERENSI_DAFTAR_NILAI`, `REFERENSI_PERIODE_PELAPORAN` |
+| 9 | Data induk wilayah dan GIS | `MASTER_WILAYAH`, `MASTER_LINGKUNGAN`, `PROFIL_EKONOMI_LINGKUNGAN`, `GEOMETRI_ILUSTRATIF_LINGKUNGAN` |
+| - | Referensi bersama | `INFO_DATASET`, `MASTER_SEKSI`, `REFERENSI_DAFTAR_NILAI`, `REFERENSI_PERIODE_PELAPORAN` |
 
 ## Ringkasan tabel
 
 | Skema | Tabel | Domain | Klasifikasi | Jumlah baris (data simulasi bawaan) |
 |---|---|---|---|---:|
+| MASTER_DATA | [`INFO_DATASET`](#master_datainfodataset) | Referensi bersama | Publik | 1 |
 | MASTER_DATA | [`REFERENSI_KLASIFIKASI_DATA`](#master_datareferensiklasifikasidata) | Basis data umat (simulasi BIDUK) | Publik | 4 |
 | MASTER_DATA | [`MASTER_SEKSI`](#master_datamasterseksi) | Referensi bersama | Publik | 9 |
 | MASTER_DATA | [`REFERENSI_KATEGORI_INFORMASI`](#master_datareferensikategoriinformasi) | Basis data umat (simulasi BIDUK) | Internal | 9 |
-| MASTER_DATA | [`REFERENSI_DAFTAR_NILAI`](#master_datareferensidaftarnilai) | Referensi bersama | Publik | 68 |
+| MASTER_DATA | [`REFERENSI_DAFTAR_NILAI`](#master_datareferensidaftarnilai) | Referensi bersama | Publik | 82 |
 | MASTER_DATA | [`REFERENSI_JENIS_KOLEKTE`](#master_datareferensijeniskolekte) | Kolekte | Publik | 3 |
 | MASTER_DATA | [`REFERENSI_KESEMPATAN_KHUSUS`](#master_datareferensikesempatankhusus) | Sumbangan kesempatan khusus per wilayah | Publik | 3 |
 | MASTER_DATA | [`REFERENSI_KATEGORI_BIAYA`](#master_datareferensikategoribiaya) | Rencana tahunan, anggaran, dan realisasi | Internal | 7 |
-| MASTER_DATA | [`REFERENSI_PERIODE_PELAPORAN`](#master_datareferensiperiodepelaporan) | Referensi bersama | Publik | 24 |
+| MASTER_DATA | [`REFERENSI_PERIODE_PELAPORAN`](#master_datareferensiperiodepelaporan) | Referensi bersama | Publik | 108 |
 | MASTER_DATA | [`KEBIJAKAN_AKSES_DATA`](#master_datakebijakanaksesdata) | Basis data umat (simulasi BIDUK) | Internal | 20 |
 | MASTER_DATA | [`MASTER_WILAYAH`](#master_datamasterwilayah) | Data induk wilayah dan GIS | Publik | 6 |
 | MASTER_DATA | [`MASTER_LINGKUNGAN`](#master_datamasterlingkungan) | Data induk wilayah dan GIS | Publik | 19 |
+| MASTER_DATA | [`PROFIL_EKONOMI_LINGKUNGAN`](#master_dataprofilekonomilingkungan) | Data induk wilayah dan GIS | Internal | 19 |
 | MASTER_DATA | [`GEOMETRI_ILUSTRATIF_LINGKUNGAN`](#master_datageometriilustratiflingkungan) | Data induk wilayah dan GIS | Internal | 18 |
 | MASTER_DATA | [`JADWAL_MISA`](#master_datajadwalmisa) | Jadwal Misa | Publik | 7 |
 | MASTER_DATA | [`SURVEI`](#master_datasurvei) | Survei | Internal | 4 |
 | MASTER_DATA | [`PERTANYAAN_SURVEI`](#master_datapertanyaansurvei) | Survei | Internal | 17 |
 | MASTER_DATA | [`OPSI_JAWABAN_SURVEI`](#master_dataopsijawabansurvei) | Survei | Internal | 85 |
-| DATA_OPERASIONAL | [`KEJADIAN_MISA`](#data_operasionalkejadianmisa) | Jadwal Misa | Internal | 182 |
-| DATA_OPERASIONAL | [`KEHADIRAN_MISA`](#data_operasionalkehadiranmisa) | Kehadiran Misa | Internal | 155 |
-| DATA_OPERASIONAL | [`PENERIMAAN_KOLEKTE`](#data_operasionalpenerimaankolekte) | Kolekte | Internal | 292 |
-| DATA_OPERASIONAL | [`SUMBANGAN_KESEMPATAN_KHUSUS`](#data_operasionalsumbangankesempatankhusus) | Sumbangan kesempatan khusus per wilayah | Internal | 24 |
+| DATA_OPERASIONAL | [`KEJADIAN_MISA`](#data_operasionalkejadianmisa) | Jadwal Misa | Internal | 1825 |
+| DATA_OPERASIONAL | [`PERISTIWA_LUAR_BIASA`](#data_operasionalperistiwaluarbiasa) | Kehadiran Misa | Internal | 10 |
+| DATA_OPERASIONAL | [`KEHADIRAN_MISA`](#data_operasionalkehadiranmisa) | Kehadiran Misa | Internal | 1734 |
+| DATA_OPERASIONAL | [`PENERIMAAN_KOLEKTE`](#data_operasionalpenerimaankolekte) | Kolekte | Internal | 3263 |
 | DATA_OPERASIONAL | [`KELUARGA`](#data_operasionalkeluarga) | Basis data umat (simulasi BIDUK) | Terbatas | 227 |
 | DATA_OPERASIONAL | [`UMAT`](#data_operasionalumat) | Basis data umat (simulasi BIDUK) | Terbatas (anak di bawah 17 tahun: Sangat Terbatas) | 653 |
 | DATA_OPERASIONAL | [`PENUGASAN_KELUARGA`](#data_operasionalpenugasankeluarga) | Basis data umat (simulasi BIDUK) | Terbatas | 659 |
@@ -60,15 +62,37 @@ Dokumen ini **dihasilkan otomatis** dari komentar pada `sql/02_create_tables.sql
 | DATA_OPERASIONAL | [`RESPONDEN_SURVEI`](#data_operasionalrespondensurvei) | Survei | Terbatas | 214 |
 | DATA_OPERASIONAL | [`JAWABAN_SURVEI`](#data_operasionaljawabansurvei) | Survei | Terbatas | 1040 |
 | DATA_OPERASIONAL | [`HASIL_SURVEI_AGREGAT`](#data_operasionalhasilsurveiagregat) | Survei | Internal | 76 |
-| DATA_OPERASIONAL | [`RENCANA_KERJA_TAHUNAN`](#data_operasionalrencanakerjatahunan) | Rencana tahunan, anggaran, dan realisasi | Internal | 9 |
-| DATA_OPERASIONAL | [`RENCANA_KEGIATAN`](#data_operasionalrencanakegiatan) | Rencana tahunan, anggaran, dan realisasi | Internal | 42 |
-| DATA_OPERASIONAL | [`ALOKASI_ANGGARAN`](#data_operasionalalokasianggaran) | Rencana tahunan, anggaran, dan realisasi | Internal | 117 |
-| DATA_OPERASIONAL | [`REALISASI_PENGELUARAN`](#data_operasionalrealisasipengeluaran) | Rencana tahunan, anggaran, dan realisasi | Internal | 124 |
-| DATA_OPERASIONAL | [`KEGIATAN`](#data_operasionalkegiatan) | Kegiatan dan laporan pascakegiatan | Internal | 36 |
-| DATA_OPERASIONAL | [`LAPORAN_KEGIATAN`](#data_operasionallaporankegiatan) | Kegiatan dan laporan pascakegiatan | Internal | 24 |
-| | **Jumlah** | | | **4414** |
+| DATA_OPERASIONAL | [`RENCANA_KERJA_TAHUNAN`](#data_operasionalrencanakerjatahunan) | Rencana tahunan, anggaran, dan realisasi | Internal | 54 |
+| DATA_OPERASIONAL | [`RENCANA_KEGIATAN`](#data_operasionalrencanakegiatan) | Rencana tahunan, anggaran, dan realisasi | Internal | 179 |
+| DATA_OPERASIONAL | [`KAMPANYE_SUMBANGAN`](#data_operasionalkampanyesumbangan) | Sumbangan kesempatan khusus per wilayah | Internal | 14 |
+| DATA_OPERASIONAL | [`SUMBANGAN_KESEMPATAN_KHUSUS`](#data_operasionalsumbangankesempatankhusus) | Sumbangan kesempatan khusus per wilayah | Internal | 78 |
+| DATA_OPERASIONAL | [`SUMBANGAN_KELUARGA`](#data_operasionalsumbangankeluarga) | Sumbangan kesempatan khusus per wilayah | Sangat Terbatas | 1695 |
+| DATA_OPERASIONAL | [`ALOKASI_ANGGARAN`](#data_operasionalalokasianggaran) | Rencana tahunan, anggaran, dan realisasi | Internal | 521 |
+| DATA_OPERASIONAL | [`REALISASI_PENGELUARAN`](#data_operasionalrealisasipengeluaran) | Rencana tahunan, anggaran, dan realisasi | Internal | 698 |
+| DATA_OPERASIONAL | [`KEGIATAN`](#data_operasionalkegiatan) | Kegiatan dan laporan pascakegiatan | Internal | 169 |
+| DATA_OPERASIONAL | [`LAPORAN_KEGIATAN`](#data_operasionallaporankegiatan) | Kegiatan dan laporan pascakegiatan | Internal | 132 |
+| | **Jumlah** | | | **13899** |
 
 ## Rincian tabel
+
+### MASTER_DATA.INFO_DATASET
+<a id="master_datainfodataset"></a>
+
+Keterangan dataset demo, termasuk tanggal acuan yang dipakai view untuk membedakan tahun lengkap dari tahun berjalan.
+
+- **Granularitas:** satu baris untuk seluruh dataset.
+- **Klasifikasi data:** Publik.
+- **Domain:** Referensi bersama.
+- **Kunci utama (PK):** `ID_DATASET`.
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_DATASET` (PK) | `VARCHAR(30)` | Ya | Pengenal dataset (contoh: DS-01) |  |
+| `NAMA_DATASET` | `VARCHAR(150)` | Ya | Nama dataset demo |  |
+| `DESKRIPSI` | `VARCHAR(500)` | Ya | Penjelasan singkat isi dataset |  |
+| `BERSIFAT_SIMULASI` | `BOOLEAN` | Ya | TRUE jika seluruh data adalah data simulasi (fiktif) |  |
+| `TANGGAL_MULAI_RIWAYAT` | `DATE` | Ya | Tanggal pertama yang dicakup oleh data riwayat |  |
+| `TANGGAL_SNAPSHOT` | `DATE` | Ya | Tanggal acuan data: catatan setelah tanggal ini adalah jadwal atau rencana, bukan kejadian |  |
 
 ### MASTER_DATA.REFERENSI_KLASIFIKASI_DATA
 <a id="master_datareferensiklasifikasidata"></a>
@@ -271,6 +295,27 @@ Daftar lingkungan (fiktif) beserta wilayah induknya.
 | `TANGGAL_AKHIR_BERLAKU` | `DATE` | Tidak | Tanggal lingkungan berhenti berlaku, kosong jika masih berlaku |  |
 | `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan tambahan, misalnya penggabungan lingkungan |  |
 
+### MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN
+<a id="master_dataprofilekonomilingkungan"></a>
+
+Gambaran kapasitas ekonomi umum setiap lingkungan (simulasi, hanya tingkat lingkungan, tidak ada data ekonomi rumah tangga). Menjelaskan konteks, bukan menilai kemurahan hati atau iman.
+
+- **Granularitas:** satu baris per lingkungan.
+- **Klasifikasi data:** Internal.
+- **Domain:** Data induk wilayah dan GIS.
+- **Kunci utama (PK):** `ID_PROFIL`.
+- **Kunci unik (UQ):** `ID_LINGKUNGAN`.
+- **Relasi (FK):** `ID_LINGKUNGAN` merujuk ke `MASTER_DATA.MASTER_LINGKUNGAN` (`ID_LINGKUNGAN`).
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_PROFIL` (PK) | `VARCHAR(30)` | Ya | Pengenal profil ekonomi (contoh: PEK-01) |  |
+| `ID_LINGKUNGAN` | `VARCHAR(30)` | Ya | Lingkungan yang dinilai | Merujuk ke `MASTER_LINGKUNGAN` |
+| `TAHUN_PENILAIAN` | `NUMBER(4,0)` | Ya | Tahun penilaian profil |  |
+| `KATEGORI_EKONOMI` | `VARCHAR(50)` | Ya | Kapasitas ekonomi umum lingkungan: Rendah, Menengah Bawah, Menengah Atas, atau Tinggi | Salah satu dari: `Rendah`, `Menengah Bawah`, `Menengah Atas`, `Tinggi` |
+| `INDEKS_KAPASITAS_EKONOMI` | `NUMBER(4,2)` | Ya | Indeks kapasitas ekonomi relatif terhadap rata-rata paroki, 1.00 berarti rata-rata |  |
+| `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan penilaian |  |
+
 ### MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN
 <a id="master_datageometriilustratiflingkungan"></a>
 
@@ -401,6 +446,26 @@ Kejadian Misa yang sebenarnya, hasil penerapan aturan jadwal pada tanggal terten
 | `STATUS_PELAKSANAAN` | `VARCHAR(50)` | Ya | Status: Terjadwal, Terlaksana, atau Dibatalkan | Salah satu dari: `Terjadwal`, `Terlaksana`, `Dibatalkan` |
 | `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan, misalnya hari raya atau alasan pembatalan |  |
 
+### DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA
+<a id="data_operasionalperistiwaluarbiasa"></a>
+
+Catatan peristiwa luar biasa seperti hujan deras, kabut asap, atau abu vulkanik yang dapat menurunkan kehadiran dan kolekte. Besar dampak sengaja tidak disimpan agar dapat dianalisis dari data.
+
+- **Granularitas:** satu baris per peristiwa.
+- **Klasifikasi data:** Internal.
+- **Domain:** Kehadiran Misa.
+- **Kunci utama (PK):** `ID_PERISTIWA`.
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_PERISTIWA` (PK) | `VARCHAR(30)` | Ya | Pengenal peristiwa (contoh: PRS-01) |  |
+| `JENIS_PERISTIWA` | `VARCHAR(100)` | Ya | Jenis peristiwa, misalnya Hujan Deras dan Banjir, Kabut Asap, atau Abu Vulkanik | Salah satu dari: `Hujan Deras dan Banjir`, `Kabut Asap`, `Abu Vulkanik`, `Gangguan Listrik` |
+| `NAMA_PERISTIWA` | `VARCHAR(200)` | Ya | Nama peristiwa untuk tampilan pada grafik riwayat |  |
+| `TANGGAL_MULAI` | `DATE` | Ya | Tanggal peristiwa mulai memengaruhi paroki |  |
+| `TANGGAL_SELESAI` | `DATE` | Ya | Tanggal peristiwa berakhir |  |
+| `TINGKAT_GANGGUAN` | `VARCHAR(50)` | Ya | Penilaian petugas atas gangguan: Ringan, Sedang, atau Berat | Salah satu dari: `Ringan`, `Sedang`, `Berat` |
+| `DESKRIPSI` | `VARCHAR(500)` | Ya | Penjelasan singkat peristiwa dan akibatnya bagi kegiatan paroki |  |
+
 ### DATA_OPERASIONAL.KEHADIRAN_MISA
 <a id="data_operasionalkehadiranmisa"></a>
 
@@ -412,6 +477,7 @@ Total kehadiran umat pada setiap Misa yang terlaksana.
 - **Kunci utama (PK):** `ID_KEHADIRAN`.
 - **Kunci unik (UQ):** `ID_KEJADIAN_MISA`.
 - **Relasi (FK):** `ID_KEJADIAN_MISA` merujuk ke `DATA_OPERASIONAL.KEJADIAN_MISA` (`ID_KEJADIAN_MISA`).
+- **Relasi (FK):** `ID_PERISTIWA` merujuk ke `DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA` (`ID_PERISTIWA`).
 
 | Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
 |---|---|---|---|---|
@@ -422,6 +488,7 @@ Total kehadiran umat pada setiap Misa yang terlaksana.
 | `STATUS_VALIDASI` | `VARCHAR(50)` | Ya | Status validasi: Sudah Divalidasi, Menunggu Validasi, atau Perlu Dicek Ulang | Salah satu dari: `Sudah Divalidasi`, `Menunggu Validasi`, `Perlu Dicek Ulang` |
 | `WAKTU_PENCATATAN` | `TIMESTAMP_NTZ` | Ya | Waktu lokal pencatatan jumlah umat |  |
 | `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan, misalnya kondisi cuaca atau alasan pengecekan ulang |  |
+| `ID_PERISTIWA` | `VARCHAR(30)` | Tidak | Peristiwa luar biasa yang dicatat petugas sebagai penyebab kehadiran berbeda, kosong jika tidak ada | Merujuk ke `PERISTIWA_LUAR_BIASA` |
 
 ### DATA_OPERASIONAL.PENERIMAAN_KOLEKTE
 <a id="data_operasionalpenerimaankolekte"></a>
@@ -446,32 +513,6 @@ Ringkasan kolekte per Misa dan jenis kolekte, membedakan jumlah tercatat, hasil 
 | `STATUS_REKONSILIASI` | `VARCHAR(50)` | Ya | Status: Sudah Cocok, Selisih Disetujui, Selisih Sedang Ditelusuri, atau Belum Dihitung | Salah satu dari: `Sudah Cocok`, `Selisih Disetujui`, `Selisih Sedang Ditelusuri`, `Belum Dihitung` |
 | `TANGGAL_PENCATATAN` | `DATE` | Ya | Tanggal hasil terakhir dicatat |  |
 | `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan, misalnya penjelasan selisih |  |
-
-### DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS
-<a id="data_operasionalsumbangankesempatankhusus"></a>
-
-Ringkasan sumbangan kesempatan khusus per wilayah. Tidak dipakai untuk memeringkat wilayah.
-
-- **Granularitas:** satu baris per wilayah, kesempatan khusus, dan periode.
-- **Klasifikasi data:** Internal.
-- **Domain:** Sumbangan kesempatan khusus per wilayah.
-- **Kunci utama (PK):** `ID_SUMBANGAN`.
-- **Kunci unik (UQ):** `ID_WILAYAH, ID_KESEMPATAN, PERIODE_MULAI`.
-- **Relasi (FK):** `ID_WILAYAH` merujuk ke `MASTER_DATA.MASTER_WILAYAH` (`ID_WILAYAH`).
-- **Relasi (FK):** `ID_KESEMPATAN` merujuk ke `MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS` (`ID_KESEMPATAN`).
-
-| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
-|---|---|---|---|---|
-| `ID_SUMBANGAN` (PK) | `VARCHAR(30)` | Ya | Pengenal catatan sumbangan (contoh: SMB-001) |  |
-| `ID_WILAYAH` | `VARCHAR(30)` | Ya | Wilayah pelapor sumbangan | Merujuk ke `MASTER_WILAYAH` |
-| `ID_KESEMPATAN` | `VARCHAR(30)` | Ya | Kesempatan khusus, misalnya Prapaskah atau Adven | Merujuk ke `REFERENSI_KESEMPATAN_KHUSUS` |
-| `PERIODE_MULAI` | `DATE` | Ya | Tanggal awal periode pengumpulan |  |
-| `PERIODE_SELESAI` | `DATE` | Ya | Tanggal akhir periode pengumpulan |  |
-| `JUMLAH_KELUARGA_PESERTA` | `NUMBER(6,0)` | Ya | Jumlah keluarga di wilayah yang ikut menyumbang |  |
-| `JUMLAH_SUMBANGAN` | `NUMBER(18,0)` | Ya | Total sumbangan wilayah pada periode tersebut, dalam rupiah |  |
-| `TANGGAL_PENCATATAN` | `DATE` | Ya | Tanggal laporan wilayah dicatat |  |
-| `STATUS_VALIDASI` | `VARCHAR(50)` | Ya | Status validasi: Sudah Divalidasi, Menunggu Validasi, atau Perlu Dicek Ulang | Salah satu dari: `Sudah Divalidasi`, `Menunggu Validasi`, `Perlu Dicek Ulang` |
-| `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan tambahan |  |
 
 ### DATA_OPERASIONAL.KELUARGA
 <a id="data_operasionalkeluarga"></a>
@@ -655,13 +696,85 @@ Kegiatan yang direncanakan dalam rencana kerja tahunan. Tidak semua rencana suda
 
 | Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
 |---|---|---|---|---|
-| `ID_RENCANA` (PK) | `VARCHAR(30)` | Ya | Pengenal rencana kegiatan (contoh: RNC-001) |  |
+| `ID_RENCANA` (PK) | `VARCHAR(30)` | Ya | Pengenal rencana kegiatan (contoh: RNC-0001) |  |
 | `ID_RENCANA_KERJA` | `VARCHAR(30)` | Ya | Rencana kerja tahunan induk, dari sini diperoleh seksi dan tahun | Merujuk ke `RENCANA_KERJA_TAHUNAN` |
 | `NAMA_PROGRAM` | `VARCHAR(200)` | Ya | Nama program atau kegiatan yang direncanakan |  |
 | `TUJUAN_PROGRAM` | `VARCHAR(500)` | Ya | Tujuan program |  |
 | `TANGGAL_RENCANA` | `DATE` | Ya | Tanggal pelaksanaan menurut rencana (tanggal mulai) |  |
 | `STATUS_PELAKSANAAN` | `VARCHAR(50)` | Ya | Status: Direncanakan, Terlaksana, Ditunda, atau Dibatalkan | Salah satu dari: `Direncanakan`, `Terlaksana`, `Ditunda`, `Dibatalkan` |
 | `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan, misalnya alasan penundaan atau pembatalan |  |
+
+### DATA_OPERASIONAL.KAMPANYE_SUMBANGAN
+<a id="data_operasionalkampanyesumbangan"></a>
+
+Satu kampanye sumbangan pada satu periode, dengan kegiatan besar yang didanainya. Dasar analisis titik impas.
+
+- **Granularitas:** satu baris per kesempatan khusus dan periode.
+- **Klasifikasi data:** Internal.
+- **Domain:** Sumbangan kesempatan khusus per wilayah.
+- **Kunci utama (PK):** `ID_KAMPANYE`.
+- **Kunci unik (UQ):** `ID_KESEMPATAN, PERIODE_MULAI`.
+- **Relasi (FK):** `ID_KESEMPATAN` merujuk ke `MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS` (`ID_KESEMPATAN`).
+- **Relasi (FK):** `ID_RENCANA_PENGGUNAAN` merujuk ke `DATA_OPERASIONAL.RENCANA_KEGIATAN` (`ID_RENCANA`).
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_KAMPANYE` (PK) | `VARCHAR(30)` | Ya | Pengenal kampanye sumbangan (contoh: KMP-01) |  |
+| `ID_KESEMPATAN` | `VARCHAR(30)` | Ya | Kesempatan khusus yang melandasi kampanye | Merujuk ke `REFERENSI_KESEMPATAN_KHUSUS` |
+| `NAMA_KAMPANYE` | `VARCHAR(200)` | Ya | Nama kampanye beserta tahunnya, misalnya Aksi Puasa Pembangunan 2026 |  |
+| `PERIODE_MULAI` | `DATE` | Ya | Tanggal awal pengumpulan |  |
+| `PERIODE_SELESAI` | `DATE` | Ya | Tanggal akhir pengumpulan |  |
+| `TARGET_DANA` | `NUMBER(18,0)` | Ya | Target dana kampanye, dalam rupiah |  |
+| `ID_RENCANA_PENGGUNAAN` | `VARCHAR(30)` | Tidak | Rencana kegiatan yang akan dibiayai dana kampanye, misalnya perayaan Paskah atau Natal, kosong jika belum ditentukan | Merujuk ke `RENCANA_KEGIATAN` |
+| `STATUS_KAMPANYE` | `VARCHAR(50)` | Ya | Status kampanye: Direncanakan, Berjalan, atau Selesai | Salah satu dari: `Direncanakan`, `Berjalan`, `Selesai` |
+| `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan tambahan |  |
+
+### DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS
+<a id="data_operasionalsumbangankesempatankhusus"></a>
+
+Ringkasan sumbangan kampanye per wilayah. Harus sama dengan jumlah sumbangan keluarga di wilayah itu. Tidak dipakai untuk memeringkat wilayah.
+
+- **Granularitas:** satu baris per kampanye dan wilayah.
+- **Klasifikasi data:** Internal.
+- **Domain:** Sumbangan kesempatan khusus per wilayah.
+- **Kunci utama (PK):** `ID_SUMBANGAN`.
+- **Kunci unik (UQ):** `ID_KAMPANYE, ID_WILAYAH`.
+- **Relasi (FK):** `ID_KAMPANYE` merujuk ke `DATA_OPERASIONAL.KAMPANYE_SUMBANGAN` (`ID_KAMPANYE`).
+- **Relasi (FK):** `ID_WILAYAH` merujuk ke `MASTER_DATA.MASTER_WILAYAH` (`ID_WILAYAH`).
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_SUMBANGAN` (PK) | `VARCHAR(30)` | Ya | Pengenal catatan sumbangan wilayah (contoh: SMB-001) |  |
+| `ID_KAMPANYE` | `VARCHAR(30)` | Ya | Kampanye yang dilaporkan, dari sini diperoleh kesempatan khusus dan periode | Merujuk ke `KAMPANYE_SUMBANGAN` |
+| `ID_WILAYAH` | `VARCHAR(30)` | Ya | Wilayah pelapor sumbangan | Merujuk ke `MASTER_WILAYAH` |
+| `JUMLAH_KELUARGA_PESERTA` | `NUMBER(6,0)` | Ya | Jumlah keluarga di wilayah yang ikut menyumbang |  |
+| `JUMLAH_SUMBANGAN` | `NUMBER(18,0)` | Ya | Total sumbangan wilayah pada kampanye tersebut, dalam rupiah |  |
+| `TANGGAL_PENCATATAN` | `DATE` | Ya | Tanggal laporan wilayah dicatat |  |
+| `STATUS_VALIDASI` | `VARCHAR(50)` | Ya | Status validasi: Sudah Divalidasi, Menunggu Validasi, atau Perlu Dicek Ulang | Salah satu dari: `Sudah Divalidasi`, `Menunggu Validasi`, `Perlu Dicek Ulang` |
+| `KETERANGAN` | `VARCHAR(500)` | Tidak | Catatan tambahan |  |
+
+### DATA_OPERASIONAL.SUMBANGAN_KELUARGA
+<a id="data_operasionalsumbangankeluarga"></a>
+
+Sumbangan setiap keluarga fiktif pada satu kampanye. Data keuangan keluarga yang teridentifikasi, hanya boleh tampil sebagai angka agregat.
+
+- **Granularitas:** satu baris per keluarga dan kampanye.
+- **Klasifikasi data:** Sangat Terbatas.
+- **Domain:** Sumbangan kesempatan khusus per wilayah.
+- **Kunci utama (PK):** `ID_SUMBANGAN_KELUARGA`.
+- **Kunci unik (UQ):** `ID_KAMPANYE, ID_KELUARGA`.
+- **Relasi (FK):** `ID_KAMPANYE` merujuk ke `DATA_OPERASIONAL.KAMPANYE_SUMBANGAN` (`ID_KAMPANYE`).
+- **Relasi (FK):** `ID_KELUARGA` merujuk ke `DATA_OPERASIONAL.KELUARGA` (`ID_KELUARGA`).
+- **Relasi (FK):** `ID_LINGKUNGAN` merujuk ke `MASTER_DATA.MASTER_LINGKUNGAN` (`ID_LINGKUNGAN`).
+
+| Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
+|---|---|---|---|---|
+| `ID_SUMBANGAN_KELUARGA` (PK) | `VARCHAR(30)` | Ya | Pengenal sumbangan keluarga (contoh: SKL-00001) |  |
+| `ID_KAMPANYE` | `VARCHAR(30)` | Ya | Kampanye yang disumbang | Merujuk ke `KAMPANYE_SUMBANGAN` |
+| `ID_KELUARGA` | `VARCHAR(30)` | Ya | Keluarga fiktif penyumbang | Merujuk ke `KELUARGA` |
+| `ID_LINGKUNGAN` | `VARCHAR(30)` | Ya | Lingkungan keluarga pada tanggal sumbangan, dicatat agar riwayat pindah lingkungan tidak mengubah angka lama | Merujuk ke `MASTER_LINGKUNGAN` |
+| `JUMLAH_SUMBANGAN` | `NUMBER(18,0)` | Ya | Jumlah sumbangan keluarga pada kampanye ini, dalam rupiah |  |
+| `TANGGAL_SUMBANGAN` | `DATE` | Ya | Tanggal sumbangan diterima |  |
 
 ### DATA_OPERASIONAL.ALOKASI_ANGGARAN
 <a id="data_operasionalalokasianggaran"></a>
@@ -678,7 +791,7 @@ Anggaran yang direncanakan, terpisah dari realisasi pengeluaran.
 
 | Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
 |---|---|---|---|---|
-| `ID_ALOKASI` (PK) | `VARCHAR(30)` | Ya | Pengenal alokasi anggaran (contoh: ALK-001) |  |
+| `ID_ALOKASI` (PK) | `VARCHAR(30)` | Ya | Pengenal alokasi anggaran (contoh: ALK-0001) |  |
 | `ID_RENCANA` | `VARCHAR(30)` | Ya | Kegiatan yang dianggarkan | Merujuk ke `RENCANA_KEGIATAN` |
 | `ID_KATEGORI_BIAYA` | `VARCHAR(30)` | Ya | Kategori biaya yang dianggarkan | Merujuk ke `REFERENSI_KATEGORI_BIAYA` |
 | `JUMLAH_ANGGARAN` | `NUMBER(18,0)` | Ya | Jumlah anggaran yang disetujui, dalam rupiah |  |
@@ -698,7 +811,7 @@ Pengeluaran sebenarnya. Satu alokasi bisa memiliki banyak pengeluaran atau belum
 
 | Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
 |---|---|---|---|---|
-| `ID_PENGELUARAN` (PK) | `VARCHAR(30)` | Ya | Pengenal pengeluaran (contoh: PGL-0001) |  |
+| `ID_PENGELUARAN` (PK) | `VARCHAR(30)` | Ya | Pengenal pengeluaran (contoh: PGL-00001) |  |
 | `ID_ALOKASI` | `VARCHAR(30)` | Ya | Alokasi anggaran yang digunakan | Merujuk ke `ALOKASI_ANGGARAN` |
 | `TANGGAL_PENGELUARAN` | `DATE` | Ya | Tanggal pengeluaran terjadi |  |
 | `JUMLAH_PENGELUARAN` | `NUMBER(18,0)` | Ya | Jumlah pengeluaran sebenarnya, dalam rupiah |  |
@@ -719,7 +832,7 @@ Kegiatan yang benar-benar terdaftar atau terlaksana. Satu rencana memiliki palin
 
 | Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
 |---|---|---|---|---|
-| `ID_KEGIATAN` (PK) | `VARCHAR(30)` | Ya | Pengenal kegiatan (contoh: KGT-001) |  |
+| `ID_KEGIATAN` (PK) | `VARCHAR(30)` | Ya | Pengenal kegiatan (contoh: KGT-0001) |  |
 | `ID_RENCANA` | `VARCHAR(30)` | Tidak | Rencana kegiatan asal, kosong untuk kegiatan yang tidak direncanakan | Merujuk ke `RENCANA_KEGIATAN` |
 | `NAMA_KEGIATAN` | `VARCHAR(200)` | Ya | Nama kegiatan |  |
 | `ID_SEKSI` | `VARCHAR(30)` | Ya | Seksi penyelenggara | Merujuk ke `MASTER_SEKSI` |
@@ -745,7 +858,7 @@ Laporan pascakegiatan. Tidak semua kegiatan memiliki laporan, dan sebagian lapor
 
 | Kolom | Tipe data | Wajib diisi | Penjelasan | Nilai yang diizinkan atau rujukan |
 |---|---|---|---|---|
-| `ID_LAPORAN` (PK) | `VARCHAR(30)` | Ya | Pengenal laporan (contoh: LPK-001) |  |
+| `ID_LAPORAN` (PK) | `VARCHAR(30)` | Ya | Pengenal laporan (contoh: LPK-0001) |  |
 | `ID_KEGIATAN` | `VARCHAR(30)` | Ya | Kegiatan yang dilaporkan | Merujuk ke `KEGIATAN` |
 | `TANGGAL_LAPORAN` | `DATE` | Ya | Tanggal laporan dibuat atau terakhir diubah |  |
 | `STATUS_LAPORAN` | `VARCHAR(50)` | Ya | Status laporan: Final, Draf, atau Perlu Revisi | Salah satu dari: `Final`, `Draf`, `Perlu Revisi` |
@@ -946,6 +1059,48 @@ Dipakai pada: `MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS.MUSIM_LITURGI`.
 | `Adven` | Masa persiapan menjelang Natal. |
 | `Tidak Terkait Musim` | Tidak terkait musim liturgi tertentu. |
 
+### STATUS_KAMPANYE
+
+Dipakai pada: `DATA_OPERASIONAL.KAMPANYE_SUMBANGAN.STATUS_KAMPANYE`.
+
+| Nilai | Arti |
+|---|---|
+| `Direncanakan` | Kampanye belum dibuka. |
+| `Berjalan` | Kampanye sedang mengumpulkan sumbangan. |
+| `Selesai` | Kampanye sudah ditutup. |
+
+### JENIS_PERISTIWA
+
+Dipakai pada: `DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA.JENIS_PERISTIWA`.
+
+| Nilai | Arti |
+|---|---|
+| `Hujan Deras dan Banjir` | Hujan lebat atau banjir yang menyulitkan umat menuju gereja. |
+| `Kabut Asap` | Kualitas udara buruk akibat kabut asap. |
+| `Abu Vulkanik` | Hujan abu dari letusan gunung berapi. |
+| `Gangguan Listrik` | Pemadaman listrik yang mengganggu pelaksanaan Misa. |
+
+### TINGKAT_GANGGUAN
+
+Dipakai pada: `DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA.TINGKAT_GANGGUAN`.
+
+| Nilai | Arti |
+|---|---|
+| `Ringan` | Gangguan kecil, sebagian kecil umat terpengaruh. |
+| `Sedang` | Gangguan yang nyata menurunkan jumlah umat yang datang. |
+| `Berat` | Gangguan besar, kegiatan dapat dibatalkan. |
+
+### KATEGORI_EKONOMI
+
+Dipakai pada: `MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN.KATEGORI_EKONOMI`.
+
+| Nilai | Arti |
+|---|---|
+| `Rendah` | Kapasitas ekonomi umum lingkungan di bawah rata-rata paroki. |
+| `Menengah Bawah` | Kapasitas ekonomi umum lingkungan agak di bawah rata-rata paroki. |
+| `Menengah Atas` | Kapasitas ekonomi umum lingkungan agak di atas rata-rata paroki. |
+| `Tinggi` | Kapasitas ekonomi umum lingkungan di atas rata-rata paroki. |
+
 ### KELOMPOK_PENGGUNA
 
 Dipakai pada: `MASTER_DATA.KEBIJAKAN_AKSES_DATA.KELOMPOK_PENGGUNA`.
@@ -979,7 +1134,7 @@ View hanya berisi data agregat atau ringkasan operasional. Tidak ada view yang m
 | `ANALISIS.KEHADIRAN_MISA_BULANAN` | Kehadiran umat per bulan dan sesi Misa (hanya Misa yang terlaksana). Data simulasi. |
 | `ANALISIS.KOLEKTE_MISA_BULANAN` | Kolekte per bulan, sesi Misa, dan jenis kolekte: jumlah tercatat, hasil penghitungan, dan status rekonsiliasi. Bukan ukuran iman. Data simulasi. |
 | `ANALISIS.TREN_KEHADIRAN_PERIODE` | Tren kehadiran seluruh Misa per bulan dengan perbandingan terhadap bulan sebelumnya. Data simulasi. |
-| `ANALISIS.SUMBANGAN_KHUSUS_PER_WILAYAH` | Sumbangan kesempatan khusus per wilayah dan periode. Hanya ringkasan, tidak untuk memeringkat wilayah. Data simulasi. |
+| `ANALISIS.SUMBANGAN_KHUSUS_PER_WILAYAH` | Sumbangan kampanye (Prapaskah, Adven, solidaritas) per wilayah. Hanya ringkasan, tidak untuk memeringkat wilayah. Data simulasi. |
 | `ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM` | Anggaran rencana dibandingkan pengeluaran sebenarnya untuk setiap program. Data simulasi. |
 | `ANALISIS.ANGGARAN_VS_REALISASI_SEKSI` | Ringkasan anggaran dan pengeluaran per seksi, termasuk pembandingan khusus untuk program yang sudah terlaksana. Data simulasi. |
 | `ANALISIS.KEGIATAN_DAN_LAPORAN` | Setiap kegiatan dengan target peserta, peserta aktual, anggaran, dan status laporan pascakegiatan. Data simulasi. |
@@ -987,12 +1142,24 @@ View hanya berisi data agregat atau ringkasan operasional. Tidak ada view yang m
 | `ANALISIS.HASIL_SURVEI` | Hasil survei yang sudah dirangkum: jumlah dan persentase responden per kategori jawaban. Data simulasi. |
 | `ANALISIS.RINGKASAN_SKOR_LIKERT` | Skor rata-rata (1 sampai 5) dan persentase setuju untuk pertanyaan berskala Likert. Data simulasi. |
 | `ANALISIS.RINGKASAN_UMAT_PER_LINGKUNGAN` | Jumlah keluarga dan umat aktif per lingkungan. Hanya angka agregat, tanpa nama atau identitas individu. Data simulasi. |
+| `ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA` | Kolekte dan kehadiran per pekan (Senin sampai Minggu) dengan peristiwa luar biasa, untuk grafik riwayat dan membaca penyimpangan peramalan. Data simulasi. |
+| `ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA` | Kehadiran dan kolekte selama setiap peristiwa luar biasa dibandingkan dengan yang diharapkan dari rata-rata 8 pekan sebelumnya untuk sesi Misa yang sama. Data simulasi. |
+| `ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN` | Kolekte per umat yang hadir menurut tanggal dalam bulan, per tahun. Pola administrasi (setelah hari gajian), bukan ukuran iman. Data simulasi. |
+| `ANALISIS.KORELASI_KOLEKTE_KEHADIRAN` | Korelasi kolekte dengan jumlah umat dan dengan tanggal dalam bulan, per tahun dan sesi Misa. Data simulasi. |
+| `ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN` | Pemasukan (kolekte, sumbangan khusus) dan pengeluaran program per bulan, dengan peristiwa luar biasa. Data simulasi. |
+| `ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN` | Pemasukan dan pengeluaran program per tahun, pertumbuhan tahun ke tahun, dan kolekte per Misa tanpa peristiwa luar biasa. Tahun berjalan ditandai belum lengkap. Data simulasi. |
+| `ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN` | Garis tren linear dari tahun-tahun lengkap dan proyeksinya ke depan, serta tahun ketika tren pengeluaran melampaui tren kolekte. Metode sederhana. Data simulasi. |
+| `ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN` | Sumbangan kampanye per lingkungan: total, rata-rata, median, dan per keluarga atau umat terdaftar, beserta kapasitas ekonomi lingkungan. Menggambarkan sebaran, bukan menilai iman atau kemurahan hati. Data simulasi. |
+| `ANALISIS.TITIK_IMPAS_KAMPANYE` | Sumbangan kampanye (Prapaskah, Adven, solidaritas) dibandingkan dengan biaya kegiatan besar yang didanainya, per tahun. Surplus menjadi pemasukan gereja, defisit ditutup gereja. Data simulasi. |
 
 ## Catatan kewajaran dan privasi
 
 - Nama pada `UMAT` dan `KELUARGA` adalah gabungan acak nama depan dan nama keluarga yang umum. Kemiripan dengan orang sebenarnya adalah kebetulan.
 - Model data tidak memiliki kolom untuk nomor identitas, nomor telepon, alamat rumah, atau tanggal lahir lengkap.
 - Responden survei bersifat anonim dan tidak terhubung ke `ID_UMAT`.
-- Jumlah kolekte adalah ringkasan administrasi keuangan dan bukan ukuran iman atau komitmen rohani.
-- Sumbangan per wilayah tidak boleh dipakai untuk memeringkat wilayah.
+- Jumlah kolekte adalah ringkasan administrasi keuangan dan bukan ukuran iman atau komitmen rohani. Hubungan kolekte dengan jumlah umat dan tanggal dalam bulan dipakai hanya untuk memahami pola dan membuat proyeksi.
+- Sumbangan per wilayah atau per lingkungan tidak boleh dipakai untuk memeringkat wilayah atau lingkungan, dan tidak menggambarkan iman atau kemurahan hati. Angka tersebut menunjukkan kapasitas ekonomi dan sebaran sumbangan.
+- `SUMBANGAN_KELUARGA` memuat jumlah sumbangan keluarga fiktif yang teridentifikasi. Data ini berklasifikasi Sangat Terbatas dan hanya boleh tampil sebagai angka agregat (misalnya rata-rata, median, dan total per lingkungan).
+- Kapasitas ekonomi hanya dicatat pada tingkat lingkungan (`PROFIL_EKONOMI_LINGKUNGAN`). Tidak ada data ekonomi per keluarga, dan keluarga penyumbang besar tidak ditandai pada data mana pun.
+- `PERISTIWA_LUAR_BIASA` mencatat kejadian dan tingkat gangguannya, tetapi sengaja tidak menyimpan besar dampaknya terhadap kehadiran atau kolekte. Dampak dihitung oleh view analisis dari data.
 - Geometri pada `GEOMETRI_ILUSTRATIF_LINGKUNGAN` sengaja diletakkan di koordinat 0 derajat Lintang dan 0 derajat Bujur agar tidak disangka batas wilayah paroki yang sebenarnya.

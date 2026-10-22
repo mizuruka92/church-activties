@@ -103,8 +103,26 @@ def literal(value, column):
     raise DataError(f"unsupported type {column.sql_type}")
 
 
+MAX_ROWS_PER_STATEMENT = 1000
+
+
+def merge_statements(table, rows, max_rows=MAX_ROWS_PER_STATEMENT):
+    """One MERGE statement per chunk of rows. Chunks keep every statement small enough
+    for browser editors and well below Snowflake's statement size limit."""
+    validate_rows(table, rows)
+    chunks = [rows[i:i + max_rows] for i in range(0, len(rows), max_rows)] or [rows]
+    statements = []
+    for number, chunk in enumerate(chunks, start=1):
+        statement = merge_statement(table, chunk)
+        if len(chunks) > 1:
+            first, remainder = statement.split("\n", 1)
+            statement = f"{first} (part {number} of {len(chunks)})\n{remainder}"
+        statements.append(statement)
+    return statements
+
+
 def merge_statement(table, rows):
-    """One idempotent MERGE statement for all rows of a table."""
+    """One idempotent MERGE statement for all given rows."""
     validate_rows(table, rows)
     names = table.column_names
     key = set(table.primary_key)

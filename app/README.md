@@ -1,0 +1,76 @@
+# Dashboard (Phase 2): Pusat Informasi Paroki
+
+A Streamlit dashboard for the simulated Parish Information Hub. All text on screen is Bahasa Indonesia, all
+data is fictional, and every page says so.
+
+* `streamlit_app.py` is the whole app, in one file on purpose: it can be pasted into the Snowsight Streamlit
+  editor or deployed from the Git repository.
+* It reads **only the 20 aggregate views of the `ANALISIS` schema**, never the detail tables. It shows no
+  names, households or single gifts.
+* The page-by-page description, design rules and the list of views per page are in
+  [../docs/DASHBOARD.md](../docs/DASHBOARD.md).
+* New to Snowflake? Start with [../docs/STARTER_GUIDE.md](../docs/STARTER_GUIDE.md). It takes you from
+  creating an account to the running dashboard.
+
+## Status: please read
+
+* **Tested locally** on a DuckDB stand-in for Snowflake, with Streamlit's own test runner and a headless
+  browser: every page renders, only allowed views are read, the privacy and language rules hold. See
+  `tests/test_app.py`. Also tested on an older stack (Python 3.11, Streamlit 1.35, Altair 4.2) and the
+  current one (Streamlit 1.66, Altair 6).
+* **Not yet run inside Snowflake.** Nothing in this repository has been executed in a Snowflake account. The first
+  real run is the real test. The most likely surprises are listed in the starter guide, part 12.
+
+## Three ways to run it
+
+| Way | For whom | Needs |
+|---|---|---|
+| **Streamlit in Snowflake** (recommended) | Anyone | The setup (steps 1 to 6) done in Snowflake. No installation, no credentials. |
+| **From the Git repository** | Whoever keeps the app up to date | A Git repository object in Snowflake. |
+| **On your own computer** | Developers | Python 3.9 to 3.12 and a sign-in method that works outside a browser. |
+
+The first two are explained step by step in the starter guide. The local way:
+
+```bash
+pip install -r app/requirements.txt
+cp app/.streamlit/secrets.toml.example app/.streamlit/secrets.toml   # then fill in your own values
+cd app && streamlit run streamlit_app.py
+```
+
+`secrets.toml` is ignored by Git. Never commit it. The sign-in method that suits a trial account (password with
+multi-factor authentication versus a key pair) is explained in the starter guide, part 10. This way has not been
+tried against a real account.
+
+## Settings you may change
+
+All of them are constants at the top of `streamlit_app.py`:
+
+| Constant | Meaning |
+|---|---|
+| `DATABASE` | Database that holds the `ANALISIS` views. Default `PUSAT_INFORMASI_PAROKI`. Change it if you set the demo up under another name. |
+| `CACHE_SECONDS` | How long a view is kept in memory before it is read again (default 10 minutes). The button "Muat ulang data" clears it at once. |
+| `PALETTES` | Chart colours for light and dark themes. Keep at most three series per chart; see the design notes. |
+
+## Compatibility rules for the code
+
+The Streamlit and Python versions in a Snowflake account differ from your computer's, so the code avoids
+anything new: no `st.navigation`, no Altair 5-only encodings such as `xOffset`, no `match` statements, no
+`X | Y` types. A test parses the file with the Python 3.9 grammar. Width helpers try the new `width="stretch"`
+form and fall back to `use_container_width`.
+
+## Tests
+
+```bash
+pip install -r tests/requirements.txt
+python -m unittest tests.test_app -v      # about 25 seconds
+```
+
+The tests replace the single function that talks to Snowflake (`run_query`) with a DuckDB-backed stand-in built
+from the real SQL files (`tests/app_support.py`). They do not prove the app runs inside Streamlit in Snowflake.
+
+## Adding a page
+
+1. Add the view to `sql/05_create_views.sql` (and document it, as the existing views are) and to `VIEWS` in the app.
+2. Write a `page_...` function that calls `get("<VIEW>")`, and add it to `PAGES`.
+3. Show the banner (`banner()`), keep categories in a fixed order (never sorted by amount), and give each chart a table.
+4. Run the tests. They fail if a page raises, reads a view that is not listed, leaves a listed view unused, or uses a ranking word.

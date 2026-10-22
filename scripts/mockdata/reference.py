@@ -6,6 +6,7 @@ saints, but the combination here is generic and does not describe a real parish.
 """
 
 from datetime import date
+from decimal import Decimal
 
 from . import config, util
 from .vocab import DAFTAR_NILAI
@@ -133,6 +134,19 @@ MERGE_END = date(2024, 12, 31)
 
 ACTIVE_LINGKUNGAN = [row[0] for row in LINGKUNGAN if row[3]]
 LINGKUNGAN_TO_WILAYAH = {row[0]: row[1] for row in LINGKUNGAN}
+
+# Economic capacity of each community, as one area-level index (1.00 = parish average).
+# Only the community is described: no economic attribute exists for a household.
+EKONOMI = {
+    "LNG-01": ("Menengah Atas", "1.25"), "LNG-02": ("Tinggi", "1.70"), "LNG-03": ("Menengah Bawah", "0.85"),
+    "LNG-04": ("Menengah Atas", "1.20"), "LNG-05": ("Rendah", "0.55"), "LNG-06": ("Menengah Bawah", "0.90"),
+    "LNG-07": ("Rendah", "0.50"), "LNG-08": ("Menengah Bawah", "0.80"), "LNG-09": ("Menengah Atas", "1.15"),
+    "LNG-10": ("Tinggi", "1.55"), "LNG-11": ("Menengah Bawah", "0.95"), "LNG-12": ("Rendah", "0.60"),
+    "LNG-13": ("Menengah Atas", "1.30"), "LNG-14": ("Rendah", "0.55"), "LNG-15": ("Menengah Bawah", "0.85"),
+    "LNG-16": ("Menengah Bawah", "0.90"), "LNG-17": ("Tinggi", "1.60"), "LNG-18": ("Menengah Atas", "1.10"),
+    "LNG-19": ("Menengah Bawah", "0.80"),
+}
+ECONOMIC_INDEX = {lingkungan: Decimal(index) for lingkungan, (_, index) in EKONOMI.items()}
 
 GEO_NOTE = "Geometri sintetis untuk ilustrasi, bukan batas wilayah resmi paroki."
 
@@ -284,6 +298,29 @@ def build():
             }
         )
     data[f"{SCHEMA}.MASTER_LINGKUNGAN"] = lingkungan
+
+    data[f"{SCHEMA}.PROFIL_EKONOMI_LINGKUNGAN"] = [
+        {
+            "ID_PROFIL": f"PEK-{util.pad(number, 2)}",
+            "ID_LINGKUNGAN": lingkungan_id,
+            "TAHUN_PENILAIAN": 2025,
+            "KATEGORI_EKONOMI": category,
+            "INDEKS_KAPASITAS_EKONOMI": Decimal(index),
+            "KETERANGAN": "Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.",
+        }
+        for number, (lingkungan_id, (category, index)) in enumerate(EKONOMI.items(), start=1)
+    ]
+
+    data[f"{SCHEMA}.INFO_DATASET"] = [
+        {
+            "ID_DATASET": "DS-01",
+            "NAMA_DATASET": "Pusat Informasi Paroki (data simulasi)",
+            "DESKRIPSI": "Dataset demo fiktif dengan riwayat lima tahun lebih untuk Misa, kolekte, sumbangan, rencana, anggaran, dan kegiatan.",
+            "BERSIFAT_SIMULASI": True,
+            "TANGGAL_MULAI_RIWAYAT": config.HISTORY_START,
+            "TANGGAL_SNAPSHOT": config.AS_OF,
+        }
+    ]
 
     data[f"{SCHEMA}.GEOMETRI_ILUSTRATIF_LINGKUNGAN"] = _geometry()
     return data

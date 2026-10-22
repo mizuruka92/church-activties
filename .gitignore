@@ -14,3 +14,7 @@ data/generated/
 connections.toml
 config.toml
 .snowflake/
+
+# Streamlit connection settings (account, user, key paths): never commit these
+secrets.toml
+.streamlit/secrets.toml

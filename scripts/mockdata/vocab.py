@@ -103,6 +103,28 @@ DAFTAR_NILAI = {
         ("Adven", "Masa persiapan menjelang Natal."),
         ("Tidak Terkait Musim", "Tidak terkait musim liturgi tertentu."),
     ],
+    "STATUS_KAMPANYE": [
+        ("Direncanakan", "Kampanye belum dibuka."),
+        ("Berjalan", "Kampanye sedang mengumpulkan sumbangan."),
+        ("Selesai", "Kampanye sudah ditutup."),
+    ],
+    "JENIS_PERISTIWA": [
+        ("Hujan Deras dan Banjir", "Hujan lebat atau banjir yang menyulitkan umat menuju gereja."),
+        ("Kabut Asap", "Kualitas udara buruk akibat kabut asap."),
+        ("Abu Vulkanik", "Hujan abu dari letusan gunung berapi."),
+        ("Gangguan Listrik", "Pemadaman listrik yang mengganggu pelaksanaan Misa."),
+    ],
+    "TINGKAT_GANGGUAN": [
+        ("Ringan", "Gangguan kecil, sebagian kecil umat terpengaruh."),
+        ("Sedang", "Gangguan yang nyata menurunkan jumlah umat yang datang."),
+        ("Berat", "Gangguan besar, kegiatan dapat dibatalkan."),
+    ],
+    "KATEGORI_EKONOMI": [
+        ("Rendah", "Kapasitas ekonomi umum lingkungan di bawah rata-rata paroki."),
+        ("Menengah Bawah", "Kapasitas ekonomi umum lingkungan agak di bawah rata-rata paroki."),
+        ("Menengah Atas", "Kapasitas ekonomi umum lingkungan agak di atas rata-rata paroki."),
+        ("Tinggi", "Kapasitas ekonomi umum lingkungan di atas rata-rata paroki."),
+    ],
     "KELOMPOK_PENGGUNA": [
         ("Pastor Paroki dan Pengurus Harian", "Pimpinan paroki."),
         ("Ketua Seksi", "Ketua seksi pelayanan."),
@@ -141,6 +163,10 @@ NILAI_TERKENDALI = [
     ("DATA_OPERASIONAL.RENCANA_KEGIATAN", "STATUS_PELAKSANAAN", "STATUS_PELAKSANAAN_RENCANA"),
     ("DATA_OPERASIONAL.KEGIATAN", "STATUS_KEGIATAN", "STATUS_KEGIATAN"),
     ("DATA_OPERASIONAL.LAPORAN_KEGIATAN", "STATUS_LAPORAN", "STATUS_LAPORAN"),
+    ("DATA_OPERASIONAL.KAMPANYE_SUMBANGAN", "STATUS_KAMPANYE", "STATUS_KAMPANYE"),
+    ("DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA", "JENIS_PERISTIWA", "JENIS_PERISTIWA"),
+    ("DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA", "TINGKAT_GANGGUAN", "TINGKAT_GANGGUAN"),
+    ("MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN", "KATEGORI_EKONOMI", "KATEGORI_EKONOMI"),
 ]
 
 

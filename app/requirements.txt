@@ -1,0 +1,7 @@
+# Only for running the dashboard on your own computer (see app/README.md).
+# Not needed inside Snowflake: Streamlit in Snowflake already provides streamlit, pandas and altair.
+streamlit>=1.35
+pandas
+altair>=4.2
+snowflake-snowpark-python
+snowflake-connector-python[pandas]

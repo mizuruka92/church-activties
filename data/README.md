@@ -5,7 +5,7 @@ This folder intentionally holds **no committed data files**.
 The synthetic dataset is produced by `scripts/generate_mock_data.py` and is committed once, as SQL:
 
 * `sql/03_load_reference_data.sql` (schema `MASTER_DATA`)
-* `sql/04_load_mock_data.sql` (schema `DATA_OPERASIONAL`)
+* `sql/04a_load_mass_history.sql` to `sql/04f_load_donations.sql` (schema `DATA_OPERASIONAL`), one file per business area
 
 Keeping a second copy of the same rows as CSV would only create two files that can disagree, so CSV
 is an optional export:

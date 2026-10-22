@@ -8,6 +8,7 @@ person running the setup (see README.md).
 Needs the optional packages in tests/requirements.txt; the tests skip without them.
 """
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -35,8 +36,15 @@ if HAVE_DUCKDB:
 
 TABLES = build.load_tables(ROOT / "sql" / "02_create_tables.sql")
 DATA = build.build_all()
-LOAD_FILES = ["01_create_schemas.sql", "02_create_tables.sql", "03_load_reference_data.sql",
-              "04_load_mock_data.sql", "05_create_views.sql"]
+FIRST_HELD_MASS = next(o["ID_KEJADIAN_MISA"] for o in DATA["DATA_OPERASIONAL.KEJADIAN_MISA"] if o["STATUS_PELAKSANAAN"] == "Terlaksana")
+_FINAL_REPORT = next(r for r in DATA["DATA_OPERASIONAL.LAPORAN_KEGIATAN"] if r["STATUS_LAPORAN"] == "Final")
+FIRST_FINAL_REPORT = _FINAL_REPORT["ID_LAPORAN"]
+FIRST_PLANNED_HELD_EVENT = next(e["ID_KEGIATAN"] for e in DATA["DATA_OPERASIONAL.KEGIATAN"]
+                                if e["ID_RENCANA"] and e["STATUS_KEGIATAN"] == "Terlaksana")
+FIRST_EXPENDITURE = DATA["DATA_OPERASIONAL.REALISASI_PENGELUARAN"][0]["ID_PENGELUARAN"]
+FIRST_ATTENDANCE = next(a["ID_KEHADIRAN"] for a in DATA["DATA_OPERASIONAL.KEHADIRAN_MISA"] if a["ID_KEJADIAN_MISA"] == FIRST_HELD_MASS)
+FIRST_OFFERTORY = next(c["ID_KOLEKTE"] for c in DATA["DATA_OPERASIONAL.PENERIMAAN_KOLEKTE"] if c["ID_KEJADIAN_MISA"] == FIRST_HELD_MASS)
+VIEWS = validation.view_names((ROOT / "sql" / "05_create_views.sql").read_text(encoding="utf-8"))
 
 
 def count(connection, table):
@@ -60,19 +68,19 @@ class LoadTests(unittest.TestCase):
     def test_rerunning_the_load_does_not_duplicate_rows(self):
         connection = shim.build_database(keep_constraints=False)
         before = {t.qualified: count(connection, t.qualified) for t in TABLES}
-        for name in ["01_create_schemas.sql", "02_create_tables.sql", "03_load_reference_data.sql", "04_load_mock_data.sql",
-                     "03_load_reference_data.sql", "04_load_mock_data.sql"]:
+        loads = [name for name in shim.load_files() if name.startswith(("03", "04"))]
+        for name in ["01_create_schemas.sql", "02_create_tables.sql"] + loads:
             shim.run_file(connection, name, keep_constraints=False)
         after = {t.qualified: count(connection, t.qualified) for t in TABLES}
         self.assertEqual(before, after)
 
     def test_rerunning_the_load_repairs_changed_rows(self):
         connection = shim.build_database(keep_constraints=False)
-        connection.execute("UPDATE DATA_OPERASIONAL.KEHADIRAN_MISA SET JUMLAH_UMAT = 1 WHERE ID_KEHADIRAN = 'KHD-000001'")
-        shim.run_file(connection, "04_load_mock_data.sql", keep_constraints=False)
+        connection.execute(f"UPDATE DATA_OPERASIONAL.KEHADIRAN_MISA SET JUMLAH_UMAT = 1 WHERE ID_KEHADIRAN = '{FIRST_ATTENDANCE}'")
+        shim.run_file(connection, "04a_load_mass_history.sql", keep_constraints=False)
         value = connection.execute(
-            "SELECT JUMLAH_UMAT FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE ID_KEHADIRAN = 'KHD-000001'").fetchone()[0]
-        expected = next(r["JUMLAH_UMAT"] for r in DATA["DATA_OPERASIONAL.KEHADIRAN_MISA"] if r["ID_KEHADIRAN"] == "KHD-000001")
+            f"SELECT JUMLAH_UMAT FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE ID_KEHADIRAN = '{FIRST_ATTENDANCE}'").fetchone()[0]
+        expected = next(r["JUMLAH_UMAT"] for r in DATA["DATA_OPERASIONAL.KEHADIRAN_MISA"] if r["ID_KEHADIRAN"] == FIRST_ATTENDANCE)
         self.assertEqual(value, expected)
 
     def test_each_step_runs_on_its_own_after_its_prerequisites(self):
@@ -81,7 +89,8 @@ class LoadTests(unittest.TestCase):
         shim.run_file(connection, "02_create_tables.sql")
         shim.run_file(connection, "02_create_tables.sql")  # CREATE ... IF NOT EXISTS is repeatable
         shim.run_file(connection, "03_load_reference_data.sql")
-        shim.run_file(connection, "04_load_mock_data.sql")
+        for name in sorted(path.name for path in (ROOT / "sql").glob("04*.sql")):
+            shim.run_file(connection, name)  # each domain file runs on its own, in order
         shim.run_file(connection, "05_create_views.sql")
         shim.run_file(connection, "05_create_views.sql")  # CREATE OR REPLACE VIEW is repeatable
         rows, _ = validate(connection)
@@ -144,8 +153,8 @@ class ValidationTests(unittest.TestCase):
             self.assertIn(("VOCABULARY", f"Value not in list {group}", f"{table}.{column}"), keys)
 
     def test_every_view_is_checked(self):
-        views = validation.view_names((ROOT / "sql" / "05_create_views.sql").read_text(encoding="utf-8"))
-        self.assertEqual(len(views), 13)
+        views = VIEWS
+        self.assertGreaterEqual(len(views), 20)
         for view in views:
             self.assertEqual(self.by_key[("VIEWS", "View returns rows", f"ANALISIS.{view}")]["RESULT"], "PASS")
 
@@ -196,47 +205,47 @@ class MutationTests(unittest.TestCase):
     def test_duplicate_unique_key(self):
         self.assertDetected(
             "INSERT INTO DATA_OPERASIONAL.KEHADIRAN_MISA SELECT 'KHD-999999', ID_KEJADIAN_MISA, JUMLAH_UMAT, METODE_PENGHITUNGAN, "
-            "STATUS_VALIDASI, WAKTU_PENCATATAN, KETERANGAN FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE ID_KEHADIRAN = 'KHD-000001'",
+            f"STATUS_VALIDASI, WAKTU_PENCATATAN, KETERANGAN, ID_PERISTIWA FROM DATA_OPERASIONAL.KEHADIRAN_MISA WHERE ID_KEHADIRAN = '{FIRST_ATTENDANCE}'",
             "KEYS", "Duplicate unique key UQ_KEHADIRAN_MISA_KEJADIAN")
 
     def test_orphaned_reference(self):
-        self.assertDetected("UPDATE DATA_OPERASIONAL.KEHADIRAN_MISA SET ID_KEJADIAN_MISA = 'MIS-999999' WHERE ID_KEHADIRAN = 'KHD-000001'",
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.KEHADIRAN_MISA SET ID_KEJADIAN_MISA = 'MIS-999999' WHERE ID_KEHADIRAN = '{FIRST_ATTENDANCE}'",
                             "REFERENCES", "Orphaned reference")
 
     def test_negative_amount(self):
-        self.assertDetected("UPDATE DATA_OPERASIONAL.PENERIMAAN_KOLEKTE SET JUMLAH_PENERIMAAN = -500 WHERE ID_KOLEKTE = 'KLK-000001'",
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.PENERIMAAN_KOLEKTE SET JUMLAH_PENERIMAAN = -500 WHERE ID_KOLEKTE = '{FIRST_OFFERTORY}'",
                             "NUMBERS", "Negative numeric value")
 
     def test_unknown_status_label(self):
-        self.assertDetected("UPDATE DATA_OPERASIONAL.KEHADIRAN_MISA SET STATUS_VALIDASI = 'Valid' WHERE ID_KEHADIRAN = 'KHD-000001'",
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.KEHADIRAN_MISA SET STATUS_VALIDASI = 'Valid' WHERE ID_KEHADIRAN = '{FIRST_ATTENDANCE}'",
                             "VOCABULARY", "Value not in list STATUS_VALIDASI")
 
     def test_implausible_dates(self):
         self.assertDetected("UPDATE DATA_OPERASIONAL.UMAT SET TAHUN_LAHIR = 1850 WHERE ID_UMAT = 'UMT-00001'",
                             "DATES", "Birth year implausible or registration before birth")
         self.assertDetected("UPDATE DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN SET TANGGAL_MULAI_BERLAKU = DATE '1980-01-01' "
-                            "WHERE ID_PENUGASAN_LINGKUNGAN = 'PLG-0001'", "DATES", "Date outside 2000-2027")
-        self.assertDetected("UPDATE DATA_OPERASIONAL.REALISASI_PENGELUARAN SET TANGGAL_PENGELUARAN = DATE '2026-12-01' "
-                            "WHERE ID_PENGELUARAN = 'PGL-0001'", "DATES", "Expenditure after the as-of date")
+                            "WHERE ID_PENUGASAN_LINGKUNGAN = 'PLG-0001'", "DATES", "Date outside 2000-2030")
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.REALISASI_PENGELUARAN SET TANGGAL_PENGELUARAN = DATE '2026-12-01' "
+                            f"WHERE ID_PENGELUARAN = '{FIRST_EXPENDITURE}'", "DATES", "Expenditure after the as-of date")
 
     def test_attendance_for_a_cancelled_mass(self):
         self.assertDetected(
             "UPDATE DATA_OPERASIONAL.KEJADIAN_MISA SET STATUS_PELAKSANAAN = 'Dibatalkan', WAKTU_MULAI_AKTUAL = NULL, "
-            "WAKTU_SELESAI_AKTUAL = NULL WHERE ID_KEJADIAN_MISA = 'MIS-000001'",
+            f"WAKTU_SELESAI_AKTUAL = NULL WHERE ID_KEJADIAN_MISA = '{FIRST_HELD_MASS}'",
             "MASS", "Attendance for a Mass that was not held")
 
     def test_mass_on_the_wrong_weekday(self):
-        self.assertDetected("UPDATE DATA_OPERASIONAL.KEJADIAN_MISA SET TANGGAL_MISA = TANGGAL_MISA + 1 WHERE ID_KEJADIAN_MISA = 'MIS-000002'",
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.KEJADIAN_MISA SET TANGGAL_MISA = TANGGAL_MISA + 1 WHERE ID_KEJADIAN_MISA = '{FIRST_HELD_MASS}'",
                             "MASS", "Occurrence weekday differs from schedule")
 
     def test_held_mass_without_offertory(self):
-        self.assertDetected("DELETE FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE ID_KEJADIAN_MISA = 'MIS-000002'",
+        self.assertDetected(f"DELETE FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE WHERE ID_KEJADIAN_MISA = '{FIRST_HELD_MASS}'",
                             "MASS", "Held Mass without offertory")
 
     def test_reconciliation_status_contradicts_amounts(self):
         self.assertDetected(
             "UPDATE DATA_OPERASIONAL.PENERIMAAN_KOLEKTE SET STATUS_REKONSILIASI = 'Sudah Cocok', "
-            "JUMLAH_HASIL_PENGHITUNGAN = JUMLAH_PENERIMAAN + 1000 WHERE ID_KOLEKTE = 'KLK-000001'",
+            f"JUMLAH_HASIL_PENGHITUNGAN = JUMLAH_PENERIMAAN + 1000 WHERE ID_KOLEKTE = '{FIRST_OFFERTORY}'",
             "MASS", "Sudah Cocok but recorded and counted differ")
 
     def test_household_assigned_to_two_communities_at_once(self):
@@ -258,20 +267,20 @@ class MutationTests(unittest.TestCase):
                             "GOVERNANCE", "Personal-data columns exposed in ANALISIS")
 
     def test_event_and_plan_disagree(self):
-        self.assertDetected("UPDATE DATA_OPERASIONAL.KEGIATAN SET STATUS_KEGIATAN = 'Dibatalkan' WHERE ID_KEGIATAN = 'KGT-001'",
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.KEGIATAN SET STATUS_KEGIATAN = 'Dibatalkan' WHERE ID_KEGIATAN = '{FIRST_PLANNED_HELD_EVENT}'",
                             "PLANNING", "Event status differs from its plan status")
 
     def test_completed_plan_loses_its_event(self):
-        self.assertDetected(["DELETE FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE ID_KEGIATAN = 'KGT-001'",
-                             "DELETE FROM DATA_OPERASIONAL.KEGIATAN WHERE ID_KEGIATAN = 'KGT-001'"],
+        self.assertDetected([f"DELETE FROM DATA_OPERASIONAL.LAPORAN_KEGIATAN WHERE ID_KEGIATAN = '{FIRST_PLANNED_HELD_EVENT}'",
+                             f"DELETE FROM DATA_OPERASIONAL.KEGIATAN WHERE ID_KEGIATAN = '{FIRST_PLANNED_HELD_EVENT}'"],
                             "PLANNING", "Completed plan without an event")
 
     def test_final_report_with_gaps(self):
-        self.assertDetected("UPDATE DATA_OPERASIONAL.LAPORAN_KEGIATAN SET HASIL_KEGIATAN = NULL WHERE ID_LAPORAN = 'LPK-001'",
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.LAPORAN_KEGIATAN SET HASIL_KEGIATAN = NULL WHERE ID_LAPORAN = '{FIRST_FINAL_REPORT}'",
                             "PLANNING", "Final report with empty required fields")
 
     def test_spending_after_the_snapshot_date(self):
-        self.assertDetected("UPDATE DATA_OPERASIONAL.REALISASI_PENGELUARAN SET TANGGAL_PENGELUARAN = DATE '2026-11-15' WHERE ID_PENGELUARAN = 'PGL-0001'",
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.REALISASI_PENGELUARAN SET TANGGAL_PENGELUARAN = DATE '2026-11-15' WHERE ID_PENGELUARAN = '{FIRST_EXPENDITURE}'",
                             "DATES", "Expenditure after the as-of date")
 
     def test_survey_counts_tampered(self):
@@ -289,6 +298,47 @@ class MutationTests(unittest.TestCase):
     def test_new_answers_without_a_summary_are_caught(self):
         self.assertDetected("DELETE FROM DATA_OPERASIONAL.HASIL_SURVEI_AGREGAT WHERE ID_PERTANYAAN = 'PRT-0101'",
                             "SURVEYS", "Answered question without aggregate rows")
+
+    def test_overlapping_event_windows(self):
+        self.assertDetected("INSERT INTO DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA VALUES ('PRS-99', 'Kabut Asap', 'Uji', "
+                            "DATE '2025-06-10', DATE '2025-06-12', 'Ringan', 'Uji tumpang tindih')", "EVENTS", "Event windows overlap")
+
+    def test_attendance_linked_to_an_event_that_was_not_on_that_day(self):
+        self.assertDetected(f"UPDATE DATA_OPERASIONAL.KEHADIRAN_MISA SET ID_PERISTIWA = 'PRS-08' WHERE ID_KEHADIRAN = '{FIRST_ATTENDANCE}'",
+                            "EVENTS", "Attendance linked to an event that does not cover the Mass date")
+
+    def test_gift_recorded_in_the_wrong_community(self):
+        self.assertDetected("UPDATE DATA_OPERASIONAL.SUMBANGAN_KELUARGA SET ID_LINGKUNGAN = "
+                            "CASE WHEN ID_LINGKUNGAN = 'LNG-01' THEN 'LNG-02' ELSE 'LNG-01' END WHERE ID_SUMBANGAN_KELUARGA = 'SKL-00001'",
+                            "DONATIONS", "Gift community differs from the household assignment")
+
+    def test_regional_summary_that_no_longer_matches_the_gifts(self):
+        self.assertDetected("UPDATE DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS SET JUMLAH_SUMBANGAN = JUMLAH_SUMBANGAN + 5000 "
+                            "WHERE ID_SUMBANGAN = 'SMB-001'", "DONATIONS", "Regional summary differs from the household gifts")
+
+    def test_gifts_without_a_regional_summary(self):
+        self.assertDetected("DELETE FROM DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS WHERE ID_SUMBANGAN = 'SMB-001'",
+                            "DONATIONS", "Household gifts without a regional summary")
+
+    def test_campaign_status_contradicting_its_dates(self):
+        self.assertDetected("UPDATE DATA_OPERASIONAL.KAMPANYE_SUMBANGAN SET STATUS_KAMPANYE = 'Direncanakan' WHERE ID_KAMPANYE = 'KMP-01'",
+                            "DONATIONS", "Campaign dates or status inconsistent")
+
+    def test_community_without_an_economic_profile(self):
+        self.assertDetected("DELETE FROM MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN WHERE ID_LINGKUNGAN = 'LNG-01'",
+                            "DONATIONS", "Community without an economic profile")
+
+    def test_snapshot_date_that_disagrees_with_the_validation(self):
+        self.assertDetected("UPDATE MASTER_DATA.INFO_DATASET SET TANGGAL_SNAPSHOT = DATE '2026-10-31'",
+                            "DATASET", "Snapshot date differs from this validation")
+
+    def test_history_cut_below_five_years(self):
+        self.assertDetected("DELETE FROM DATA_OPERASIONAL.KEJADIAN_MISA WHERE TANGGAL_MISA < DATE '2023-01-01'",
+                            "DATASET", "Mass history shorter than five years")
+
+    def test_a_view_that_leaks_household_gift_identifiers(self):
+        self.assertDetected("CREATE VIEW ANALISIS.BOCOR_SUMBANGAN AS SELECT ID_SUMBANGAN_KELUARGA, JUMLAH_SUMBANGAN "
+                            "FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA", "GOVERNANCE", "Personal-data columns exposed in ANALISIS")
 
     def test_an_empty_table_fails_the_row_count(self):
         self.assertDetected("DELETE FROM DATA_OPERASIONAL.KELUARGA", "STRUCTURE", "Row count")
@@ -329,7 +379,7 @@ class ViewTests(unittest.TestCase):
     def test_scheduled_and_actual_times_are_distinct(self):
         row = self.connection.execute(
             "SELECT WAKTU_MULAI_JADWAL, WAKTU_MULAI_AKTUAL, SELISIH_MULAI_MENIT, DURASI_AKTUAL_MENIT FROM ANALISIS.PELAKSANAAN_MISA "
-            "WHERE ID_KEJADIAN_MISA = 'MIS-000001'").fetchone()
+            f"WHERE ID_KEJADIAN_MISA = '{FIRST_HELD_MASS}'").fetchone()
         self.assertIsNotNone(row[1])
         self.assertGreaterEqual(row[2], 0)
         self.assertGreater(row[3], 30)
@@ -387,9 +437,245 @@ class ViewTests(unittest.TestCase):
     def test_every_view_is_labelled_as_simulated(self):
         views = [r[0] for r in self.connection.execute(
             "SELECT table_name FROM information_schema.tables WHERE UPPER(table_schema) = 'ANALISIS'").fetchall()]
-        self.assertEqual(len(views), 13)
+        self.assertEqual(sorted(views), sorted(VIEWS))
         for view in views:
             self.assertEqual(self.value(f"SELECT MIN(SUMBER_DATA) FROM ANALISIS.{view}"), "Data simulasi (fiktif)", view)
+
+
+@unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
+class UseCaseViewTests(unittest.TestCase):
+    """The business questions behind the demo, answered through the ANALISIS views."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.connection = shim.build_database(keep_constraints=False)
+
+    def rows(self, sql):
+        cursor = self.connection.execute(sql)
+        columns = [d[0] for d in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def value(self, sql):
+        return self.connection.execute(sql).fetchone()[0]
+
+    # --- income versus outcome -------------------------------------------------------------------------------
+    def test_monthly_series_adds_up_to_the_source_tables(self):
+        self.assertEqual(self.value("SELECT SUM(PEMASUKAN_KOLEKTE) FROM ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN"),
+                         self.value("SELECT SUM(COALESCE(JUMLAH_HASIL_PENGHITUNGAN, JUMLAH_PENERIMAAN)) FROM DATA_OPERASIONAL.PENERIMAAN_KOLEKTE "
+                                    "c JOIN DATA_OPERASIONAL.KEJADIAN_MISA k ON k.ID_KEJADIAN_MISA = c.ID_KEJADIAN_MISA "
+                                    "WHERE k.TANGGAL_MISA <= DATE '2026-09-30'"))
+        self.assertEqual(self.value("SELECT SUM(PENGELUARAN_PROGRAM) FROM ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN"),
+                         self.value("SELECT SUM(JUMLAH_PENGELUARAN) FROM DATA_OPERASIONAL.REALISASI_PENGELUARAN"))
+        self.assertEqual(self.value("SELECT SUM(PEMASUKAN_SUMBANGAN_KHUSUS) FROM ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN"),
+                         self.value("SELECT SUM(JUMLAH_SUMBANGAN) FROM DATA_OPERASIONAL.SUMBANGAN_KELUARGA"))
+        self.assertEqual(self.value("SELECT COUNT(*) FROM ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN"), 69)  # Jan 2021 - Sep 2026
+        self.assertEqual(self.value("SELECT MAX(STATUS_PERIODE) FROM ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN"), "Lengkap")
+
+    def test_annual_view_marks_only_the_current_year_as_incomplete(self):
+        years = {r["TAHUN"]: r for r in self.rows("SELECT * FROM ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN")}
+        self.assertEqual(sorted(years), [2021, 2022, 2023, 2024, 2025, 2026])
+        self.assertTrue(all(years[y]["TAHUN_LENGKAP"] for y in range(2021, 2026)))
+        self.assertFalse(years[2026]["TAHUN_LENGKAP"])
+        self.assertIn("9 bulan", years[2026]["STATUS_TAHUN"])
+        self.assertIsNone(years[2026]["PERTUMBUHAN_KOLEKTE_PERSEN"], "no growth figure for a partial year")
+        for y in range(2021, 2027):
+            self.assertGreater(years[y]["SELISIH_KOLEKTE_VS_PENGELUARAN"], 0, f"{y}: income is still bigger than outcome")
+
+    def test_underlying_growth_slows_while_spending_growth_stays_high(self):
+        years = {r["TAHUN"]: r for r in self.rows("SELECT * FROM ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN")}
+        calm = [years[y]["PERTUMBUHAN_KOLEKTE_PER_MISA_TANPA_PERISTIWA_PERSEN"] for y in range(2022, 2026)]
+        self.assertGreater(calm[0], calm[-1] + 3)
+        self.assertGreater((calm[0] + calm[1]) / 2, (calm[2] + calm[3]) / 2 + 2.5)
+        for y in range(2022, 2026):
+            self.assertGreater(years[y]["PERTUMBUHAN_PENGELUARAN_PERSEN"], 15)
+
+    def test_the_projection_shows_spending_overtaking_the_offertory(self):
+        rows = {r["TAHUN"]: r for r in self.rows("SELECT * FROM ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN")}
+        self.assertEqual(sorted(rows)[:6], [2021, 2022, 2023, 2024, 2025, 2026])
+        self.assertGreaterEqual(max(rows), 2030)
+        self.assertEqual(rows[2025]["JENIS_DATA"], "Aktual (tahun lengkap)")
+        self.assertEqual(rows[2026]["JENIS_DATA"], "Tahun berjalan (sebagian) dan proyeksi")
+        self.assertEqual(rows[2028]["JENIS_DATA"], "Proyeksi")
+        crossing = rows[2021]["TAHUN_PERTAMA_PENGELUARAN_MELEBIHI_KOLEKTE"]
+        self.assertIn(crossing, (2028, 2029, 2030))
+        self.assertFalse(rows[crossing - 1]["TREN_PENGELUARAN_MELEBIHI_KOLEKTE"])
+        self.assertTrue(rows[crossing]["TREN_PENGELUARAN_MELEBIHI_KOLEKTE"])
+        self.assertGreater(rows[2021]["PERTAMBAHAN_PENGELUARAN_PER_TAHUN"], 3 * rows[2021]["PERTAMBAHAN_KOLEKTE_PER_TAHUN"])
+        self.assertEqual(rows[2021]["JUMLAH_TAHUN_DASAR"], 5)
+        self.assertIn("regresi linear", rows[2021]["CATATAN_METODE"])
+
+    # --- offertory behaviour -----------------------------------------------------------------------------------------
+    def test_offertory_per_attendee_is_highest_just_after_salary_day(self):
+        for year in range(2021, 2026):
+            groups = {r["KELOMPOK_TANGGAL"]: r["KOLEKTE_PER_UMAT"] for r in self.rows(
+                f"SELECT KELOMPOK_TANGGAL, 1.0 * SUM(TOTAL_KOLEKTE) / SUM(TOTAL_UMAT) AS KOLEKTE_PER_UMAT "
+                f"FROM ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN WHERE TAHUN = {year} GROUP BY KELOMPOK_TANGGAL")}
+            self.assertGreater(groups["Tanggal 1-7"], groups["Tanggal 8-14"], year)
+            self.assertGreater(groups["Tanggal 8-14"], groups["Tanggal 15-21"], year)
+            self.assertGreater(groups["Tanggal 15-21"], groups["Tanggal 22-31"], year)
+            self.assertGreater(groups["Tanggal 1-7"] / groups["Tanggal 22-31"], 1.25, year)
+
+    def test_offertory_correlates_with_attendance_and_declines_through_the_month(self):
+        rows = self.rows("SELECT * FROM ANALISIS.KORELASI_KOLEKTE_KEHADIRAN WHERE NAMA_MISA LIKE 'Misa Minggu%' OR NAMA_MISA = 'Misa Sabtu Sore'")
+        self.assertGreater(len(rows), 25)
+        for r in rows:
+            self.assertGreater(r["KORELASI_KOLEKTE_DENGAN_UMAT"], 0.3, (r["TAHUN"], r["NAMA_MISA"]))
+            self.assertLess(r["KORELASI_TANGGAL_DENGAN_KOLEKTE_PER_UMAT"], -0.5, (r["TAHUN"], r["NAMA_MISA"]))
+            self.assertGreater(r["TAMBAHAN_KOLEKTE_PER_UMAT"], 5000)
+
+    # --- unforeseen events -----------------------------------------------------------------------------------------------
+    def test_weekly_series_starts_on_mondays_and_names_the_events(self):
+        self.assertEqual(self.value("SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA "
+                                    "WHERE MOD(DATEDIFF('day', DATE '1900-01-01', AWAL_PEKAN), 7) <> 0"), 0)
+        self.assertEqual(self.value("SELECT SUM(TOTAL_UMAT) FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA"),
+                         self.value("SELECT SUM(JUMLAH_UMAT) FROM DATA_OPERASIONAL.KEHADIRAN_MISA"))
+        self.assertGreater(self.value("SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA"), 280)
+        labelled = {r[0] for r in self.connection.execute(
+            "SELECT DISTINCT ID_PERISTIWA FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA WHERE ID_PERISTIWA IS NOT NULL").fetchall()}
+        self.assertEqual(len(labelled), 10)
+        ash = self.rows("SELECT PERSEN_UMAT_TERHADAP_8_PEKAN_SEBELUMNYA AS P, PERSEN_KOLEKTE_TERHADAP_8_PEKAN_SEBELUMNYA AS K "
+                        "FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA WHERE ID_PERISTIWA = 'PRS-08'")
+        self.assertGreater(len(ash), 3)
+        self.assertLess(sum(r["P"] for r in ash) / len(ash), 80)
+        normal = self.value("SELECT AVG(PERSEN_UMAT_TERHADAP_8_PEKAN_SEBELUMNYA) FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA "
+                            "WHERE ID_PERISTIWA IS NULL AND PERSEN_UMAT_TERHADAP_8_PEKAN_SEBELUMNYA IS NOT NULL")
+        self.assertTrue(95 < normal < 108)
+
+    def test_every_event_shows_a_dip_and_severity_orders_the_effect(self):
+        rows = {r["ID_PERISTIWA"]: r for r in self.rows("SELECT * FROM ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA")}
+        self.assertEqual(len(rows), 10)
+        by_level = {"Ringan": [], "Sedang": [], "Berat": []}
+        for r in rows.values():
+            self.assertLess(r["PERSEN_KEHADIRAN_TERHADAP_HARAPAN"], 100, r["NAMA_PERISTIWA"])
+            by_level[r["TINGKAT_GANGGUAN"]].append(r["PERSEN_KEHADIRAN_TERHADAP_HARAPAN"])
+        mean = {k: sum(v) / len(v) for k, v in by_level.items()}
+        self.assertLess(mean["Berat"], mean["Sedang"])
+        self.assertLess(mean["Sedang"], mean["Ringan"])
+        self.assertGreater(rows["PRS-08"]["JUMLAH_MISA_DIBATALKAN"], 0)
+        self.assertGreater(rows["PRS-08"]["PERKIRAAN_KOLEKTE_YANG_TIDAK_DITERIMA"], 10_000_000)
+
+    def test_a_dip_can_be_hidden_by_payday_and_that_is_why_forecasts_get_biased(self):
+        """The March 2023 power cut fell in the first week of the month: attendance dipped, offertory did not."""
+        r = self.rows("SELECT PERSEN_KEHADIRAN_TERHADAP_HARAPAN AS U, PERSEN_KOLEKTE_TERHADAP_HARAPAN AS K "
+                      "FROM ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA WHERE ID_PERISTIWA = 'PRS-05'")[0]
+        self.assertLess(r["U"], 100)
+        self.assertGreater(r["K"], r["U"] + 5)
+
+    # --- donations and break-even ----------------------------------------------------------------------------------------------
+    def test_break_even_story_per_campaign(self):
+        rows = {r["NAMA_KAMPANYE"]: r for r in self.rows("SELECT * FROM ANALISIS.TITIK_IMPAS_KAMPANYE")}
+        for year in range(2021, 2027):
+            easter = rows[f"Aksi Puasa Pembangunan {year}"]
+            self.assertTrue(easter["STATUS_TITIK_IMPAS"].startswith("Surplus"), year)
+            self.assertIsNotNone(easter["PEMASUKAN_BERSIH_UNTUK_GEREJA"])
+            self.assertIsNone(easter["DANA_TAMBAHAN_DARI_GEREJA"])
+        self.assertGreater(rows["Aksi Puasa Pembangunan 2021"]["SELISIH_SUMBANGAN_VS_BIAYA_AKTUAL"],
+                           3 * rows["Aksi Puasa Pembangunan 2026"]["SELISIH_SUMBANGAN_VS_BIAYA_AKTUAL"])
+        statuses = [rows[f"Aksi Adven Peduli Sesama {y}"]["STATUS_TITIK_IMPAS"][:7] for y in range(2021, 2026)]
+        self.assertEqual(statuses, ["Surplus", "Surplus", "Defisit", "Defisit", "Defisit"])
+        advent_2026 = rows["Aksi Adven Peduli Sesama 2026"]
+        self.assertTrue(advent_2026["STATUS_TITIK_IMPAS"].startswith("Belum dapat dihitung"))
+        self.assertLess(advent_2026["PROYEKSI_SELISIH_JIKA_TARGET_TERCAPAI"], 0, "the church must plan extra money for Christmas 2026")
+        self.assertIsNotNone(advent_2026["ANGGARAN_RENCANA"])
+        for r in rows.values():
+            if r["PEMASUKAN_BERSIH_UNTUK_GEREJA"] is not None:
+                self.assertEqual(r["PEMASUKAN_BERSIH_UNTUK_GEREJA"], r["SELISIH_SUMBANGAN_VS_BIAYA_AKTUAL"])
+            if r["DANA_TAMBAHAN_DARI_GEREJA"] is not None:
+                self.assertEqual(r["DANA_TAMBAHAN_DARI_GEREJA"], -r["SELISIH_SUMBANGAN_VS_BIAYA_AKTUAL"])
+
+    def test_mean_median_and_per_household_numbers_differ_by_community(self):
+        rows = self.rows("SELECT * FROM ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN WHERE NAMA_KAMPANYE = 'Aksi Puasa Pembangunan 2025'")
+        by = {r["ID_LINGKUNGAN"]: r for r in rows}
+        outliers = [by[c] for c in ("LNG-05", "LNG-07", "LNG-12", "LNG-14")]
+        for r in outliers:
+            self.assertEqual(r["KATEGORI_EKONOMI"], "Rendah")
+            self.assertGreater(r["SELISIH_RATA_RATA_DARI_MEDIAN_PERSEN"], 35)
+            self.assertGreater(r["PERSEN_TOTAL_DARI_SUMBANGAN_TERBESAR"], 40)
+        calm = [by[c] for c in ("LNG-02", "LNG-10", "LNG-17", "LNG-09")]
+        for r in calm:
+            self.assertLess(abs(r["SELISIH_RATA_RATA_DARI_MEDIAN_PERSEN"]), 10)
+        self.assertLess(max(r["MEDIAN_PER_KELUARGA_PENYUMBANG"] for r in outliers),
+                        min(r["MEDIAN_PER_KELUARGA_PENYUMBANG"] for r in calm if r["KATEGORI_EKONOMI"] == "Tinggi"))
+        by_total = [r["ID_LINGKUNGAN"] for r in sorted(rows, key=lambda r: r["TOTAL_SUMBANGAN"])]
+        by_median = [r["ID_LINGKUNGAN"] for r in sorted(rows, key=lambda r: r["MEDIAN_PER_KELUARGA_PENYUMBANG"])]
+        by_person = [r["ID_LINGKUNGAN"] for r in sorted(rows, key=lambda r: r["SUMBANGAN_PER_UMAT_TERDAFTAR"])]
+        self.assertNotEqual(by_total, by_median)
+        self.assertNotEqual(by_person, by_median)
+        self.assertNotEqual(by_person, by_total)
+
+    def test_community_donation_view_is_aggregate_only_and_never_ranks(self):
+        columns = {r[0] for r in self.connection.execute("DESCRIBE ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN").fetchall()}
+        self.assertTrue(columns.isdisjoint({"ID_KELUARGA", "NAMA_KELUARGA_FIKTIF", "ID_SUMBANGAN_KELUARGA", "ID_UMAT"}))
+        for name in columns:
+            self.assertNotIn("PERINGKAT", name)
+            self.assertNotIn("RANK", name)
+        note = self.value("SELECT MIN(CATATAN_PENGGUNAAN) FROM ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN")
+        self.assertIn("bukan tingkat iman", note)
+        self.assertIn("memeringkat", note)
+
+    def test_registered_households_in_the_community_view_follow_the_assignments(self):
+        total = self.value("SELECT SUM(JUMLAH_KELUARGA_TERDAFTAR) FROM ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN "
+                           "WHERE NAMA_KAMPANYE = 'Aksi Puasa Pembangunan 2026'")
+        expected = self.value("SELECT COUNT(DISTINCT p.ID_KELUARGA) FROM DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN p "
+                              "WHERE p.TANGGAL_MULAI_BERLAKU <= DATE '2026-04-04' "
+                              "AND (p.TANGGAL_AKHIR_BERLAKU IS NULL OR p.TANGGAL_AKHIR_BERLAKU >= DATE '2026-04-04')")
+        self.assertLessEqual(total, expected)
+        self.assertGreater(total, 0.9 * expected)
+
+
+@unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
+class DocumentedQueryTests(unittest.TestCase):
+    """Every SQL example in the README, the use-case guide and the starter guide (SELECTs on the views) runs and returns rows."""
+
+    DOCUMENTS = ("README.md", "docs/USE_CASES.md", "docs/STARTER_GUIDE.md")
+    # Documents that also contain statements meant for Snowflake only (Git setup, grants):
+    # only the SELECT statements on the ANALISIS views are executed from them.
+    SELECT_ONLY = ("docs/STARTER_GUIDE.md",)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.connection = shim.build_database(keep_constraints=False)
+
+    def examples(self):
+        for name in self.DOCUMENTS:
+            text = (ROOT / name).read_text(encoding="utf-8")
+            for block in re.findall(r"```sql\n(.*?)```", text, re.DOTALL):
+                lines = [line for line in block.splitlines() if not line.strip().startswith("--")]
+                for statement in re.split(r";\s*(?:\n|$)", "\n".join(lines)):
+                    if not statement.strip():
+                        continue
+                    if name in self.SELECT_ONLY and not (statement.strip().upper().startswith("SELECT") and ".ANALISIS." in statement):
+                        continue
+                    yield name, statement.strip()
+
+    def test_there_are_examples_to_check(self):
+        self.assertGreaterEqual(len(list(self.examples())), 12)
+
+    def test_headline_figures_in_the_use_case_guide_match_the_data(self):
+        """The guide quotes a few figures. If the data changes, the guide must be updated."""
+        guide = (ROOT / "docs" / "USE_CASES.md").read_text(encoding="utf-8")
+        crossing = self.connection.execute(
+            "SELECT MIN(TAHUN_PERTAMA_PENGELUARAN_MELEBIHI_KOLEKTE) FROM ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN").fetchone()[0]
+        self.assertIn(f"the lines cross in **{crossing}**", guide)
+        events = self.connection.execute("SELECT COUNT(*) FROM DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA").fetchone()[0]
+        self.assertIn(f"{events} events", guide)
+        deficits = [row[0] for row in self.connection.execute(
+            "SELECT TAHUN FROM ANALISIS.TITIK_IMPAS_KAMPANYE WHERE NAMA_KESEMPATAN LIKE '%Adven%' "
+            "AND DANA_TAMBAHAN_DARI_GEREJA > 0 ORDER BY TAHUN").fetchall()]
+        self.assertIn(f"Christmas drops\n  below break-even from {deficits[0]}", guide)
+        households, people = (self.connection.execute(f"SELECT COUNT(*) FROM DATA_OPERASIONAL.{t}").fetchone()[0]
+                              for t in ("KELUARGA", "UMAT"))
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn(f"{households} households, {people} people", readme)
+
+    def test_every_documented_query_returns_rows(self):
+        for name, statement in self.examples():
+            local = shim.rewrite_dateadd(statement.replace("PUSAT_INFORMASI_PAROKI.", ""))
+            try:
+                rows = self.connection.execute(local).fetchall()
+            except Exception as error:  # noqa: BLE001 - report which example broke
+                self.fail(f"{name}: query failed ({error}): {statement[:120]!r}")
+            self.assertTrue(rows, f"{name}: query returned no rows: {statement[:120]!r}")
 
 
 @unittest.skipUnless(HAVE_SQLGLOT, "sqlglot is not installed (pip install -r tests/requirements.txt)")
@@ -397,30 +683,38 @@ class SnowflakeSyntaxLintTests(unittest.TestCase):
     """A second opinion on syntax using sqlglot's Snowflake grammar. It is a lint,
     not Snowflake itself."""
 
+    @staticmethod
+    def parse(name):
+        text = (ROOT / "sql" / name).read_text(encoding="utf-8")
+        return [s for s in sqlglot.parse(text, read="snowflake", error_level=sqlglot.ErrorLevel.RAISE)
+                if s is not None and type(s).__name__ != "Semicolon"]
+
     def test_all_sql_files_parse_as_snowflake_sql(self):
-        expected = {"00_setup.sql": 1, "01_create_schemas.sql": 5, "02_create_tables.sql": 34,
-                    "03_load_reference_data.sql": 17, "04_load_mock_data.sql": 18, "05_create_views.sql": 14,
-                    "06_validate_data.sql": 2, "full_setup.sql": 1 + 5 + 34 + 17 + 18 + 14 + 2 + 1}
-        for name in expected:
-            text = (ROOT / "sql" / name).read_text(encoding="utf-8")
-            statements = [s for s in sqlglot.parse(text, read="snowflake", error_level=sqlglot.ErrorLevel.RAISE)
-                          if s is not None and type(s).__name__ != "Semicolon"]
-            self.assertGreaterEqual(len(statements), 1, name)
-            kinds = {type(s).__name__ for s in statements}
+        names = sorted(path.name for path in (ROOT / "sql").glob("*.sql") if not path.name.startswith("99"))
+        self.assertIn("full_setup.sql", names)
+        for name in names:
+            kinds = {type(statement).__name__ for statement in self.parse(name)}
             self.assertTrue(kinds <= {"Use", "Create", "Merge", "Select", "Command"}, f"{name}: {kinds}")
 
     def test_statement_counts_match_the_design(self):
-        def kinds(name):
-            text = (ROOT / "sql" / name).read_text(encoding="utf-8")
-            result = {}
-            for s in sqlglot.parse(text, read="snowflake"):
-                if s is not None:
-                    result[type(s).__name__] = result.get(type(s).__name__, 0) + 1
-            return result
-        self.assertEqual(kinds("02_create_tables.sql")["Create"], 33)
-        self.assertEqual(kinds("03_load_reference_data.sql")["Merge"], 16)
-        self.assertEqual(kinds("04_load_mock_data.sql")["Merge"], 17)
-        self.assertEqual(kinds("05_create_views.sql")["Create"], 13)
+        def count(name, kind):
+            return sum(1 for statement in self.parse(name) if type(statement).__name__ == kind)
+        tables = len(TABLES)
+        self.assertEqual(count("02_create_tables.sql", "Create"), tables)
+        merges = sum(count(path.name, "Merge") for path in (ROOT / "sql").glob("0[34]*.sql"))
+        expected = sum(max(1, -(-len(rows) // 1000)) for rows in DATA.values())  # one MERGE per started block of 1000 rows
+        self.assertEqual(merges, expected)
+        self.assertEqual(count("05_create_views.sql", "Create"), len(VIEWS))
+        self.assertEqual(count("06_validate_data.sql", "Select"), 1)
+
+    def test_every_statement_stays_far_below_the_size_limit(self):
+        for path in (ROOT / "sql").glob("0*.sql"):
+            for statement in re.split(r";\s*\n", path.read_text(encoding="utf-8")):
+                self.assertLess(len(statement.encode("utf-8")), 600_000, f"{path.name}: a statement is too large")
+
+    def test_no_step_file_is_too_large_to_paste(self):
+        for path in (ROOT / "sql").glob("0*.sql"):
+            self.assertLess(path.stat().st_size, 600_000, f"{path.name} is larger than 600 KB")
 
 
 if __name__ == "__main__":

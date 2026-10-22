@@ -15,15 +15,30 @@ from . import config, dictionary, sqlwriter, validation
 from .build import build_all, load_tables
 from .checks import check_integrity, check_scenarios
 
-SQL_SOURCES = [
-    "00_setup.sql",
-    "01_create_schemas.sql",
-    "02_create_tables.sql",
-    "03_load_reference_data.sql",
-    "04_load_mock_data.sql",
-    "05_create_views.sql",
-    "06_validate_data.sql",
+# The operational data is loaded by domain, in dependency order, so that no single
+# file gets too large to paste into a browser editor and every part can be re-run alone.
+# (file name, title, tables, what it needs)
+OPERATIONAL_LOADS = [
+    ("04a_load_mass_history.sql", "Load Mass occurrences, attendance and the unforeseen-event log",
+     ["PERISTIWA_LUAR_BIASA", "KEJADIAN_MISA", "KEHADIRAN_MISA"], "steps 2 and 3"),
+    ("04b_load_offertory.sql", "Load the offertory collections of every Mass",
+     ["PENERIMAAN_KOLEKTE"], "steps 2, 3 and 4a (Mass occurrences)"),
+    ("04c_load_parishioners.sql", "Load fictional households, parishioners and their assignments",
+     ["KELUARGA", "UMAT", "PENUGASAN_KELUARGA", "PENUGASAN_LINGKUNGAN"], "steps 2 and 3"),
+    ("04d_load_surveys.sql", "Load anonymous survey respondents, answers and aggregated results",
+     ["RESPONDEN_SURVEI", "JAWABAN_SURVEI", "HASIL_SURVEI_AGREGAT"], "steps 2 and 3"),
+    ("04e_load_plans_and_events.sql", "Load annual plans, budgets, expenditure, events and reports",
+     ["RENCANA_KERJA_TAHUNAN", "RENCANA_KEGIATAN", "ALOKASI_ANGGARAN", "REALISASI_PENGELUARAN", "KEGIATAN",
+      "LAPORAN_KEGIATAN"], "steps 2 and 3"),
+    ("04f_load_donations.sql", "Load donation campaigns, household gifts and regional summaries",
+     ["KAMPANYE_SUMBANGAN", "SUMBANGAN_KESEMPATAN_KHUSUS", "SUMBANGAN_KELUARGA"], "steps 4c (households) and 4e (plans)"),
 ]
+
+SQL_SOURCES = (
+    ["00_setup.sql", "01_create_schemas.sql", "02_create_tables.sql", "03_load_reference_data.sql"]
+    + [entry[0] for entry in OPERATIONAL_LOADS]
+    + ["05_create_views.sql", "06_validate_data.sql"]
+)
 
 _RULE = "-- " + "=" * 77
 
@@ -50,9 +65,10 @@ def _load_header(step, title, schema, tables, data, requires):
     ])
 
 
-def render_load_file(step, title, schema, tables, data, requires):
-    selected = [t for t in tables if t.schema == schema]
-    statements = [sqlwriter.merge_statement(t, data[t.qualified]) for t in selected]
+def render_load_file(step, title, schema, selected, data, requires):
+    statements = []
+    for table in selected:
+        statements += sqlwriter.merge_statements(table, data[table.qualified])
     return _load_header(step, title, schema, selected, data, requires) + "\n\n".join(statements) + "\n"
 
 
@@ -133,15 +149,19 @@ def generate(root):
     if gaps:
         raise SystemExit("Generated data lost demo scenarios:\n  " + "\n  ".join(gaps))
 
+    by_name = {t.qualified: t for t in tables}
     files = {
         "sql/03_load_reference_data.sql": render_load_file(
-            3, "Load reference and master data", "MASTER_DATA", tables, data, "step 2 (tables)"),
-        "sql/04_load_mock_data.sql": render_load_file(
-            4, "Load synthetic operational data", "DATA_OPERASIONAL", tables, data, "steps 2 and 3 (tables and master data)"),
+            3, "Load reference and master data", "MASTER_DATA",
+            [t for t in tables if t.schema == "MASTER_DATA"], data, "step 2 (tables)"),
         "sql/06_validate_data.sql": validation.render(tables, data, views_sql, config.SEED),
         "docs/DATA_DICTIONARY.md": dictionary.render(tables, data, views_sql),
         "sql/99_reset_demo.sql": render_reset(tables),
     }
+    for name, title, names, requires in OPERATIONAL_LOADS:
+        selected = [by_name[f"DATA_OPERASIONAL.{n}"] for n in names]
+        step = name.split("_")[0].lstrip("0")  # "04a_..." -> "4a"
+        files[f"sql/{name}"] = render_load_file(step, title, "DATA_OPERASIONAL", selected, data, requires)
     sources = []
     for name in SQL_SOURCES:
         key = f"sql/{name}"

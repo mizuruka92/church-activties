@@ -27,6 +27,44 @@ def split_statements(text):
     return [s.strip() for s in re.split(r";\s*(?:\n|$)", body) if s.strip()]
 
 
+def _split_arguments(text):
+    """Split 'a, f(b, c), d' on top-level commas."""
+    parts, depth, current = [], 0, ""
+    for char in text:
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append(current.strip())
+            current = ""
+        else:
+            current += char
+    parts.append(current.strip())
+    return parts
+
+
+def rewrite_dateadd(sql):
+    """DuckDB has no DATEADD. Rewrite DATEADD('day', n, d) as (d + CAST(n AS INTEGER)), with
+    balanced-parenthesis parsing so nested calls are handled. Other parts are not supported."""
+    while True:
+        start = sql.find("DATEADD(")
+        if start < 0:
+            return sql
+        depth, i = 0, start + len("DATEADD")
+        for i in range(start + len("DATEADD"), len(sql)):
+            if sql[i] == "(":
+                depth += 1
+            elif sql[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+        unit, amount, base = _split_arguments(sql[start + len("DATEADD("):i])
+        if unit.strip("'").lower() != "day":
+            raise ValueError(f"the shim only supports DATEADD('day', ...): {unit}")
+        sql = sql[:start] + f"({base} + CAST({amount} AS INTEGER))" + sql[i + 1:]
+
+
 def translate(statement, keep_constraints=True):
     head = statement.lstrip().upper()
     if head.startswith(("USE DATABASE", "CREATE DATABASE")):
@@ -39,6 +77,7 @@ def translate(statement, keep_constraints=True):
     s = _OBJECT_COMMENT.sub("", s)
     if head.startswith("CREATE SCHEMA"):
         s = re.sub(r"\s+COMMENT = '[^']*'\s*$", "", s)
+    s = rewrite_dateadd(s)
     s = s.replace("TIMESTAMP_NTZ", "TIMESTAMP")
     s = re.sub(r"\bNUMBER\(", "DECIMAL(", s)
     if head.startswith("CREATE TABLE"):
@@ -71,12 +110,17 @@ def run_file(connection, filename, keep_constraints=True):
     return last
 
 
+def load_files():
+    """Setup steps that create objects and load data, in execution order (not 00, 06 or 99)."""
+    return (["01_create_schemas.sql", "02_create_tables.sql", "03_load_reference_data.sql"]
+            + sorted(path.name for path in SQL.glob("04*.sql")) + ["05_create_views.sql"])
+
+
 def build_database(keep_constraints=True, through="05_create_views.sql"):
     import duckdb
 
     connection = duckdb.connect(":memory:")
-    for name in ["01_create_schemas.sql", "02_create_tables.sql", "03_load_reference_data.sql",
-                 "04_load_mock_data.sql", "05_create_views.sql"]:
+    for name in load_files():
         run_file(connection, name, keep_constraints)
         if name == through:
             break

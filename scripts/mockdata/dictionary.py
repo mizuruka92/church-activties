@@ -7,13 +7,14 @@ from .vocab import DAFTAR_NILAI, NILAI_TERKENDALI
 
 DOMAINS = [
     ("1", "Kolekte", ["DATA_OPERASIONAL.PENERIMAAN_KOLEKTE", "MASTER_DATA.REFERENSI_JENIS_KOLEKTE"]),
-    ("2", "Kehadiran Misa", ["DATA_OPERASIONAL.KEHADIRAN_MISA"]),
+    ("2", "Kehadiran Misa", ["DATA_OPERASIONAL.KEHADIRAN_MISA", "DATA_OPERASIONAL.PERISTIWA_LUAR_BIASA"]),
     ("3", "Basis data umat (simulasi BIDUK)", [
         "DATA_OPERASIONAL.KELUARGA", "DATA_OPERASIONAL.UMAT", "DATA_OPERASIONAL.PENUGASAN_KELUARGA",
         "DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN", "MASTER_DATA.REFERENSI_KLASIFIKASI_DATA",
         "MASTER_DATA.KEBIJAKAN_AKSES_DATA", "MASTER_DATA.REFERENSI_KATEGORI_INFORMASI"]),
     ("4", "Sumbangan kesempatan khusus per wilayah", [
-        "DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS", "MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS"]),
+        "DATA_OPERASIONAL.KAMPANYE_SUMBANGAN", "DATA_OPERASIONAL.SUMBANGAN_KESEMPATAN_KHUSUS",
+        "DATA_OPERASIONAL.SUMBANGAN_KELUARGA", "MASTER_DATA.REFERENSI_KESEMPATAN_KHUSUS"]),
     ("5", "Jadwal Misa", ["MASTER_DATA.JADWAL_MISA", "DATA_OPERASIONAL.KEJADIAN_MISA"]),
     ("6", "Survei", [
         "MASTER_DATA.SURVEI", "MASTER_DATA.PERTANYAAN_SURVEI", "MASTER_DATA.OPSI_JAWABAN_SURVEI",
@@ -24,9 +25,11 @@ DOMAINS = [
         "MASTER_DATA.REFERENSI_KATEGORI_BIAYA"]),
     ("8", "Kegiatan dan laporan pascakegiatan", ["DATA_OPERASIONAL.KEGIATAN", "DATA_OPERASIONAL.LAPORAN_KEGIATAN"]),
     ("9", "Data induk wilayah dan GIS", [
-        "MASTER_DATA.MASTER_WILAYAH", "MASTER_DATA.MASTER_LINGKUNGAN", "MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN"]),
+        "MASTER_DATA.MASTER_WILAYAH", "MASTER_DATA.MASTER_LINGKUNGAN", "MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN",
+        "MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN"]),
     ("-", "Referensi bersama", [
-        "MASTER_DATA.MASTER_SEKSI", "MASTER_DATA.REFERENSI_DAFTAR_NILAI", "MASTER_DATA.REFERENSI_PERIODE_PELAPORAN"]),
+        "MASTER_DATA.INFO_DATASET", "MASTER_DATA.MASTER_SEKSI", "MASTER_DATA.REFERENSI_DAFTAR_NILAI",
+        "MASTER_DATA.REFERENSI_PERIODE_PELAPORAN"]),
 ]
 
 
@@ -161,8 +164,16 @@ def render(tables, data, views_sql):
       "Kemiripan dengan orang sebenarnya adalah kebetulan.")
     w("- Model data tidak memiliki kolom untuk nomor identitas, nomor telepon, alamat rumah, atau tanggal lahir lengkap.")
     w("- Responden survei bersifat anonim dan tidak terhubung ke `ID_UMAT`.")
-    w("- Jumlah kolekte adalah ringkasan administrasi keuangan dan bukan ukuran iman atau komitmen rohani.")
-    w("- Sumbangan per wilayah tidak boleh dipakai untuk memeringkat wilayah.")
+    w("- Jumlah kolekte adalah ringkasan administrasi keuangan dan bukan ukuran iman atau komitmen rohani. "
+      "Hubungan kolekte dengan jumlah umat dan tanggal dalam bulan dipakai hanya untuk memahami pola dan membuat proyeksi.")
+    w("- Sumbangan per wilayah atau per lingkungan tidak boleh dipakai untuk memeringkat wilayah atau lingkungan, "
+      "dan tidak menggambarkan iman atau kemurahan hati. Angka tersebut menunjukkan kapasitas ekonomi dan sebaran sumbangan.")
+    w("- `SUMBANGAN_KELUARGA` memuat jumlah sumbangan keluarga fiktif yang teridentifikasi. Data ini berklasifikasi "
+      "Sangat Terbatas dan hanya boleh tampil sebagai angka agregat (misalnya rata-rata, median, dan total per lingkungan).")
+    w("- Kapasitas ekonomi hanya dicatat pada tingkat lingkungan (`PROFIL_EKONOMI_LINGKUNGAN`). Tidak ada data ekonomi "
+      "per keluarga, dan keluarga penyumbang besar tidak ditandai pada data mana pun.")
+    w("- `PERISTIWA_LUAR_BIASA` mencatat kejadian dan tingkat gangguannya, tetapi sengaja tidak menyimpan besar dampaknya "
+      "terhadap kehadiran atau kolekte. Dampak dihitung oleh view analisis dari data.")
     w("- Geometri pada `GEOMETRI_ILUSTRATIF_LINGKUNGAN` sengaja diletakkan di koordinat 0 derajat Lintang dan 0 derajat "
       "Bujur agar tidak disangka batas wilayah paroki yang sebenarnya.")
     w("")

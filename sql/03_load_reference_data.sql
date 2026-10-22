@@ -2,7 +2,7 @@
 -- Step 3: Load reference and master data
 --
 -- GENERATED FILE. Do not edit by hand: run  python scripts/generate_mock_data.py
--- Content  : 16 tables, 303 rows in schema MASTER_DATA. All data is synthetic
+-- Content  : 18 tables, 421 rows in schema MASTER_DATA. All data is synthetic
 --            (fictional) and reproducible (seed 20260930, snapshot date 2026-09-30).
 -- Requires : step 2 (tables)
 -- Safe to re-run: yes. Every table is loaded with MERGE on its primary key, so existing
@@ -12,6 +12,30 @@
 -- =============================================================================
 
 USE DATABASE PUSAT_INFORMASI_PAROKI;
+
+-- MASTER_DATA.INFO_DATASET: 1 rows
+MERGE INTO MASTER_DATA.INFO_DATASET AS t
+USING (
+    SELECT
+        v.ID_DATASET AS ID_DATASET,
+        v.NAMA_DATASET AS NAMA_DATASET,
+        v.DESKRIPSI AS DESKRIPSI,
+        CAST(v.BERSIFAT_SIMULASI AS BOOLEAN) AS BERSIFAT_SIMULASI,
+        CAST(v.TANGGAL_MULAI_RIWAYAT AS DATE) AS TANGGAL_MULAI_RIWAYAT,
+        CAST(v.TANGGAL_SNAPSHOT AS DATE) AS TANGGAL_SNAPSHOT
+    FROM (VALUES
+            ('DS-01', 'Pusat Informasi Paroki (data simulasi)', 'Dataset demo fiktif dengan riwayat lima tahun lebih untuk Misa, kolekte, sumbangan, rencana, anggaran, dan kegiatan.', TRUE, '2021-01-01', '2026-09-30')
+    ) AS v (ID_DATASET, NAMA_DATASET, DESKRIPSI, BERSIFAT_SIMULASI, TANGGAL_MULAI_RIWAYAT, TANGGAL_SNAPSHOT)
+) AS s
+ON t.ID_DATASET = s.ID_DATASET
+WHEN MATCHED THEN UPDATE SET
+    NAMA_DATASET = s.NAMA_DATASET,
+    DESKRIPSI = s.DESKRIPSI,
+    BERSIFAT_SIMULASI = s.BERSIFAT_SIMULASI,
+    TANGGAL_MULAI_RIWAYAT = s.TANGGAL_MULAI_RIWAYAT,
+    TANGGAL_SNAPSHOT = s.TANGGAL_SNAPSHOT
+WHEN NOT MATCHED THEN INSERT (ID_DATASET, NAMA_DATASET, DESKRIPSI, BERSIFAT_SIMULASI, TANGGAL_MULAI_RIWAYAT, TANGGAL_SNAPSHOT)
+    VALUES (s.ID_DATASET, s.NAMA_DATASET, s.DESKRIPSI, s.BERSIFAT_SIMULASI, s.TANGGAL_MULAI_RIWAYAT, s.TANGGAL_SNAPSHOT);
 
 -- MASTER_DATA.REFERENSI_KLASIFIKASI_DATA: 4 rows
 MERGE INTO MASTER_DATA.REFERENSI_KLASIFIKASI_DATA AS t
@@ -100,7 +124,7 @@ WHEN MATCHED THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT (ID_KATEGORI_INFORMASI, NAMA_KATEGORI, DESKRIPSI, ID_KLASIFIKASI_DATA, ID_SEKSI_PENGELOLA)
     VALUES (s.ID_KATEGORI_INFORMASI, s.NAMA_KATEGORI, s.DESKRIPSI, s.ID_KLASIFIKASI_DATA, s.ID_SEKSI_PENGELOLA);
 
--- MASTER_DATA.REFERENSI_DAFTAR_NILAI: 68 rows
+-- MASTER_DATA.REFERENSI_DAFTAR_NILAI: 82 rows
 MERGE INTO MASTER_DATA.REFERENSI_DAFTAR_NILAI AS t
 USING (
     SELECT
@@ -169,6 +193,20 @@ USING (
             ('MUSIM_LITURGI', 'Prapaskah', 1, 'Masa persiapan menjelang Paskah.'),
             ('MUSIM_LITURGI', 'Adven', 2, 'Masa persiapan menjelang Natal.'),
             ('MUSIM_LITURGI', 'Tidak Terkait Musim', 3, 'Tidak terkait musim liturgi tertentu.'),
+            ('STATUS_KAMPANYE', 'Direncanakan', 1, 'Kampanye belum dibuka.'),
+            ('STATUS_KAMPANYE', 'Berjalan', 2, 'Kampanye sedang mengumpulkan sumbangan.'),
+            ('STATUS_KAMPANYE', 'Selesai', 3, 'Kampanye sudah ditutup.'),
+            ('JENIS_PERISTIWA', 'Hujan Deras dan Banjir', 1, 'Hujan lebat atau banjir yang menyulitkan umat menuju gereja.'),
+            ('JENIS_PERISTIWA', 'Kabut Asap', 2, 'Kualitas udara buruk akibat kabut asap.'),
+            ('JENIS_PERISTIWA', 'Abu Vulkanik', 3, 'Hujan abu dari letusan gunung berapi.'),
+            ('JENIS_PERISTIWA', 'Gangguan Listrik', 4, 'Pemadaman listrik yang mengganggu pelaksanaan Misa.'),
+            ('TINGKAT_GANGGUAN', 'Ringan', 1, 'Gangguan kecil, sebagian kecil umat terpengaruh.'),
+            ('TINGKAT_GANGGUAN', 'Sedang', 2, 'Gangguan yang nyata menurunkan jumlah umat yang datang.'),
+            ('TINGKAT_GANGGUAN', 'Berat', 3, 'Gangguan besar, kegiatan dapat dibatalkan.'),
+            ('KATEGORI_EKONOMI', 'Rendah', 1, 'Kapasitas ekonomi umum lingkungan di bawah rata-rata paroki.'),
+            ('KATEGORI_EKONOMI', 'Menengah Bawah', 2, 'Kapasitas ekonomi umum lingkungan agak di bawah rata-rata paroki.'),
+            ('KATEGORI_EKONOMI', 'Menengah Atas', 3, 'Kapasitas ekonomi umum lingkungan agak di atas rata-rata paroki.'),
+            ('KATEGORI_EKONOMI', 'Tinggi', 4, 'Kapasitas ekonomi umum lingkungan di atas rata-rata paroki.'),
             ('KELOMPOK_PENGGUNA', 'Pastor Paroki dan Pengurus Harian', 1, 'Pimpinan paroki.'),
             ('KELOMPOK_PENGGUNA', 'Ketua Seksi', 2, 'Ketua seksi pelayanan.'),
             ('KELOMPOK_PENGGUNA', 'Ketua Wilayah dan Lingkungan', 3, 'Pengurus wilayah dan lingkungan.'),
@@ -252,7 +290,7 @@ WHEN MATCHED THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT (ID_KATEGORI_BIAYA, NAMA_KATEGORI_BIAYA, DESKRIPSI)
     VALUES (s.ID_KATEGORI_BIAYA, s.NAMA_KATEGORI_BIAYA, s.DESKRIPSI);
 
--- MASTER_DATA.REFERENSI_PERIODE_PELAPORAN: 24 rows
+-- MASTER_DATA.REFERENSI_PERIODE_PELAPORAN: 108 rows
 MERGE INTO MASTER_DATA.REFERENSI_PERIODE_PELAPORAN AS t
 USING (
     SELECT
@@ -264,6 +302,54 @@ USING (
         CAST(v.TANGGAL_MULAI AS DATE) AS TANGGAL_MULAI,
         CAST(v.TANGGAL_SELESAI AS DATE) AS TANGGAL_SELESAI
     FROM (VALUES
+            ('PER-202101', 2021, 1, 'Januari 2021', 1, '2021-01-01', '2021-01-31'),
+            ('PER-202102', 2021, 2, 'Februari 2021', 1, '2021-02-01', '2021-02-28'),
+            ('PER-202103', 2021, 3, 'Maret 2021', 1, '2021-03-01', '2021-03-31'),
+            ('PER-202104', 2021, 4, 'April 2021', 2, '2021-04-01', '2021-04-30'),
+            ('PER-202105', 2021, 5, 'Mei 2021', 2, '2021-05-01', '2021-05-31'),
+            ('PER-202106', 2021, 6, 'Juni 2021', 2, '2021-06-01', '2021-06-30'),
+            ('PER-202107', 2021, 7, 'Juli 2021', 3, '2021-07-01', '2021-07-31'),
+            ('PER-202108', 2021, 8, 'Agustus 2021', 3, '2021-08-01', '2021-08-31'),
+            ('PER-202109', 2021, 9, 'September 2021', 3, '2021-09-01', '2021-09-30'),
+            ('PER-202110', 2021, 10, 'Oktober 2021', 4, '2021-10-01', '2021-10-31'),
+            ('PER-202111', 2021, 11, 'November 2021', 4, '2021-11-01', '2021-11-30'),
+            ('PER-202112', 2021, 12, 'Desember 2021', 4, '2021-12-01', '2021-12-31'),
+            ('PER-202201', 2022, 1, 'Januari 2022', 1, '2022-01-01', '2022-01-31'),
+            ('PER-202202', 2022, 2, 'Februari 2022', 1, '2022-02-01', '2022-02-28'),
+            ('PER-202203', 2022, 3, 'Maret 2022', 1, '2022-03-01', '2022-03-31'),
+            ('PER-202204', 2022, 4, 'April 2022', 2, '2022-04-01', '2022-04-30'),
+            ('PER-202205', 2022, 5, 'Mei 2022', 2, '2022-05-01', '2022-05-31'),
+            ('PER-202206', 2022, 6, 'Juni 2022', 2, '2022-06-01', '2022-06-30'),
+            ('PER-202207', 2022, 7, 'Juli 2022', 3, '2022-07-01', '2022-07-31'),
+            ('PER-202208', 2022, 8, 'Agustus 2022', 3, '2022-08-01', '2022-08-31'),
+            ('PER-202209', 2022, 9, 'September 2022', 3, '2022-09-01', '2022-09-30'),
+            ('PER-202210', 2022, 10, 'Oktober 2022', 4, '2022-10-01', '2022-10-31'),
+            ('PER-202211', 2022, 11, 'November 2022', 4, '2022-11-01', '2022-11-30'),
+            ('PER-202212', 2022, 12, 'Desember 2022', 4, '2022-12-01', '2022-12-31'),
+            ('PER-202301', 2023, 1, 'Januari 2023', 1, '2023-01-01', '2023-01-31'),
+            ('PER-202302', 2023, 2, 'Februari 2023', 1, '2023-02-01', '2023-02-28'),
+            ('PER-202303', 2023, 3, 'Maret 2023', 1, '2023-03-01', '2023-03-31'),
+            ('PER-202304', 2023, 4, 'April 2023', 2, '2023-04-01', '2023-04-30'),
+            ('PER-202305', 2023, 5, 'Mei 2023', 2, '2023-05-01', '2023-05-31'),
+            ('PER-202306', 2023, 6, 'Juni 2023', 2, '2023-06-01', '2023-06-30'),
+            ('PER-202307', 2023, 7, 'Juli 2023', 3, '2023-07-01', '2023-07-31'),
+            ('PER-202308', 2023, 8, 'Agustus 2023', 3, '2023-08-01', '2023-08-31'),
+            ('PER-202309', 2023, 9, 'September 2023', 3, '2023-09-01', '2023-09-30'),
+            ('PER-202310', 2023, 10, 'Oktober 2023', 4, '2023-10-01', '2023-10-31'),
+            ('PER-202311', 2023, 11, 'November 2023', 4, '2023-11-01', '2023-11-30'),
+            ('PER-202312', 2023, 12, 'Desember 2023', 4, '2023-12-01', '2023-12-31'),
+            ('PER-202401', 2024, 1, 'Januari 2024', 1, '2024-01-01', '2024-01-31'),
+            ('PER-202402', 2024, 2, 'Februari 2024', 1, '2024-02-01', '2024-02-29'),
+            ('PER-202403', 2024, 3, 'Maret 2024', 1, '2024-03-01', '2024-03-31'),
+            ('PER-202404', 2024, 4, 'April 2024', 2, '2024-04-01', '2024-04-30'),
+            ('PER-202405', 2024, 5, 'Mei 2024', 2, '2024-05-01', '2024-05-31'),
+            ('PER-202406', 2024, 6, 'Juni 2024', 2, '2024-06-01', '2024-06-30'),
+            ('PER-202407', 2024, 7, 'Juli 2024', 3, '2024-07-01', '2024-07-31'),
+            ('PER-202408', 2024, 8, 'Agustus 2024', 3, '2024-08-01', '2024-08-31'),
+            ('PER-202409', 2024, 9, 'September 2024', 3, '2024-09-01', '2024-09-30'),
+            ('PER-202410', 2024, 10, 'Oktober 2024', 4, '2024-10-01', '2024-10-31'),
+            ('PER-202411', 2024, 11, 'November 2024', 4, '2024-11-01', '2024-11-30'),
+            ('PER-202412', 2024, 12, 'Desember 2024', 4, '2024-12-01', '2024-12-31'),
             ('PER-202501', 2025, 1, 'Januari 2025', 1, '2025-01-01', '2025-01-31'),
             ('PER-202502', 2025, 2, 'Februari 2025', 1, '2025-02-01', '2025-02-28'),
             ('PER-202503', 2025, 3, 'Maret 2025', 1, '2025-03-01', '2025-03-31'),
@@ -287,7 +373,43 @@ USING (
             ('PER-202609', 2026, 9, 'September 2026', 3, '2026-09-01', '2026-09-30'),
             ('PER-202610', 2026, 10, 'Oktober 2026', 4, '2026-10-01', '2026-10-31'),
             ('PER-202611', 2026, 11, 'November 2026', 4, '2026-11-01', '2026-11-30'),
-            ('PER-202612', 2026, 12, 'Desember 2026', 4, '2026-12-01', '2026-12-31')
+            ('PER-202612', 2026, 12, 'Desember 2026', 4, '2026-12-01', '2026-12-31'),
+            ('PER-202701', 2027, 1, 'Januari 2027', 1, '2027-01-01', '2027-01-31'),
+            ('PER-202702', 2027, 2, 'Februari 2027', 1, '2027-02-01', '2027-02-28'),
+            ('PER-202703', 2027, 3, 'Maret 2027', 1, '2027-03-01', '2027-03-31'),
+            ('PER-202704', 2027, 4, 'April 2027', 2, '2027-04-01', '2027-04-30'),
+            ('PER-202705', 2027, 5, 'Mei 2027', 2, '2027-05-01', '2027-05-31'),
+            ('PER-202706', 2027, 6, 'Juni 2027', 2, '2027-06-01', '2027-06-30'),
+            ('PER-202707', 2027, 7, 'Juli 2027', 3, '2027-07-01', '2027-07-31'),
+            ('PER-202708', 2027, 8, 'Agustus 2027', 3, '2027-08-01', '2027-08-31'),
+            ('PER-202709', 2027, 9, 'September 2027', 3, '2027-09-01', '2027-09-30'),
+            ('PER-202710', 2027, 10, 'Oktober 2027', 4, '2027-10-01', '2027-10-31'),
+            ('PER-202711', 2027, 11, 'November 2027', 4, '2027-11-01', '2027-11-30'),
+            ('PER-202712', 2027, 12, 'Desember 2027', 4, '2027-12-01', '2027-12-31'),
+            ('PER-202801', 2028, 1, 'Januari 2028', 1, '2028-01-01', '2028-01-31'),
+            ('PER-202802', 2028, 2, 'Februari 2028', 1, '2028-02-01', '2028-02-29'),
+            ('PER-202803', 2028, 3, 'Maret 2028', 1, '2028-03-01', '2028-03-31'),
+            ('PER-202804', 2028, 4, 'April 2028', 2, '2028-04-01', '2028-04-30'),
+            ('PER-202805', 2028, 5, 'Mei 2028', 2, '2028-05-01', '2028-05-31'),
+            ('PER-202806', 2028, 6, 'Juni 2028', 2, '2028-06-01', '2028-06-30'),
+            ('PER-202807', 2028, 7, 'Juli 2028', 3, '2028-07-01', '2028-07-31'),
+            ('PER-202808', 2028, 8, 'Agustus 2028', 3, '2028-08-01', '2028-08-31'),
+            ('PER-202809', 2028, 9, 'September 2028', 3, '2028-09-01', '2028-09-30'),
+            ('PER-202810', 2028, 10, 'Oktober 2028', 4, '2028-10-01', '2028-10-31'),
+            ('PER-202811', 2028, 11, 'November 2028', 4, '2028-11-01', '2028-11-30'),
+            ('PER-202812', 2028, 12, 'Desember 2028', 4, '2028-12-01', '2028-12-31'),
+            ('PER-202901', 2029, 1, 'Januari 2029', 1, '2029-01-01', '2029-01-31'),
+            ('PER-202902', 2029, 2, 'Februari 2029', 1, '2029-02-01', '2029-02-28'),
+            ('PER-202903', 2029, 3, 'Maret 2029', 1, '2029-03-01', '2029-03-31'),
+            ('PER-202904', 2029, 4, 'April 2029', 2, '2029-04-01', '2029-04-30'),
+            ('PER-202905', 2029, 5, 'Mei 2029', 2, '2029-05-01', '2029-05-31'),
+            ('PER-202906', 2029, 6, 'Juni 2029', 2, '2029-06-01', '2029-06-30'),
+            ('PER-202907', 2029, 7, 'Juli 2029', 3, '2029-07-01', '2029-07-31'),
+            ('PER-202908', 2029, 8, 'Agustus 2029', 3, '2029-08-01', '2029-08-31'),
+            ('PER-202909', 2029, 9, 'September 2029', 3, '2029-09-01', '2029-09-30'),
+            ('PER-202910', 2029, 10, 'Oktober 2029', 4, '2029-10-01', '2029-10-31'),
+            ('PER-202911', 2029, 11, 'November 2029', 4, '2029-11-01', '2029-11-30'),
+            ('PER-202912', 2029, 12, 'Desember 2029', 4, '2029-12-01', '2029-12-31')
     ) AS v (ID_PERIODE_PELAPORAN, TAHUN, BULAN, NAMA_PERIODE, KUARTAL, TANGGAL_MULAI, TANGGAL_SELESAI)
 ) AS s
 ON t.ID_PERIODE_PELAPORAN = s.ID_PERIODE_PELAPORAN
@@ -412,6 +534,48 @@ WHEN MATCHED THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT (ID_LINGKUNGAN, ID_WILAYAH, NAMA_LINGKUNGAN, STATUS_AKTIF, TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU, KETERANGAN)
     VALUES (s.ID_LINGKUNGAN, s.ID_WILAYAH, s.NAMA_LINGKUNGAN, s.STATUS_AKTIF, s.TANGGAL_MULAI_BERLAKU, s.TANGGAL_AKHIR_BERLAKU, s.KETERANGAN);
 
+-- MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN: 19 rows
+MERGE INTO MASTER_DATA.PROFIL_EKONOMI_LINGKUNGAN AS t
+USING (
+    SELECT
+        v.ID_PROFIL AS ID_PROFIL,
+        v.ID_LINGKUNGAN AS ID_LINGKUNGAN,
+        CAST(v.TAHUN_PENILAIAN AS NUMBER(4,0)) AS TAHUN_PENILAIAN,
+        v.KATEGORI_EKONOMI AS KATEGORI_EKONOMI,
+        CAST(v.INDEKS_KAPASITAS_EKONOMI AS NUMBER(4,2)) AS INDEKS_KAPASITAS_EKONOMI,
+        v.KETERANGAN AS KETERANGAN
+    FROM (VALUES
+            ('PEK-01', 'LNG-01', 2025, 'Menengah Atas', 1.25, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-02', 'LNG-02', 2025, 'Tinggi', 1.70, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-03', 'LNG-03', 2025, 'Menengah Bawah', 0.85, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-04', 'LNG-04', 2025, 'Menengah Atas', 1.20, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-05', 'LNG-05', 2025, 'Rendah', 0.55, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-06', 'LNG-06', 2025, 'Menengah Bawah', 0.90, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-07', 'LNG-07', 2025, 'Rendah', 0.50, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-08', 'LNG-08', 2025, 'Menengah Bawah', 0.80, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-09', 'LNG-09', 2025, 'Menengah Atas', 1.15, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-10', 'LNG-10', 2025, 'Tinggi', 1.55, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-11', 'LNG-11', 2025, 'Menengah Bawah', 0.95, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-12', 'LNG-12', 2025, 'Rendah', 0.60, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-13', 'LNG-13', 2025, 'Menengah Atas', 1.30, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-14', 'LNG-14', 2025, 'Rendah', 0.55, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-15', 'LNG-15', 2025, 'Menengah Bawah', 0.85, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-16', 'LNG-16', 2025, 'Menengah Bawah', 0.90, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-17', 'LNG-17', 2025, 'Tinggi', 1.60, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-18', 'LNG-18', 2025, 'Menengah Atas', 1.10, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.'),
+            ('PEK-19', 'LNG-19', 2025, 'Menengah Bawah', 0.80, 'Penilaian simulasi atas kapasitas ekonomi umum lingkungan, bukan data keluarga.')
+    ) AS v (ID_PROFIL, ID_LINGKUNGAN, TAHUN_PENILAIAN, KATEGORI_EKONOMI, INDEKS_KAPASITAS_EKONOMI, KETERANGAN)
+) AS s
+ON t.ID_PROFIL = s.ID_PROFIL
+WHEN MATCHED THEN UPDATE SET
+    ID_LINGKUNGAN = s.ID_LINGKUNGAN,
+    TAHUN_PENILAIAN = s.TAHUN_PENILAIAN,
+    KATEGORI_EKONOMI = s.KATEGORI_EKONOMI,
+    INDEKS_KAPASITAS_EKONOMI = s.INDEKS_KAPASITAS_EKONOMI,
+    KETERANGAN = s.KETERANGAN
+WHEN NOT MATCHED THEN INSERT (ID_PROFIL, ID_LINGKUNGAN, TAHUN_PENILAIAN, KATEGORI_EKONOMI, INDEKS_KAPASITAS_EKONOMI, KETERANGAN)
+    VALUES (s.ID_PROFIL, s.ID_LINGKUNGAN, s.TAHUN_PENILAIAN, s.KATEGORI_EKONOMI, s.INDEKS_KAPASITAS_EKONOMI, s.KETERANGAN);
+
 -- MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN: 18 rows
 MERGE INTO MASTER_DATA.GEOMETRI_ILUSTRATIF_LINGKUNGAN AS t
 USING (
@@ -473,7 +637,7 @@ USING (
             ('JDW-02', 'Misa Sabtu Sore', 'Sabtu', '17:30:00', '18:45:00', 'Gereja Santa Maria Contoh', 'Bahasa Indonesia', TRUE, '2026-07-01', NULL, 'Menggantikan jadwal pukul 17.00.'),
             ('JDW-03', 'Misa Minggu Pagi I', 'Minggu', '06:00:00', '07:15:00', 'Gereja Santa Maria Contoh', 'Bahasa Indonesia', TRUE, '2018-01-01', NULL, NULL),
             ('JDW-04', 'Misa Minggu Pagi II', 'Minggu', '08:00:00', '09:15:00', 'Gereja Santa Maria Contoh', 'Bahasa Indonesia', TRUE, '2018-01-01', NULL, 'Misa keluarga dengan petugas anak-anak.'),
-            ('JDW-05', 'Misa Minggu Bahasa Inggris', 'Minggu', '10:30:00', '11:30:00', 'Gereja Santa Maria Contoh', 'Bahasa Inggris', TRUE, '2022-03-06', NULL, NULL),
+            ('JDW-05', 'Misa Minggu Bahasa Inggris', 'Minggu', '10:30:00', '11:30:00', 'Gereja Santa Maria Contoh', 'Bahasa Inggris', TRUE, '2019-01-06', NULL, NULL),
             ('JDW-06', 'Misa Minggu Sore', 'Minggu', '17:30:00', '18:45:00', 'Gereja Santa Maria Contoh', 'Bahasa Indonesia', TRUE, '2018-01-01', NULL, NULL),
             ('JDW-07', 'Misa Harian Rabu', 'Rabu', '05:30:00', '06:15:00', 'Kapel Santo Petrus Contoh', 'Bahasa Indonesia', TRUE, '2018-01-01', NULL, NULL)
     ) AS v (ID_JADWAL_MISA, NAMA_MISA, HARI, WAKTU_MULAI, WAKTU_SELESAI, LOKASI, BAHASA_MISA, STATUS_AKTIF, TANGGAL_MULAI_BERLAKU, TANGGAL_AKHIR_BERLAKU, KETERANGAN)
