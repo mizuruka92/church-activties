@@ -77,10 +77,11 @@ You can try the same on any file with a command-line tool such as `pdftotext -la
 
 ## Using the files with Snowflake later
 
-Nothing about these PDFs is part of the Snowflake setup: no SQL file mentions them and nothing was loaded or run in Snowflake. They exist so
-that a later step can show how documents become rows. In outline:
+The normal setup does not use these PDFs, and nothing was loaded or run in Snowflake. The optional step 7 ([`sql/07_dokumen_pdf.sql`](../sql/07_dokumen_pdf.sql), described in the
+[starter guide, part 8b](STARTER_GUIDE.md#8b-optional-open-the-pdf-files-from-the-dashboard)) creates the stage `ANALISIS.DOKUMEN_PAROKI` and a view with a pre-signed link
+per file; with it, the dashboard opens the reports and guides from the stage. The PDFs also exist so that a later step can show how documents become rows. In outline:
 
-1. Upload the PDFs to an internal stage (for example with the Snowsight file upload or `PUT`).
+1. Upload the PDFs to an internal stage (for example with the Snowsight file upload or `PUT`). Step 7 creates the stage `ANALISIS.DOKUMEN_PAROKI` for this.
 2. Run a document-extraction feature on them (Snowflake offers several, such as Cortex functions and Document AI; names, availability and syntax
    change between releases, so check the current documentation) and compare the result with `LAPORAN_KEGIATAN`, which acts as the answer key.
 3. Join on `NAMA_BERKAS_SUMBER` (or on the report number at the start of the file name). Only the file name is stored; on a stage the same
@@ -115,7 +116,8 @@ the dashboard in `app/public_documents/`, which is where the page **Layanan dan 
 * `tests/test_layanan.py` reads every committed PDF back and finds each service's summary, notes, requirements and steps in the document, in the same order as the tables, with the
   right *Wajib* or *Jika berlaku* mark and the right actor; checks the footer on every page, that text never leaves the margin, and that no PDF holds a long number, e-mail or web address.
   `python scripts/generate_mock_data.py --check` also fails when a guide differs, is missing or is left over.
-* Nothing about these PDFs is loaded into Snowflake. The dashboard page renders the same content from the three public views, so it works even where the PDF files are not available.
+* The PDFs are not loaded into Snowflake by the normal setup. The dashboard page renders the same content from the three public views, so it works even where the PDF files are not available. With the optional step 7 the page also offers a link that opens the guide from the stage.
+* **In the offline HTML dashboard** all 138 PDFs (132 reports and 6 guides) are inside the file, so "Buka laporan (PDF)" and "Buka panduan (PDF)" open them in the browser's own PDF viewer without any folder or internet ([HTML_DASHBOARD.md](HTML_DASHBOARD.md)).
 
 ## Limits
 

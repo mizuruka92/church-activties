@@ -42,6 +42,8 @@ body {
   font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: .4rem; padding: .4rem .8rem; cursor: pointer;
 }
 .btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+p.buttons { margin: .8rem 0 .2rem; display: flex; flex-wrap: wrap; gap: .5rem; }
 .sidebar .btn { margin-top: 1rem; width: 100%; }
 main { flex: 1 1 auto; min-width: 0; padding: 1.5rem 2rem 4rem; max-width: 76rem; }
 h1 { font-size: 2.1rem; margin: 0 0 1rem; }

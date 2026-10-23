@@ -114,16 +114,29 @@ function showPage(name) {
   return render(false);
 }
 
-function downloadGuide(file) {
-  var b64 = GUIDES[file];
-  if (!b64) { return; }
-  var raw = atob(b64), bytes = new Uint8Array(raw.length);
-  for (var i = 0; i < raw.length; i++) { bytes[i] = raw.charCodeAt(i); }
-  var url = URL.createObjectURL(new Blob([bytes], {type: "application/pdf"}));
+// A PDF is decoded from its base64 text into a Blob, so it opens in the browser's own viewer and works offline, wherever
+// the HTML file has been copied to.
+var pdfUrls = {};
+function pdfUrl(file) {
+  if (!hasPdf(file)) { return null; }
+  if (!pdfUrls[file]) {
+    var raw = atob(PDFS[file]), bytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) { bytes[i] = raw.charCodeAt(i); }
+    pdfUrls[file] = URL.createObjectURL(new Blob([bytes], {type: "application/pdf"}));
+  }
+  return pdfUrls[file];
+}
+function downloadPdf(file) {
+  var url = pdfUrl(file);
+  if (!url) { return; }
   var a = document.createElement("a");
   a.href = url; a.download = file;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+}
+function openPdf(file) {
+  var url = pdfUrl(file);
+  if (!url) { return; }
+  if (!window.open(url, "_blank")) { downloadPdf(file); }   // a blocked pop-up falls back to a download
 }
 
 function start() {
@@ -138,10 +151,11 @@ function start() {
     render(true);
   });
   document.addEventListener("click", function (e) {
-    var el = e.target.closest ? e.target.closest("[data-tab],[data-download],#theme-toggle") : null;
+    var el = e.target.closest ? e.target.closest("[data-tab],[data-open],[data-download],#theme-toggle") : null;
     if (!el) { return; }
     if (el.hasAttribute("data-tab")) { S[el.getAttribute("data-tab")] = el.getAttribute("data-value"); render(true); }
-    else if (el.hasAttribute("data-download")) { downloadGuide(el.getAttribute("data-download")); }
+    else if (el.hasAttribute("data-open")) { openPdf(el.getAttribute("data-open")); }
+    else if (el.hasAttribute("data-download")) { downloadPdf(el.getAttribute("data-download")); }
     else if (el.id === "theme-toggle") {
       themeChoice = THEME_CHOICES[(THEME_CHOICES.indexOf(themeChoice) + 1) % THEME_CHOICES.length];
       storageSet("pip.tema", themeChoice);

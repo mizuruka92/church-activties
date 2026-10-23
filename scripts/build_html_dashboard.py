@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 HTML = ROOT / "app" / "html"
 OUTPUT = HTML / "pusat_informasi_paroki.html"
 GUIDE_FOLDER = ROOT / "app" / "public_documents"
+REPORT_FOLDER = ROOT / "data" / "documents" / "laporan_kegiatan"
 VENDOR = (("VEGA", "vega.min.js"), ("VEGA_LITE", "vega-lite.min.js"), ("VEGA_EMBED", "vega-embed.min.js"))
 # Mass rows that the pages need: the scheduled ones (upcoming list) and the first and last held Mass (the "Tentang data" dates).
 # The other thousands of held Masses are not drawn individually, so they stay out of the file.
@@ -101,16 +102,26 @@ def trim_masses(columns, rows):
     return scheduled + ([held[0], held[-1]] if held else [])
 
 
-def guide_files(data):
-    table = data["LAYANAN_PUBLIK"]
-    index = table["c"].index("NAMA_BERKAS_PANDUAN")
-    guides = {}
-    for row in table["r"]:
-        name = row[index]
-        path = GUIDE_FOLDER / name
-        if name and path.is_file() and path.name == name and name.lower().endswith(".pdf"):
-            guides[name] = base64.b64encode(path.read_bytes()).decode("ascii")
-    return guides
+def pdf_files(data):
+    """The PDFs the pages can open, as {file name: base64}: the service guides of LAYANAN_PUBLIK and the post-event reports of
+    KEGIATAN_DAN_LAPORAN. They are embedded so that the single HTML file still works when it is copied away from the repository."""
+    pdfs = {}
+    for view, column, folder in (("LAYANAN_PUBLIK", "NAMA_BERKAS_PANDUAN", GUIDE_FOLDER),
+                                 ("KEGIATAN_DAN_LAPORAN", "NAMA_BERKAS_LAPORAN", REPORT_FOLDER)):
+        table = data[view]
+        index = table["c"].index(column)
+        for row in table["r"]:
+            name = row[index]
+            if not name:
+                continue  # an event without a report has no file, as in the table
+            path = folder / name
+            if path.name != name or not name.lower().endswith(".pdf") or not path.is_file():
+                print(f"Warning: {column} names {name!r}, which is not in {folder.relative_to(ROOT)}; the page will say the file is not included.")
+                continue
+            if name in pdfs:
+                raise SystemExit(f"The file name {name} is used twice")
+            pdfs[name] = base64.b64encode(path.read_bytes()).decode("ascii")
+    return pdfs
 
 
 def as_script_json(value):
@@ -123,11 +134,11 @@ def build():
     app_js = "\n".join(f"/* {name} */\n{text}" for name, text in scripts)
     names = needed_views(app_js, dashboard_views())
     data = read_views(names, app_js)
-    guides = guide_files(data)
+    pdfs = pdf_files(data)
 
     parts = {
         "CSS": (HTML / "dashboard.css").read_text(encoding="utf-8"),
-        "DATA": "var DATA = " + as_script_json(data) + ";\nvar GUIDES = " + as_script_json(guides) + ";",
+        "DATA": "var DATA = " + as_script_json(data) + ";\nvar PDFS = " + as_script_json(pdfs) + ";",
         "APP": app_js,
     }
     for key, file_name in VENDOR:
@@ -145,7 +156,7 @@ def build():
     return page
 
 
-DATA_BLOCK = re.compile(r"var DATA = (.*?);\nvar GUIDES = (.*?);\n", re.S)
+DATA_BLOCK = re.compile(r"var DATA = (.*?);\nvar PDFS = (.*?);\n", re.S)
 
 
 def close_enough(a, b):

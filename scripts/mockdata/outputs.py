@@ -104,7 +104,7 @@ def render_reset(tables):
         lines.append(f"-- TRUNCATE TABLE IF EXISTS {table.qualified};")
     lines += [
         "",
-        "-- Option B: drop the three demo schemas with everything in them (tables, views).",
+        "-- Option B: drop the three demo schemas with everything in them (tables, views, and the stage ANALISIS.DOKUMEN_PAROKI with its PDF files, if the optional step 7 was run).",
         "-- DROP SCHEMA IF EXISTS PUSAT_INFORMASI_PAROKI.ANALISIS;",
         "-- DROP SCHEMA IF EXISTS PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL;",
         "-- DROP SCHEMA IF EXISTS PUSAT_INFORMASI_PAROKI.MASTER_DATA;",

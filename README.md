@@ -39,6 +39,7 @@ and available as PDFs.
 | Validation checks | 384 result rows, returned as one result table |
 | Dashboard | One Streamlit file, 11 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
 | Offline dashboard | One HTML file, the same 11 pages as charts and dropdowns, opens by double-click with no installation or account ([docs/HTML_DASHBOARD.md](docs/HTML_DASHBOARD.md)) |
+| PDFs in the dashboards | The offline HTML dashboard opens all 138 PDFs from inside the file. The Streamlit dashboard can open them from a Snowflake stage after the optional step 7 ([starter guide, part 8b](docs/STARTER_GUIDE.md#8b-optional-open-the-pdf-files-from-the-dashboard)) |
 | Mock source documents | 132 PDF post-event reports, one per report row, as if the rows had been extracted from them ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
 | Public service guides | 6 PDF guides in `app/public_documents/`, generated from the same rows the dashboard page shows ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
 
@@ -281,6 +282,7 @@ README.md                     This file
 sql/                          SQL steps 00-06, 99 (destructive) and full_setup.sql
   02_create_tables.sql        Hand-written DDL, the source of truth
   05_create_views.sql         Hand-written views
+  07_dokumen_pdf.sql          OPTIONAL: stage for the PDF files and the view with links to them (not in full_setup.sql)
   03, 04a-04g, 06, 99, full_setup  GENERATED, do not edit by hand
 scripts/
   generate_mock_data.py       Command line entry point

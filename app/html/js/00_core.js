@@ -245,6 +245,16 @@ function tabs(key, labels) {
     }).join("") + "</div>"
   };
 }
+// Buttons for a PDF that is stored inside this file (PDFS maps a file name to its base64 text). what: "laporan" or "panduan".
+function hasPdf(file) { return typeof PDFS === "object" && PDFS !== null && !missing(file) && !!PDFS[file]; }
+function pdfButtons(file, what) {
+  if (!hasPdf(file)) {
+    return caption("Berkas PDF " + esc(text(file)) + " tidak disertakan pada berkas HTML ini.");
+  }
+  return '<p class="buttons"><button type="button" class="btn primary" data-open="' + esc(file) + '">Buka ' + what + " (PDF)</button> " +
+    '<button type="button" class="btn" data-download="' + esc(file) + '">Unduh ' + what + " (PDF)</button></p>" +
+    caption("Berkas: " + esc(file));
+}
 function chartBox(spec, height, extra) {
   var id = "chart" + (++chartCounter);
   pending.push({id: id, spec: spec, height: height});

@@ -19,9 +19,9 @@ The sidebar menu has eleven pages. The text on screen is Bahasa Indonesia; this 
 | Perkiraan kolekte | How good is the stored forecast of the weekly offertory, and which events explain the misses? Four tiles (error and share inside the 80% range, for ordinary weeks and for event weeks), a line chart of actual versus forecast with the range and the event weeks shaded, a table of weeks outside the range (explained by an event, or honestly unexplained), one bar per event showing its gap against the usual error, a close-up of a chosen event, accuracy by kind of week, and the forecast for the weeks ahead. | `KOLEKTE_AKTUAL_VS_PERKIRAAN`, `BIAS_PERKIRAAN_PER_PERISTIWA`, `AKURASI_PERKIRAAN_TAHUNAN` |
 | Peristiwa luar biasa | What did rain, haze, ash or a power cut do, and why would a forecast be off? Weekly line chart with event weeks marked (for attendance against the 8-week average, for the offertory against the stored forecast in one chart), attendance and offertory against expectation per event, a detail card per event. | `KOLEKTE_MINGGUAN_DAN_PERISTIWA`, `KOLEKTE_AKTUAL_VS_PERKIRAAN`, `DAMPAK_PERISTIWA_LUAR_BIASA` |
 | Sumbangan khusus | Do Lent and Advent gifts cover Easter and Christmas? How are gifts distributed over communities (mean versus median, total versus per person)? Which regions have reported? | `TITIK_IMPAS_KAMPANYE`, `SUMBANGAN_KELUARGA_PER_LINGKUNGAN`, `SUMBANGAN_KHUSUS_PER_WILAYAH` |
-| Rencana, anggaran, kegiatan | How much of the budget was used, and how complete are the reports? Budget use per section and year, programme list with filters, report completeness, target versus actual participants, and an event list that names the source document of each report ("Berkas laporan"). | `ANGGARAN_VS_REALISASI_SEKSI`, `ANGGARAN_VS_REALISASI_PROGRAM`, `KEGIATAN_DAN_LAPORAN`, `KELENGKAPAN_LAPORAN_PER_SEKSI` |
+| Rencana, anggaran, kegiatan | How much of the budget was used, and how complete are the reports? Budget use per section and year, programme list with filters, report completeness, target versus actual participants, an event list that names the source document of each report ("Berkas laporan"), and a picker "Laporan kegiatan (PDF)" with a button that opens the report from the stage when the optional step 7 has been run. | `ANGGARAN_VS_REALISASI_SEKSI`, `ANGGARAN_VS_REALISASI_PROGRAM`, `KEGIATAN_DAN_LAPORAN`, `KELENGKAPAN_LAPORAN_PER_SEKSI` |
 | Survei umat | What do the survey results say? One survey and question at a time, percentages with response counts, Likert summary. | `HASIL_SURVEI`, `RINGKASAN_SKOR_LIKERT` |
-| Layanan dan prosedur | What do I need, and what are the steps, to be baptised, confirmed or married, to join a community, or when someone dies? A disclaimer, a list of the six services, a selector, two tabs (requirements as a checklist, numbered steps with who does each), the important notes and a download button for the PDF guide. Public information: it never shows personal data. | `LAYANAN_PUBLIK`, `LANGKAH_LAYANAN_PUBLIK`, `PERSYARATAN_LAYANAN_PUBLIK` |
+| Layanan dan prosedur | What do I need, and what are the steps, to be baptised, confirmed or married, to join a community, or when someone dies? A disclaimer, a list of the six services, a selector, two tabs (requirements as a checklist, numbered steps with who does each), the important notes, a download button for the PDF guide (when the file is next to the app) and a button that opens it from the stage (when the optional step 7 has been run). Public information: it never shows personal data. | `LAYANAN_PUBLIK`, `LANGKAH_LAYANAN_PUBLIK`, `PERSYARATAN_LAYANAN_PUBLIK` |
 | Tentang data | What is this data and how far does it go? Purpose, privacy, how to read the projection, the list of views, the date of the latest held Mass. | `PELAKSANAAN_MISA` |
 
 The use cases behind the first five pages, with the figures they show, are in [USE_CASES.md](USE_CASES.md).
@@ -92,7 +92,7 @@ comma for decimals); the numeric tick labels on axes follow the browser locale.
 
 * No map. The illustrative geometry lives in `MASTER_DATA` and is not exposed through any view. A map would risk looking like the real
   parish boundaries, so it is left for a later phase.
-* No data export (the only downloads are the public PDF service guides), no login, no per-user access rules. Who may open the app is controlled in Snowflake (see the starter guide, part 9).
+* No data export (the only downloads are the public PDF service guides; the reports and guides can be opened through one-hour links when step 7 is used, see section 5), no login, no per-user access rules. Who may open the app is controlled in Snowflake (see the starter guide, part 9).
 * No write-back. The app only reads.
 * The only forecasts are the straight-line projection of income versus outcome and the stored weekly shadow forecast. No operating costs. See [USE_CASES.md](USE_CASES.md).
 
@@ -111,3 +111,16 @@ comma for decimals); the numeric tick labels on axes follow the browser locale.
 [HTML_DASHBOARD.md](HTML_DASHBOARD.md) describes a single-file copy of this dashboard (charts and dropdowns, no tables, a snapshot of the data) that opens
 without Snowflake, Streamlit or internet. It ports the pages and charts of `streamlit_app.py` to JavaScript, so a change to a page here needs the same change
 there. `tests/test_html_dashboard.py` compares the figures on the tiles of both dashboards and fails when they differ.
+
+### The PDF links (optional step 7)
+
+`sql/07_dokumen_pdf.sql` adds the stage `ANALISIS.DOKUMEN_PAROKI` and the view `ANALISIS.BERKAS_DOKUMEN` (one row per PDF that the tables name, with `ADA_DI_STAGE` and a
+pre-signed `TAUTAN_BERKAS`). It is the only view outside the fixed list of 27: the app reads it through `OPTIONAL_VIEWS`, caches it like the others, and treats any error
+(the view does not exist, or may not be read) as "step 7 was not run": the pages then say so in one sentence and everything else works. Design notes:
+
+* A pre-signed link needs `SNOWFLAKE_SSE` encryption and is open to anyone who holds it until it expires (one hour). The dashboard caches the view for ten minutes, so a link on screen
+  has at least fifty minutes left. This is acceptable for fictional files only; for real documents use Snowflake roles and the default encryption.
+* `show_document` uses `st.link_button` (Streamlit 1.29 or later) and a Markdown link before that, plus a copyable "Tautan langsung". Whether a browser opens the link when the app is shown inside
+  Streamlit in Snowflake has not been verified.
+* Tests: `tests/test_app.py` (`PdfLinkTests`) replaces the view with a DuckDB stand-in that has the same columns and invents the links (host `.invalid`). It checks the button, the sentence for a file that is
+  not on the stage, the page when the view does not exist, that the picker matches the files of `KEGIATAN_DAN_LAPORAN`, and that `sql/07` is non-destructive and absent from `full_setup.sql`. It cannot show that Snowflake produces working links.
