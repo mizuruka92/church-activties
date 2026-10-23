@@ -430,6 +430,48 @@ class PageTests(unittest.TestCase):
             self.assertEqual(len(done), app.RECENT_WEEKS)
             self.assertTrue(done["Perkiraan kolekte"].str.startswith("Rp ").all(), label)
 
+    def test_every_shaded_week_can_be_traced_to_its_event(self):
+        frame = app._normalise(app_support.run_query(f"SELECT * FROM {app.DATABASE}.ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN"))
+        data, long, struck = app.forecast_frames(frame)
+        self.assertTrue((struck["Teks peristiwa"] != "-").all())
+        self.assertTrue((struck["Teks jenis"] != "-").all() and (struck["Teks tingkat"] != "-").all())
+        labels = app.event_labels(struck)
+        self.assertEqual(list(labels["Kode"]), [f"PRS-{n:02d}" for n in range(2, 11)], "one label per event, in date order")
+        for _, event in labels.iterrows():
+            weeks = struck[struck["ID_PERISTIWA"] == event["Kode"]]
+            self.assertTrue(weeks["AWAL_PEKAN"].min() <= event["Tengah"] <= weeks["Akhir"].max())
+        self.assertTrue(app.event_labels(struck.iloc[0:0]).empty, "a chart without event weeks has nothing to label")
+
+    def test_the_chart_writes_the_event_code_on_the_band_and_the_band_has_a_tooltip(self):
+        spec = [c for c in charts(self.pages["Perkiraan kolekte"]) if app.SERIES_ACTUAL in c.proto.spec][0].proto.spec
+        self.assertIn('"angle": 270', spec, "the event code is written on the band")
+        for title in ("Peristiwa", "Kode", "Jenis", "Tingkat gangguan"):
+            self.assertIn(f'"title": "{title}"', spec, title)
+
+    def test_each_weekly_chart_lists_the_events_it_shades_by_name(self):
+        for label in ("Kolekte dan kehadiran", "Perkiraan kolekte"):
+            text = page_text(self.pages[label])
+            self.assertIn("Peristiwa pada pekan berlatar abu-abu", text, label)
+            self.assertIn("**PRS-10**: Banjir Juli 2026 (Hujan Deras dan Banjir, gangguan sedang), 4 Juli 2026 sampai 12 Juli 2026", text, label)
+            self.assertIn("**PRS-09**: Hujan deras masa Adven 2025", text, label)
+            self.assertNotIn("PRS-08", text.split("Peristiwa pada pekan berlatar abu-abu")[1][:600], f"{label}: only the events of the zoomed year")
+
+    def test_the_whole_range_lists_all_nine_events_the_forecast_could_cover(self):
+        at = open_page("Perkiraan kolekte")
+        at.radio(key="jangka_grafik_perkiraan").set_value(app.VIEW_ALL).run()
+        first_list = next(str(m.value) for m in at.markdown if str(m.value).startswith("**Peristiwa pada pekan berlatar abu-abu**"))
+        for number in range(2, 11):
+            self.assertIn(f"**PRS-{number:02d}**", first_list)
+        self.assertIn("Hujan abu vulkanik tebal Juni 2025 (Abu Vulkanik, gangguan berat), 7 Juni 2025 sampai 6 Juli 2025", first_list)
+
+    def test_the_events_page_names_the_shaded_weeks_and_includes_the_event_before_the_first_forecast(self):
+        at = open_page("Peristiwa luar biasa")
+        at.radio(key="ukuran_peristiwa").set_value("Kolekte per pekan").run()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        listed = next(str(m.value) for m in at.markdown if str(m.value).startswith("**Peristiwa pada pekan berlatar abu-abu**"))
+        self.assertIn("**PRS-01**: Banjir besar Februari 2021", listed, "weeks before the first forecast are shaded and named too")
+        self.assertIn("**PRS-10**", listed)
+
     def test_the_table_follows_the_zoom_of_the_chart(self):
         at = open_page("Perkiraan kolekte")
         at.radio(key="jangka_grafik_perkiraan").set_value(app.VIEW_ALL).run()
