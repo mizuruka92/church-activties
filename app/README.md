@@ -26,8 +26,9 @@ data is fictional, and every page says so.
   browser: every page renders, only allowed views are read, the privacy and language rules hold. See
   `tests/test_app.py`. Also tested on an older stack (Python 3.11, Streamlit 1.35, Altair 4.2) and the
   current one (Streamlit 1.66, Altair 6).
-* **Not yet run inside Snowflake.** Nothing in this repository has been executed in a Snowflake account. The first
-  real run is the real test. The most likely surprises are listed in the starter guide, part 12.
+* **Confirmed in Snowflake by the project owner:** the app ran in a real account, created from copied and pasted files or from the Git repository, with no other
+  setup than uploading the PDFs to a stage by hand. The Snowflake edition and region, the Streamlit runtime and version were not written down. The places that
+  could still differ in another account are listed in the starter guide, part 12.
 
 ## Three ways to run it
 

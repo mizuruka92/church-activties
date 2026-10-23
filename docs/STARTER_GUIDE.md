@@ -6,11 +6,11 @@ Python. You will copy and paste.
 
 > **Everything in the demo is fictional.** No real parish data is involved, and you must not load any.
 >
-> **Read this once:** nothing in this repository has been run inside a real Snowflake account yet, and the
-> screens of Snowflake change from release to release. Where this guide describes a Snowflake screen or command,
-> it was checked against Snowflake's published documentation, not against your account. Part 12 lists exactly what
-> has and has not been tested. If a step fails, part 11 tells you what to do, and it helps a lot if you report
-> the exact message so the files can be fixed.
+> **Read this once:** by the project owner's report, this repository ran in a real Snowflake account (both by copy and paste and from a
+> Git repository) and the dashboard worked. The screens of Snowflake change from release to release, though. Where this guide describes a
+> Snowflake screen or command, it was checked against Snowflake's published documentation, not against your account. Part 12 lists exactly
+> what has and has not been tested. If a step fails, part 11 tells you what to do, and it helps a lot if you report the exact message so
+> the files can be fixed.
 
 ## 0. What you will have at the end
 
@@ -381,7 +381,7 @@ If you see a red box saying **"Data belum dapat dimuat dari Snowflake"**, open *
 
 The repository has 138 mock PDF files: 132 post-event reports (`data/documents/laporan_kegiatan/`) and 6 service guides
 (`app/public_documents/`). The dashboard works without them. To open them from the dashboard, put them on a Snowflake **stage** (a
-storage area for files) and run one more optional SQL file. Nothing here has been tried in a real Snowflake account.
+storage area for files) and run one more optional SQL file. By the project owner's report, the stage upload and the PDF buttons worked in a real Snowflake account.
 
 1. **Create the stage and the link view.** Run [`sql/07_dokumen_pdf.sql`](../sql/07_dokumen_pdf.sql) like the other files. It creates the stage
    `ANALISIS.DOKUMEN_PAROKI` and the view `ANALISIS.BERKAS_DOKUMEN`. The stage must be created by this file: links to files only work on a stage with
@@ -409,7 +409,7 @@ Things to know:
 
 * The button opens a **pre-signed link**, valid for one hour. Anyone who has the link can open that file until it expires. That is fine for these
   fictional files. For real reports, do not use links like this; use Snowflake roles instead.
-* If a click does nothing in your account (Streamlit in Snowflake shows the app inside a restricted frame, and I could not confirm that links open from it),
+* If a click does nothing in your account (Streamlit in Snowflake shows the app inside a restricted frame, which a browser setting may block),
   open **Tautan langsung** under the button, copy the link and paste it into a new browser tab.
 * If a file is not on the stage, the page says so in one sentence instead of showing a button. If you never run step 7, the page says that step 7 has not been run.
 * Run `ALTER STAGE ... REFRESH` again after every upload, so that new files are listed.
@@ -488,7 +488,7 @@ Write down the **exact message** and the **step** where it appeared. Do not edit
 | `LS @...PARISH_REPO/branches/main/sql/` shows nothing | `main` may not contain the files yet (see part 2), or `FETCH` has not run. Run `SHOW GIT BRANCHES IN GIT REPOSITORY PUSAT_INFORMASI_PAROKI.PUBLIC.PARISH_REPO;` to see which branches Snowflake has. |
 | A step says a table or schema "does not exist" | A previous step was skipped. Run the steps in order. |
 | A column or table "does not exist" after updating to a newer version | The tables changed and the database comes from an older version. Reset (see part 5), then run the setup again. For the single column `NAMA_BERKAS_SUMBER` (the link from a report to its PDF) a small `ALTER TABLE` is enough, see "Adding the source-file column without a reset" in [SETUP_SNOWFLAKE.md](SETUP_SNOWFLAKE.md). |
-| A statement fails with a syntax error | Note the file and the statement and report it. The SQL was tested on a different database engine and has not run in Snowflake yet. |
+| A statement fails with a syntax error | Note the file and the statement and report it. The SQL was tested on a different database engine; the project owner reports that it ran in Snowflake without other setup, but your account may differ. |
 | The validation shows `FAIL` rows | Filter `RESULT = 'FAIL'`. If the row-count or `VIEWS` rows fail, a step did not finish: run steps 3, 4a to 4g and 5 again. |
 | `EXECUTE IMMEDIATE FROM` fails for a big file | Run that file with copy and paste instead (Path A). |
 | The Streamlit app shows "Data belum dapat dimuat dari Snowflake" | The setup is not finished (steps 1 to 6), the app's warehouse is missing or stopped, or the app's owner role cannot read the views. Open "Detail teknis". An error naming a view means step 5 did not run. A permission error means you should use the role that ran the setup. |
@@ -510,7 +510,11 @@ Altair generations.
 statements (`CREATE API INTEGRATION ... API_PROVIDER = git_https_api`, `CREATE SECRET`, `CREATE GIT REPOSITORY`, `ALTER GIT REPOSITORY
 ... FETCH`), `EXECUTE IMMEDIATE FROM`, `CREATE STREAMLIT ... FROM`, the warehouse versus container runtime choice, MFA, and trial terms.
 
-**Not done:** nothing has been executed in a Snowflake account. The points most likely to need a small fix on the first real run:
+**Confirmed by the project owner in a real Snowflake account:** the files ran, both pasted by hand and from a Git repository, the dashboard worked, and no other setup was needed
+than uploading the PDFs to a stage by hand. The details were not written down (Snowflake edition and region, Streamlit runtime and version, the validation figures), and no automated
+test runs against Snowflake.
+
+**Places that could still differ in another account** (not known problems; the owner needed no fix):
 
 1. The `COMMENT` placed after `NOT NULL` in the table definitions (step 2).
 2. The `MERGE ... USING (SELECT ... FROM (VALUES ...))` form in the load files (steps 3 and 4).

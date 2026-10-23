@@ -6,8 +6,8 @@ be built on questions that already have answers.
 
 > **Everything here is simulated.** The parish, the amounts and the events are fictional. The numbers
 > in this guide were produced by running the committed SQL on a **local DuckDB stand-in**, not in
-> Snowflake (nothing has been executed in Snowflake yet; see the README). They are deterministic, so
-> Snowflake should return the same values, but that has not been verified. The stories are
+> Snowflake (see the README for the owner's report that the SQL ran in a real account). They are deterministic, so
+> Snowflake should return the same values, but nobody compared the figures one by one. The stories are
 > deliberately clean so that they are easy to present. Real data will be messier.
 
 | # | Question | Main views |

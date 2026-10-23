@@ -25,7 +25,7 @@ Three things to keep in mind:
 * **It is a snapshot, not a connection.** It never contacts Snowflake and cannot show new data. To refresh it, rebuild it (below).
 * **The data is simulated**, like everything else in this repository. Every page says so.
 * **It was built from the DuckDB stand-in, not from Snowflake.** The views were run on a local database built from the same SQL files
-  (see [SETUP_SNOWFLAKE.md](SETUP_SNOWFLAKE.md) and the verification status in the README). Nothing has been executed in Snowflake, so the
+  (see [SETUP_SNOWFLAKE.md](SETUP_SNOWFLAKE.md) and the verification status in the README). The project owner reports that the same SQL ran in a real Snowflake account, but nobody compared the figures, so the
   numbers in this file are the numbers the SQL produces on DuckDB. If Snowflake gives different results for the same SQL, the Streamlit
   dashboard will show them and this file will not, until it is rebuilt from those results.
 

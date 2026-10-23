@@ -98,12 +98,12 @@ comma for decimals); the numeric tick labels on axes follow the browser locale.
 
 ## 5. Limits of this version
 
-* The dashboard was tested against a DuckDB stand-in and in a headless browser, not against Snowflake or inside Streamlit in
-  Snowflake. Things that can differ in a real account: the Streamlit version and runtime, how `st.set_page_config` and `st.context`
-  behave in the container, and the time the first query takes while the warehouse starts.
+* The automated tests ran against a DuckDB stand-in and in a headless browser, not against Snowflake. The project owner reports that the dashboard worked in a real
+  Snowflake account; the Streamlit version and runtime were not written down. Things that can differ in another account: the Streamlit version and runtime, how
+  `st.set_page_config` and `st.context` behave in the container, and the time the first query takes while the warehouse starts.
 * Layout was reviewed on desktop-width screens (about 1,400 px). Phone widths were not reviewed.
-* The PDF download on "Layanan dan prosedur" needs the files next to the app and a runtime that offers `st.download_button`. Snowflake's documentation for Native Apps lists that button as unsupported on the warehouse runtime and the general limitations page does not mention it, so it is unverified for an ordinary Streamlit in Snowflake app. The page works either way: it shows the whole guide as text, and says in a caption when the file or the button is missing.
-* The close-up chart on the forecast page labels its date axis with a small Vega expression (Indonesian month abbreviations, because the axis library would otherwise print English months). It rendered correctly on Streamlit 1.35 and 1.66 in a headless browser, but not in Streamlit in Snowflake.
+* The PDF download on "Layanan dan prosedur" needs the files next to the app and a runtime that offers `st.download_button`. Snowflake's documentation for Native Apps lists that button as unsupported on the warehouse runtime and the general limitations page does not mention it, and the owner's run did not record which of the two ways to open a PDF was used. The page works either way: it shows the whole guide as text, and says in a caption when the file or the button is missing.
+* The close-up chart on the forecast page labels its date axis with a small Vega expression (Indonesian month abbreviations, because the axis library would otherwise print English months). It rendered correctly on Streamlit 1.35 and 1.66 in a headless browser; how it looked in Streamlit in Snowflake was not recorded.
 * Charts are drawn by Vega-Lite through Altair, so very old Streamlit releases that predate Altair 4 are not supported.
 
 ## 6. The offline HTML copy
@@ -120,7 +120,7 @@ pre-signed `TAUTAN_BERKAS`). It is the only view outside the fixed list of 27: t
 
 * A pre-signed link needs `SNOWFLAKE_SSE` encryption and is open to anyone who holds it until it expires (one hour). The dashboard caches the view for ten minutes, so a link on screen
   has at least fifty minutes left. This is acceptable for fictional files only; for real documents use Snowflake roles and the default encryption.
-* `show_document` uses `st.link_button` (Streamlit 1.29 or later) and a Markdown link before that, plus a copyable "Tautan langsung". Whether a browser opens the link when the app is shown inside
-  Streamlit in Snowflake has not been verified.
+* `show_document` uses `st.link_button` (Streamlit 1.29 or later) and a Markdown link before that, plus a copyable "Tautan langsung". By the owner's report the PDF buttons worked in Streamlit in Snowflake; whether
+  every browser opens the link from inside the app was not recorded, which is why "Tautan langsung" is there.
 * Tests: `tests/test_app.py` (`PdfLinkTests`) replaces the view with a DuckDB stand-in that has the same columns and invents the links (host `.invalid`). It checks the button, the sentence for a file that is
-  not on the stage, the page when the view does not exist, that the picker matches the files of `KEGIATAN_DAN_LAPORAN`, and that `sql/07` is non-destructive and absent from `full_setup.sql`. It cannot show that Snowflake produces working links.
+  not on the stage, the page when the view does not exist, that the picker matches the files of `KEGIATAN_DAN_LAPORAN`, and that `sql/07` is non-destructive and absent from `full_setup.sql`. It cannot show that Snowflake produces working links; that rests on the owner's report.

@@ -77,9 +77,9 @@ You can try the same on any file with a command-line tool such as `pdftotext -la
 
 ## Using the files with Snowflake later
 
-The normal setup does not use these PDFs, and nothing was loaded or run in Snowflake. The optional step 7 ([`sql/07_dokumen_pdf.sql`](../sql/07_dokumen_pdf.sql), described in the
+The normal setup does not use these PDFs. The optional step 7 ([`sql/07_dokumen_pdf.sql`](../sql/07_dokumen_pdf.sql), described in the
 [starter guide, part 8b](STARTER_GUIDE.md#8b-optional-open-the-pdf-files-from-the-dashboard)) creates the stage `ANALISIS.DOKUMEN_PAROKI` and a view with a pre-signed link
-per file; with it, the dashboard opens the reports and guides from the stage. The PDFs also exist so that a later step can show how documents become rows. In outline:
+per file; with it, the dashboard opens the reports and guides from the stage (by the project owner's report this worked in a real Snowflake account). The PDFs also exist so that a later step can show how documents become rows. In outline:
 
 1. Upload the PDFs to an internal stage (for example with the Snowsight file upload or `PUT`). Step 7 creates the stage `ANALISIS.DOKUMEN_PAROKI` for this.
 2. Run a document-extraction feature on them (Snowflake offers several, such as Cortex functions and Document AI; names, availability and syntax
