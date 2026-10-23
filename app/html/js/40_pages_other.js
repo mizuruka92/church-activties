@@ -168,6 +168,33 @@ function pagePlans() {
       out.push(barChart(yearly, "Tahun", "Persen", "Rata-rata % capaian target peserta", col(yearly, "Tahun"), "Teks", 300, 0));
       out.push(caption("Rata-rata persentase peserta aktual terhadap target, untuk kegiatan yang terlaksana pada tahun itu."));
     }
+
+    // The Streamlit page lists the events and the names of their report files in a table. Here the list is a dropdown, and the report opens.
+    out.push(sub("Laporan kegiatan (PDF)"));
+    out.push(para("Pilih kegiatan untuk membuka laporan pascakegiatannya. Berkas ini adalah dokumen contoh (fiktif). Baris tabel laporan " +
+      "diambil dari dokumen seperti ini."));
+    var sections = ["Semua seksi"].concat(uniq(col(events, "NAMA_SEKSI")).sort());
+    out.push(select("seksi_kegiatan", "Seksi", sections));
+    var section = val("seksi_kegiatan", "Semua seksi");
+    var inSection = events.filter(function (r) { return section === "Semua seksi" || r.NAMA_SEKSI === section; });
+    var listing = sortBy(inSection.filter(function (r) { return !missing(r.NAMA_BERKAS_LAPORAN); }), ["TANGGAL_MULAI", "ID_KEGIATAN"], [true, false]);
+    if (!listing.length) { out.push(info("Belum ada laporan pada pilihan ini.")); return out.join(""); }
+    var labels = listing.map(function (r) { return r.ID_KEGIATAN + " | " + longDate(r.TANGGAL_MULAI) + " | " + r.NAMA_KEGIATAN; });
+    out.push(select("laporan_kegiatan", "Kegiatan", labels));
+    var ev = listing[labels.indexOf(val("laporan_kegiatan", labels[0]))];
+    out.push(para("<strong>" + esc(ev.NAMA_KEGIATAN) + "</strong> (" + esc(ev.NAMA_SEKSI) + "), " + esc(longDate(ev.TANGGAL_MULAI)) + ", " + esc(text(ev.LOKASI))));
+    out.push(tiles([
+      metric("Status kegiatan", text(ev.STATUS_KEGIATAN)),
+      metric("Peserta aktual / target", whole(ev.JUMLAH_PESERTA_AKTUAL) + " / " + whole(ev.TARGET_PESERTA)),
+      metric("Anggaran terpakai", juta(ev.ANGGARAN_TERPAKAI), "Anggaran rencana: " + juta(ev.ANGGARAN_RENCANA)),
+      metric("Status laporan", text(ev.STATUS_PELAPORAN))
+    ]));
+    out.push(caption("Laporan " + esc(ev.ID_LAPORAN) + ", tanggal " + esc(longDate(ev.TANGGAL_LAPORAN)) + ". " + esc(text(ev.KELENGKAPAN_ISI_LAPORAN)) + "."));
+    out.push(pdfButtons(ev.NAMA_BERKAS_LAPORAN, "laporan"));
+    var without = inSection.filter(function (r) { return r.STATUS_PELAPORAN === "Belum ada laporan"; }).length;
+    if (without) {
+      out.push(caption(without + " kegiatan terlaksana pada pilihan ini belum memiliki laporan, jadi tidak ada berkasnya."));
+    }
   }
   return out.join("");
 }
@@ -252,12 +279,7 @@ function pageServices() {
     }).join("") + "</ol>");
   }
   out.push(info("<strong>Catatan penting.</strong> " + esc(row.CATATAN_PENTING)));
-  var file = row.NAMA_BERKAS_PANDUAN;
-  if (typeof GUIDES === "object" && GUIDES[file]) {
-    out.push('<p><button type="button" class="btn" data-download="' + esc(file) + '">Unduh panduan (PDF)</button></p>');
-  } else {
-    out.push(caption("Panduan PDF (" + esc(file) + ") tidak disertakan pada berkas ini. Isi panduan tetap dapat dibaca pada halaman ini."));
-  }
+  out.push(pdfButtons(row.NAMA_BERKAS_PANDUAN, "panduan"));
   out.push(howToRead([
     "Isi halaman ini sama dengan isi panduan PDF: keduanya dibuat dari data yang sama.",
     "Data pribadi tidak ditampilkan. Pendaftaran dan data keluarga hanya dilihat petugas yang berwenang.",

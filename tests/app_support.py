@@ -18,15 +18,42 @@ _connection = None
 QUERIES = []  # every statement the dashboard sent, for assertions
 
 
+# The optional view of sql/07 (links to the PDF files on a stage) uses Snowflake-only features (directory tables, pre-signed URLs),
+# so DuckDB cannot run the real definition. This stand-in has the same columns and invents the links, on a host that cannot exist
+# (".invalid"). Two documents are "not on the stage", to exercise the page text for a missing file.
+NOT_ON_STAGE = ("LPK-0002", "LYN-04")
+STAND_IN_DOCUMENT_VIEW = f"""
+CREATE OR REPLACE VIEW ANALISIS.BERKAS_DOKUMEN AS
+WITH dokumen AS (
+    SELECT 'Laporan kegiatan' AS JENIS_DOKUMEN, ID_LAPORAN AS ID_DOKUMEN, NAMA_BERKAS_LAPORAN AS NAMA_BERKAS
+    FROM ANALISIS.KEGIATAN_DAN_LAPORAN WHERE NAMA_BERKAS_LAPORAN IS NOT NULL
+    UNION ALL
+    SELECT 'Panduan layanan', ID_LAYANAN, NAMA_BERKAS_PANDUAN FROM ANALISIS.LAYANAN_PUBLIK WHERE NAMA_BERKAS_PANDUAN IS NOT NULL
+)
+SELECT JENIS_DOKUMEN, ID_DOKUMEN, NAMA_BERKAS,
+       ID_DOKUMEN NOT IN {NOT_ON_STAGE!r} AS ADA_DI_STAGE,
+       CASE WHEN ID_DOKUMEN NOT IN {NOT_ON_STAGE!r}
+            THEN 'https://stage.stand-in.invalid/DOKUMEN_PAROKI/' || NAMA_BERKAS || '?signature=stand-in' END AS TAUTAN_BERKAS,
+       3600 AS LAMA_BERLAKU_TAUTAN_DETIK,
+       'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM dokumen
+"""
+HIDDEN = set()  # names of views that the stand-in pretends do not exist, as Snowflake does before step 7 has been run
+
+
 def connection():
     global _connection
     if _connection is None:
         _connection = shim.build_database(keep_constraints=False)
+        _connection.execute(STAND_IN_DOCUMENT_VIEW)
     return _connection
 
 
 def run_query(sql):
     QUERIES.append(sql)
+    for name in HIDDEN:
+        if re.search(rf"\.{name}\b", sql):
+            raise RuntimeError(f"SQL compilation error: Object 'ANALISIS.{name}' does not exist or not authorized.")
     local = re.sub(r"\b[A-Z_]+\.ANALISIS\.", "ANALISIS.", sql)
     return connection().execute(local).df()
 

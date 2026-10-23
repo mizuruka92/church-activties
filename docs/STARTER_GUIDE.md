@@ -377,6 +377,43 @@ and have not been tried here.
 
 If you see a red box saying **"Data belum dapat dimuat dari Snowflake"**, open **"Detail teknis untuk pengelola"** and go to part 11.
 
+### 8b. Optional: open the PDF files from the dashboard
+
+The repository has 138 mock PDF files: 132 post-event reports (`data/documents/laporan_kegiatan/`) and 6 service guides
+(`app/public_documents/`). The dashboard works without them. To open them from the dashboard, put them on a Snowflake **stage** (a
+storage area for files) and run one more optional SQL file. Nothing here has been tried in a real Snowflake account.
+
+1. **Create the stage and the link view.** Run [`sql/07_dokumen_pdf.sql`](../sql/07_dokumen_pdf.sql) like the other files. It creates the stage
+   `ANALISIS.DOKUMEN_PAROKI` and the view `ANALISIS.BERKAS_DOKUMEN`. The stage must be created by this file: links to files only work on a stage with
+   `SNOWFLAKE_SSE` encryption, and that cannot be changed later.
+2. **Get the files on your computer.** On GitHub choose **Code, Download ZIP** and unzip it.
+3. **Upload them to the stage, without a subfolder.** In Snowsight go to **Ingestion, Add Data, Load files into a Stage**, choose database
+   `PUSAT_INFORMASI_PAROKI`, schema `ANALISIS`, stage `DOKUMEN_PAROKI`, and select the PDF files (Snowflake's documentation gives a limit of 250 MB per file; all
+   138 together are about 1 MB). If the dialog will not take that many files at once, upload the PDFs in several rounds, or use `PUT` from Snowflake CLI or SnowSQL
+   (it does not work in a Snowsight worksheet). `AUTO_COMPRESS=FALSE` matters: without it Snowflake would store `.pdf.gz` files.
+   ```sql
+   PUT file:///path/to/data/documents/laporan_kegiatan/*.pdf @PUSAT_INFORMASI_PAROKI.ANALISIS.DOKUMEN_PAROKI AUTO_COMPRESS=FALSE;
+   PUT file:///path/to/app/public_documents/*.pdf @PUSAT_INFORMASI_PAROKI.ANALISIS.DOKUMEN_PAROKI AUTO_COMPRESS=FALSE;
+   ```
+4. **Let Snowflake list the new files and check.**
+   ```sql
+   ALTER STAGE PUSAT_INFORMASI_PAROKI.ANALISIS.DOKUMEN_PAROKI REFRESH;
+   SELECT JENIS_DOKUMEN, COUNT(*) AS DIKENAL, COUNT_IF(ADA_DI_STAGE) AS ADA_DI_STAGE
+   FROM PUSAT_INFORMASI_PAROKI.ANALISIS.BERKAS_DOKUMEN GROUP BY JENIS_DOKUMEN;
+   ```
+   You should see 132 of 132 for *Laporan kegiatan* and 6 of 6 for *Panduan layanan*. A file that is missing shows `ADA_DI_STAGE` = FALSE.
+5. **Open the dashboard and click "Muat ulang data".** On **Rencana, anggaran, kegiatan**, tab **Kegiatan dan laporan**, the last section is **Laporan kegiatan (PDF)**: choose
+   an activity and click **Buka laporan (PDF)**. On **Layanan dan prosedur** the button **Buka panduan (PDF)** appears under each guide.
+
+Things to know:
+
+* The button opens a **pre-signed link**, valid for one hour. Anyone who has the link can open that file until it expires. That is fine for these
+  fictional files. For real reports, do not use links like this; use Snowflake roles instead.
+* If a click does nothing in your account (Streamlit in Snowflake shows the app inside a restricted frame, and I could not confirm that links open from it),
+  open **Tautan langsung** under the button, copy the link and paste it into a new browser tab.
+* If a file is not on the stage, the page says so in one sentence instead of showing a button. If you never run step 7, the page says that step 7 has not been run.
+* Run `ALTER STAGE ... REFRESH` again after every upload, so that new files are listed.
+
 ## 9. Share it and keep the cost low
 
 **Who can open the dashboard.** By default only the owner. To let someone else (with their own Snowflake user) open it, grant their
@@ -490,6 +527,7 @@ If one of these fails for you, copy the message into a new note for the project.
 * **Stop the cost:** the warehouse stops by itself after the idle time you set. Nothing else runs.
 * **Remove the dashboard:** in **Projects, Streamlit**, open the app's menu and delete it. (The SQL equivalent is `DROP STREAMLIT`, which
   is destructive, so only run it if you mean it.)
+* **Remove the PDF files (step 7):** they live on the stage `ANALISIS.DOKUMEN_PAROKI`. Removing the schema `ANALISIS` (Option B of `sql/99_reset_demo.sql`) removes the stage and its files too.
 * **Remove the demo data:** open [`sql/99_reset_demo.sql`](../sql/99_reset_demo.sql), read the three options, remove the leading `--`
   from the one you want and run only those lines. It names only the demo objects. After a reset you can run the setup again.
 * **Revoke the GitHub token** (Path B, private repository) on GitHub when you no longer need it.

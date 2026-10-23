@@ -1,7 +1,7 @@
 # Offline HTML dashboard
 
 A copy of the dashboard that needs **nothing**: no Snowflake, no Streamlit, no Python, no internet, no account. It is one file,
-[`app/html/pusat_informasi_paroki.html`](../app/html/pusat_informasi_paroki.html) (about 1.3 MB). Double-click it, or copy it to a USB
+[`app/html/pusat_informasi_paroki.html`](../app/html/pusat_informasi_paroki.html) (about 2.8 MB). Double-click it, or copy it to a USB
 stick, an email or a shared folder, and it opens in any recent browser (Chrome, Edge, Firefox, Safari), on a computer, tablet or phone.
 
 It exists so that the demo can still be shown when the Snowflake trial has ended or its credit is used up.
@@ -16,7 +16,7 @@ It exists so that the demo can still be shown when the Snowflake trial has ended
 | Charts | Altair (Vega-Lite) | The same Vega-Lite charts, drawn by the Vega libraries stored in the file |
 | Dropdowns, radio buttons, tabs | Yes | Yes. A year range is two dropdowns ("Dari" and "Sampai") instead of a slider |
 | Data tables | Yes | **No.** Only charts, tiles, short lists and the dropdowns that steer them |
-| PDF service guides | Download button | Download button (the six PDFs are inside the file) |
+| PDF files | Service guides: download button. Reports: an opening button when step 7 is used | **All 138 PDFs are inside the file** (132 reports, 6 guides): "Buka ... (PDF)" opens one in a new tab with the browser's own viewer, "Unduh ... (PDF)" saves it. No folder and no internet are needed, and it keeps working when the file is copied elsewhere |
 | Dark mode | Follows the theme | Follows the system; the button "Tema" cycles automatic, light, dark |
 | Refreshes itself | Yes, every 10 minutes | **No.** It shows the data of the moment it was built |
 
@@ -43,6 +43,15 @@ forecast for the coming weeks, the requirements and steps of each service, and t
 4. The link in the address bar (`#Perkiraan%20kolekte`) opens that page directly, so a page can be bookmarked.
 
 Nothing is stored except the theme choice (in the browser's local storage, if the browser allows it).
+
+## The PDF files
+
+The PDFs are copied into the HTML file (as text, about 1.5 MB), so the file does not depend on a folder next to it. This makes the file larger than linking to the
+repository folder would, but a link such as `../../data/documents/...` breaks as soon as the file is moved or emailed. The reports are on the page **Rencana, anggaran, kegiatan**, tab **Kegiatan dan laporan**,
+section **Laporan kegiatan (PDF)**: choose a section and an activity, read its figures, and click **Buka laporan (PDF)**. The guides are on **Layanan dan prosedur**. Only
+activities that have a report appear in the list; the number of completed activities without a report is stated below it.
+
+If the browser blocks the new tab (a pop-up blocker), the file is downloaded instead. On a phone, browsers without a built-in PDF viewer also download it.
 
 ## Rebuilding it
 
@@ -82,6 +91,7 @@ stand-in, and writes the rows as JSON into the page. The output depends only on 
 * all eleven pages draw all their charts, with no JavaScript error or console warning, and no horizontal scrolling on a 390 px wide phone screen;
 * **every option of every dropdown and radio button, on every tab of every page**, draws without error (about 200 combinations), plus every survey with every question;
 * each service shows its requirements and steps, and its PDF downloads and starts with `%PDF-`;
+* the 138 embedded PDFs are byte for byte the files in the repository, and exactly the files that the tables name; for six of the 132 reports (the first, the last and some in between) the "Buka" button opens a new tab with `application/pdf` and the "Unduh" button saves the same bytes;
 * the forecast chart names the event behind every grey week (`PRS-09`, `PRS-10`, ...);
 * dark mode draws every chart, and the dates are identical in the Asia/Jakarta, Pacific/Kiritimati (UTC+14) and America/Los_Angeles time zones;
 * the figures on the tiles (32 of them across six pages) are the same, character for character, as those of the Streamlit dashboard on the same data;

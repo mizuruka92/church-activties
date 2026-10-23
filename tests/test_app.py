@@ -99,6 +99,9 @@ class SourceRuleTests(unittest.TestCase):
         created = set(re.findall(r"CREATE OR REPLACE VIEW ANALISIS\.(\w+)", sql))
         self.assertEqual(set(app.VIEWS) - created, set())
         self.assertEqual(len(app.VIEWS), len(set(app.VIEWS)), "no duplicates")
+        optional = (ROOT / "sql" / "07_dokumen_pdf.sql").read_text(encoding="utf-8")
+        self.assertEqual(set(app.OPTIONAL_VIEWS), set(re.findall(r"CREATE OR REPLACE VIEW ANALISIS\.(\w+)", optional)))
+        self.assertFalse(set(app.OPTIONAL_VIEWS) & set(app.VIEWS))
 
     def test_the_dashboard_never_reads_the_clock(self):
         """'Upcoming' is relative to the data date, so the demo gives the same answer on any day."""
@@ -222,7 +225,8 @@ class PageTests(unittest.TestCase):
             match = pattern.match(sql)
             self.assertIsNotNone(match, sql)
             used.add(match.group(1))
-        self.assertEqual(used, set(app.VIEWS))
+        self.assertEqual(used - set(app.OPTIONAL_VIEWS), set(app.VIEWS))
+        self.assertLessEqual(used, set(app.VIEWS) | set(app.OPTIONAL_VIEWS))
 
     def test_no_page_ranks_communities_or_regions(self):
         for label, at in self.pages.items():
@@ -512,8 +516,16 @@ class PageTests(unittest.TestCase):
             self.assertNotIn(wrong, text)
         self.assertIn("rata-rata 8 pekan sebelumnya", text)
 
+    def without_stage_links(self):
+        """These two tests are about the guide file next to the app, so the optional links to a stage (step 7) are switched off."""
+        app_support.HIDDEN.add("BERKAS_DOKUMEN")
+        streamlit.cache_data.clear()
+        self.addCleanup(app_support.HIDDEN.discard, "BERKAS_DOKUMEN")
+        self.addCleanup(streamlit.cache_data.clear)
+
     def test_a_runtime_without_a_download_button_still_shows_the_guide_and_says_so(self):
         from unittest import mock
+        self.without_stage_links()
         with mock.patch.object(app.st, "download_button", side_effect=RuntimeError("not available")):
             at = open_page("Layanan dan prosedur")
         self.assertEqual([str(e.value) for e in at.exception], [])
@@ -524,6 +536,7 @@ class PageTests(unittest.TestCase):
 
     def test_a_missing_guide_file_shows_a_different_message_than_a_missing_button(self):
         from unittest import mock
+        self.without_stage_links()
         with mock.patch.object(app, "read_guide", return_value=None):
             at = open_page("Layanan dan prosedur")
         self.assertEqual([str(e.value) for e in at.exception], [])
@@ -703,6 +716,124 @@ class InteractionTests(unittest.TestCase):
         at = open_page("Ringkasan")
         at.sidebar.button[0].click().run()
         self.assertEqual([str(e.value) for e in at.exception], [])
+
+
+@unittest.skipUnless(HAVE_APP_STACK, NEEDS)
+class PdfLinkTests(unittest.TestCase):
+    """The PDF files are opened from a stage through the optional view of sql/07. DuckDB cannot run that view (directory tables and
+    pre-signed URLs are Snowflake features), so a stand-in with the same columns invents the links. These tests show that the pages use the
+    links, say plainly when a file is not on the stage, and still work when step 7 has not been run. They do not show that Snowflake
+    produces working links."""
+
+    def setUp(self):
+        app_support.HIDDEN.clear()
+        streamlit.cache_data.clear()
+
+    def tearDown(self):
+        app_support.HIDDEN.clear()
+        streamlit.cache_data.clear()
+
+    @staticmethod
+    def links(at):
+        return [(b.proto.label, b.proto.url) for b in at.get("link_button")]
+
+    @staticmethod
+    def report_page(label_part=None):
+        at = open_page("Rencana, anggaran, kegiatan")
+        if label_part:
+            at.selectbox(key="laporan_kegiatan").select(
+                next(o for o in at.selectbox(key="laporan_kegiatan").options if label_part in o))
+            at.run()
+        return at
+
+    def test_a_report_on_the_stage_gets_an_open_button_with_its_link(self):
+        at = self.report_page()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        shown = self.links(at)
+        self.assertEqual(len(shown), 1)
+        label, url = shown[0]
+        self.assertEqual(label, "Buka laporan (PDF)")
+        self.assertTrue(url.startswith("https://stage.stand-in.invalid/DOKUMEN_PAROKI/LPK-"))
+        self.assertIn("Berkas: LPK-", " ".join(str(c.value) for c in at.caption))
+
+    def test_every_report_in_the_picker_belongs_to_its_file(self):
+        at = self.report_page()
+        events = app.get("KEGIATAN_DAN_LAPORAN")
+        with_report = events[events["NAMA_BERKAS_LAPORAN"].notna()]
+        picker = at.selectbox(key="laporan_kegiatan")
+        self.assertEqual(len(picker.options), len(with_report))
+        for choice in (picker.options[0], picker.options[len(picker.options) // 2], picker.options[-1]):
+            at.selectbox(key="laporan_kegiatan").select(choice).run()
+            event_id = choice.split(" | ")[0]
+            expected = with_report[with_report["ID_KEGIATAN"] == event_id].iloc[0]["NAMA_BERKAS_LAPORAN"]
+            self.assertTrue(self.links(at)[0][1].endswith(f"{expected}?signature=stand-in"), choice)
+
+    def test_a_report_that_is_not_on_the_stage_says_so_and_has_no_button(self):
+        at = self.report_page("KGT-0003 |")  # LPK-0002, which the stand-in leaves off the stage
+        self.assertEqual(self.links(at), [])
+        text = " ".join(str(c.value) for c in at.caption)
+        self.assertIn("belum ada di stage DOKUMEN_PAROKI", text)
+        self.assertIn("LPK-0002_", text)
+
+    def test_the_picker_follows_the_section_filter(self):
+        at = self.report_page()
+        at.selectbox(key="seksi_kegiatan").select("Seksi Katekese").run()
+        options = at.selectbox(key="laporan_kegiatan").options
+        events = app.get("KEGIATAN_DAN_LAPORAN")
+        mine = events[(events["NAMA_SEKSI"] == "Seksi Katekese") & events["NAMA_BERKAS_LAPORAN"].notna()]
+        self.assertEqual(len(options), len(mine))
+        self.assertGreater(len(options), 0)
+
+    def test_without_step_7_the_pages_explain_and_do_not_fail(self):
+        app_support.HIDDEN.add("BERKAS_DOKUMEN")
+        streamlit.cache_data.clear()
+        at = self.report_page()
+        self.assertEqual([str(e.value) for e in at.exception], [])
+        self.assertEqual([str(e.value) for e in at.error], [])
+        self.assertEqual(self.links(at), [])
+        self.assertIn("langkah opsional 7", " ".join(str(c.value) for c in at.caption))
+        services = open_page("Layanan dan prosedur")
+        self.assertEqual([str(e.value) for e in services.exception], [])
+        self.assertEqual(self.links(services), [])
+        self.assertTrue(services.get("download_button"), "the local file is still offered for download")
+
+    def test_the_services_page_links_each_guide_that_is_on_the_stage(self):
+        services = app.get("LAYANAN_PUBLIK").sort_values("ID_LAYANAN")
+        for _, service in services.iterrows():
+            at = open_page("Layanan dan prosedur")
+            at.selectbox[0].select(service["NAMA_LAYANAN"]).run()
+            self.assertEqual([str(e.value) for e in at.exception], [], service["NAMA_LAYANAN"])
+            shown = self.links(at)
+            if service["ID_LAYANAN"] in app_support.NOT_ON_STAGE:
+                self.assertEqual(shown, [], service["NAMA_LAYANAN"])
+            else:
+                self.assertEqual([label for label, _ in shown], ["Buka panduan (PDF)"], service["NAMA_LAYANAN"])
+                self.assertTrue(shown[0][1].endswith(f"{service['NAMA_BERKAS_PANDUAN']}?signature=stand-in"))
+
+    def test_the_link_is_the_only_new_thing_the_page_reads(self):
+        before = len(app_support.QUERIES)
+        self.report_page()
+        new = [q for q in app_support.QUERIES[before:] if "BERKAS_DOKUMEN" in q]
+        self.assertTrue(new)
+        for query in new:
+            self.assertEqual(query, f"SELECT * FROM {app.DATABASE}.ANALISIS.BERKAS_DOKUMEN")
+
+    def test_the_optional_sql_step_is_safe_and_matches_what_the_app_reads(self):
+        text = (ROOT / "sql" / "07_dokumen_pdf.sql").read_text(encoding="utf-8")
+        code = "\n".join(line for line in text.splitlines() if not line.strip().startswith("--"))
+        self.assertIn("ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE')", code)
+        self.assertIn("DIRECTORY = (ENABLE = TRUE)", code)
+        self.assertIn("CREATE STAGE IF NOT EXISTS", code)
+        for destructive in ("DROP ", "TRUNCATE", "DELETE ", "REMOVE ", "REPLACE STAGE", "OR REPLACE STAGE"):
+            self.assertNotIn(destructive, code.upper().replace("CREATE OR REPLACE VIEW", ""), destructive)
+        for schema in ("DATA_OPERASIONAL.", "MASTER_DATA."):
+            self.assertNotIn(schema, code, "the view reads ANALISIS views only")
+        self.assertNotIn("07_dokumen_pdf", (ROOT / "sql" / "full_setup.sql").read_text(encoding="utf-8"), "step 7 is not part of the normal setup")
+        columns = ["JENIS_DOKUMEN", "ID_DOKUMEN", "NAMA_BERKAS", "ADA_DI_STAGE", "TAUTAN_BERKAS", "LAMA_BERLAKU_TAUTAN_DETIK", "SUMBER_DATA"]
+        stand_in = [d[0] for d in app_support.connection().execute("SELECT * FROM ANALISIS.BERKAS_DOKUMEN LIMIT 1").description]
+        self.assertEqual(stand_in, columns, "the stand-in must have the columns of the real view")
+        for column in columns:
+            self.assertIn(column, code)
 
 
 @unittest.skipUnless(HAVE_APP_STACK, NEEDS)

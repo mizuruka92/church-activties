@@ -1064,6 +1064,8 @@ class DocumentedQueryTests(unittest.TestCase):
                         continue
                     if name in self.SELECT_ONLY and not (statement.strip().upper().startswith("SELECT") and ".ANALISIS." in statement):
                         continue
+                    if "BERKAS_DOKUMEN" in statement:
+                        continue  # the view of the optional step 7 needs a Snowflake stage (directory table, pre-signed URLs): DuckDB cannot run it
                     yield name, statement.strip()
 
     def test_there_are_examples_to_check(self):

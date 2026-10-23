@@ -67,6 +67,10 @@ VIEWS = (
     "TREN_KEHADIRAN_PERIODE",
 )
 
+# A view of the optional step 7 (sql/07): links to the PDF files on a stage. The dashboard works without it and reads it only when it exists.
+OPTIONAL_VIEWS = ("BERKAS_DOKUMEN",)
+STAGE_NAME = "DOKUMEN_PAROKI"
+
 MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus",
           "September", "Oktober", "November", "Desember"]
 
@@ -119,7 +123,7 @@ def _normalise(frame):
 
 @st.cache_data(ttl=CACHE_SECONDS, show_spinner=False)
 def load_view(name):
-    if name not in VIEWS:
+    if name not in VIEWS + OPTIONAL_VIEWS:
         raise ValueError(f"{name} is not a view this dashboard is allowed to read")
     return _normalise(run_query(f"SELECT * FROM {DATABASE}.{SCHEMA}.{name}"))
 
@@ -136,6 +140,39 @@ def get(name):
         with st.expander("Detail teknis untuk pengelola"):
             st.code(f"{type(error).__name__}: {error}")
         st.stop()
+
+
+@st.cache_data(ttl=CACHE_SECONDS, show_spinner=False)
+def load_documents():
+    """Links to the PDF files on the stage, {file name: link or None}, from the view of the optional step 7.
+    Returns None when that step has not been run (the view does not exist or may not be read): the pages then work without links."""
+    try:
+        frame = load_view("BERKAS_DOKUMEN")
+    except Exception:  # noqa: BLE001 - the optional view is missing: no links, no error
+        return None
+    return {str(row.NAMA_BERKAS): (str(row.TAUTAN_BERKAS) if isinstance(row.TAUTAN_BERKAS, str) and row.TAUTAN_BERKAS else None)
+            for row in frame.itertuples()}
+
+
+def show_document(file_name, links, what):
+    """The button that opens one PDF from the stage, or one plain sentence on why there is none.
+    `links` is load_documents(): None when step 7 was not run, else {file name: link or None}."""
+    if links is None:
+        st.caption("Tautan ke berkas PDF belum tersedia: langkah opsional 7 (berkas PDF pada stage) belum dijalankan. "
+                   "Langkahnya ada pada panduan pemula, bagian 8b.")
+        return
+    link = links.get(str(file_name))
+    if not link:
+        st.caption(f"Berkas {file_name} belum ada di stage {STAGE_NAME}. Unggah berkasnya, lalu jalankan ALTER STAGE {STAGE_NAME} REFRESH.")
+        return
+    label = f"Buka {what} (PDF)"
+    if hasattr(st, "link_button"):
+        st.link_button(label, link)
+    else:  # Streamlit before 1.29 has no link button
+        st.markdown(f"[{label}]({link})")
+    st.caption(f"Berkas: {file_name}. Tautan berlaku sekitar satu jam; muat ulang data bila sudah kedaluwarsa.")
+    with st.expander("Tautan langsung"):
+        st.code(link)
 
 
 # --------------------------------------------------------------------------------------------
@@ -1602,6 +1639,28 @@ def page_plans():
             ("NAMA_BERKAS_LAPORAN", "Berkas laporan", text),
         ])
 
+        st.subheader("Laporan kegiatan (PDF)")
+        st.write("Pilih kegiatan untuk membuka laporan pascakegiatannya. Berkas ini adalah dokumen contoh (fiktif). "
+                 "Baris tabel laporan diambil dari dokumen seperti ini.")
+        reported = listing[listing["NAMA_BERKAS_LAPORAN"].notna()].sort_values(["TANGGAL_MULAI", "ID_KEGIATAN"], ascending=[False, True])
+        if reported.empty:
+            st.info("Belum ada laporan pada pilihan ini.")
+        else:
+            labels = [f"{r['ID_KEGIATAN']} | {long_date(r['TANGGAL_MULAI'])} | {r['NAMA_KEGIATAN']}" for _, r in reported.iterrows()]
+            pick = st.selectbox("Kegiatan", labels, key="laporan_kegiatan")
+            row = reported.iloc[labels.index(pick)]
+            st.markdown(f"**{row['NAMA_KEGIATAN']}** ({row['NAMA_SEKSI']}), {long_date(row['TANGGAL_MULAI'])}, {text(row['LOKASI'])}")
+            tiles = st.columns(4)
+            tiles[0].metric("Status kegiatan", text(row["STATUS_KEGIATAN"]))
+            tiles[1].metric("Peserta aktual / target", f"{whole(row['JUMLAH_PESERTA_AKTUAL'])} / {whole(row['TARGET_PESERTA'])}")
+            tiles[2].metric("Anggaran terpakai", juta(row["ANGGARAN_TERPAKAI"]), help=f"Anggaran rencana: {juta(row['ANGGARAN_RENCANA'])}")
+            tiles[3].metric("Status laporan", text(row["STATUS_PELAPORAN"]))
+            st.caption(f"Laporan {row['ID_LAPORAN']}, tanggal {long_date(row['TANGGAL_LAPORAN'])}. {text(row['KELENGKAPAN_ISI_LAPORAN'])}.")
+            show_document(row["NAMA_BERKAS_LAPORAN"], load_documents(), "laporan")
+            without = int((listing["STATUS_PELAPORAN"] == "Belum ada laporan").sum())
+            if without:
+                st.caption(f"{without} kegiatan terlaksana pada pilihan ini belum memiliki laporan, jadi tidak ada berkasnya.")
+
 
 # --------------------------------------------------------------------------------------------
 # Page: Survei
@@ -1709,6 +1768,8 @@ def page_services():
             st.markdown(f"**{int(item['NOMOR_URUT'])}. {item['JUDUL_LANGKAH']}**  \n*Pelaku: {item['PELAKU']}.* {item['URAIAN']}")
 
     st.info("**Catatan penting.** " + str(row["CATATAN_PENTING"]))
+    links = load_documents()
+    stage_link = bool(links and links.get(str(row["NAMA_BERKAS_PANDUAN"])))
     content = read_guide(row["NAMA_BERKAS_PANDUAN"])
     offered = False
     if content is not None:
@@ -1717,12 +1778,16 @@ def page_services():
             offered = True
         except Exception:  # noqa: BLE001 - some Streamlit in Snowflake runtimes have no download button: the text above is complete
             offered = False
-    if content is None:
+    if stage_link:
+        show_document(row["NAMA_BERKAS_PANDUAN"], links, "panduan")
+    elif content is None:
         st.caption(f"Panduan PDF ({row['NAMA_BERKAS_PANDUAN']}) tidak ditemukan di samping aplikasi ini. Berkasnya tersimpan di folder "
-                   f"app/{GUIDE_FOLDER} pada repositori. Isi panduan tetap dapat dibaca pada halaman ini.")
+                   f"app/{GUIDE_FOLDER} pada repositori, dan dapat dibuka dari stage {STAGE_NAME} bila langkah opsional 7 dijalankan. "
+                   "Isi panduan tetap dapat dibaca pada halaman ini.")
     elif not offered:
         st.caption(f"Tombol unduh tidak tersedia pada lingkungan ini. Panduan PDF ({row['NAMA_BERKAS_PANDUAN']}) tersimpan di folder "
-                   f"app/{GUIDE_FOLDER} pada repositori. Isi panduan tetap dapat dibaca pada halaman ini.")
+                   f"app/{GUIDE_FOLDER} pada repositori, dan dapat dibuka dari stage {STAGE_NAME} bila langkah opsional 7 dijalankan. "
+                   "Isi panduan tetap dapat dibaca pada halaman ini.")
     how_to_read(
         "Isi halaman ini sama dengan isi panduan PDF: keduanya dibuat dari data yang sama.",
         "Data pribadi tidak ditampilkan. Pendaftaran dan data keluarga hanya dilihat petugas yang berwenang.",
@@ -1763,7 +1828,8 @@ Peristiwa luar biasa tidak bisa diprediksi; karena itu dicatat agar penyimpangan
     st.subheader("Sumber data")
     st.write(f"Dasbor membaca {len(VIEWS)} tampilan (view) pada skema `{SCHEMA}` di basis data `{DATABASE}`:")
     st.code("\n".join(VIEWS))
-    st.caption(f"Label sumber pada setiap tampilan: \"{DATA_LABEL}\". Data disegarkan dari Snowflake setiap {CACHE_SECONDS // 60} menit, "
+    st.caption(f"Tampilan opsional {', '.join(OPTIONAL_VIEWS)} (langkah 7, tautan ke berkas PDF) dibaca hanya bila ada. "
+               f"Label sumber pada setiap tampilan: \"{DATA_LABEL}\". Data disegarkan dari Snowflake setiap {CACHE_SECONDS // 60} menit, "
                "atau gunakan tombol \"Muat ulang data\" pada menu samping.")
 
 

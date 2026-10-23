@@ -135,7 +135,7 @@ class StaticFileTests(unittest.TestCase):
 
     def test_no_credentials_or_personal_data_in_the_file(self):
         # the minified libraries are full of long digit strings, so only the dashboard's own code and data are scanned
-        mine = self.own_code + re.search(r"var DATA = .*?;\nvar GUIDES", self.page, re.S).group(0)
+        mine = self.own_code + re.search(r"var DATA = .*?;\nvar PDFS", self.page, re.S).group(0)
         for pattern in (r"password\s*[:=]", r"BEGIN (RSA |PRIVATE )", r"api[_-]?key", r"\b\d{16}\b", r"\+62\d{8,}", r"\b08\d{9,12}\b"):
             self.assertIsNone(re.search(pattern, mine, re.I), pattern)
         self.assertNotIn("sourceMappingURL", self.page)
@@ -150,6 +150,22 @@ class StaticFileTests(unittest.TestCase):
         names = set(re.findall(r'\bV\("([A-Z_]+)"\)', self.own_code))
         self.assertTrue(names)
         self.assertLessEqual(names, set(builder.dashboard_views()))
+
+    def test_every_pdf_named_in_the_data_is_inside_the_file_unchanged(self):
+        import base64
+        import json
+        block = re.search(r"var DATA = (.*?);\nvar PDFS = (.*?);\n", self.page, re.S)
+        data, pdfs = json.loads(block.group(1)), json.loads(block.group(2))
+        names = set()
+        for view, column, folder in (("KEGIATAN_DAN_LAPORAN", "NAMA_BERKAS_LAPORAN", ROOT / "data" / "documents" / "laporan_kegiatan"),
+                                     ("LAYANAN_PUBLIK", "NAMA_BERKAS_PANDUAN", ROOT / "app" / "public_documents")):
+            index = data[view]["c"].index(column)
+            for row in data[view]["r"]:
+                if row[index]:
+                    names.add(row[index])
+                    self.assertEqual(base64.b64decode(pdfs[row[index]]), (folder / row[index]).read_bytes(), row[index])
+        self.assertEqual(names, set(pdfs), "the file holds exactly the PDFs that the tables name")
+        self.assertEqual(len(names), 132 + 6)
 
     def test_no_data_tables_are_drawn(self):
         self.assertNotIn("<table", self.own_code.lower())
@@ -265,6 +281,57 @@ class BrowserTests(unittest.TestCase):
                 self.assertTrue(download.value.suggested_filename.endswith(".pdf"))
                 self.web.page.locator(".tab").nth(0).click()
                 self.web.settle()
+
+    def test_a_report_opens_in_a_new_tab_and_downloads_for_every_report_in_the_picker(self):
+        import base64
+        self.web.show("Rencana, anggaran, kegiatan")
+        self.web.page.locator(".tab").nth(1).click()
+        self.web.settle()
+        options = self.web.page.evaluate(CONTROLS_JS)["laporan_kegiatan"]["options"]
+        self.assertEqual(len(options), 132)
+        for position in sorted({0, 1, 40, 80, 130, 131}):
+            event_id = options[position].split(" | ")[0]
+            with self.subTest(report=options[position]):
+                self.web.page.select_option('select[data-key="laporan_kegiatan"]', options[position])
+                self.web.settle()
+                self.assertIn("Buka laporan (PDF)", self.web.page.inner_text("main"))
+                file_name = self.web.page.locator("[data-download]").get_attribute("data-download")
+                self.assertTrue(file_name.endswith(".pdf"))
+                raw = base64.b64decode(self.web.page.evaluate("f => PDFS[f]", file_name))
+                self.assertEqual(raw[:5], b"%PDF-")
+                self.assertIn(b"LPK-", raw)
+                with self.web.page.expect_popup() as popup:
+                    self.web.page.locator("[data-open]").click()
+                tab = popup.value
+                tab.wait_for_load_state()
+                self.assertTrue(tab.url.startswith("blob:"), tab.url)
+                self.assertEqual(tab.evaluate("document.contentType"), "application/pdf")
+                tab.close()
+                with self.web.page.expect_download() as download:
+                    self.web.page.locator("[data-download]").click()
+                self.assertEqual(download.value.suggested_filename, file_name)
+                self.assertEqual(Path(download.value.path()).read_bytes(), raw)
+                self.assertTrue(file_name.startswith("LPK-"), "the file is a report")
+        self.assertEqual(self.web.errors(), [])
+
+    def test_the_report_picker_follows_the_section_and_describes_the_event(self):
+        self.web.show("Rencana, anggaran, kegiatan")
+        self.web.page.locator(".tab").nth(1).click()
+        self.web.settle()
+        self.web.page.select_option('select[data-key="seksi_kegiatan"]', "Seksi Katekese")
+        self.web.settle()
+        options = self.web.page.evaluate(CONTROLS_JS)["laporan_kegiatan"]["options"]
+        self.assertTrue(0 < len(options) < 132)
+        text = self.web.page.inner_text("main")
+        self.assertIn("(Seksi Katekese)", text)
+        self.assertRegex(text, r"Laporan LPK-\d{4}, tanggal \d+ \w+ \d{4}\.")
+        self.assertIn("Peserta aktual / target", text)
+
+    def test_the_forecast_chart_names_the_events_behind_the_grey_weeks_in_the_close_up_too(self):
+        self.web.show("Perkiraan kolekte")
+        self.web.page.locator('select[data-key="pilih_peristiwa_perkiraan"]').select_option(index=0)
+        self.web.settle()
+        self.assertRegex(self.web.page.locator("#chart3").inner_html(), r"PRS-\d\d")
 
     def test_forecast_chart_names_the_events_behind_the_grey_weeks(self):
         self.web.show("Perkiraan kolekte")
@@ -407,7 +474,7 @@ class ParityWithStreamlitTests(unittest.TestCase):
         self.assertEqual(wrong[:10], [], f"{len(wrong)} of {len(cases)} formatted values differ from Python")
 
     # Sentences that exist only on the HTML page on purpose: they replace a table, or say what the file is.
-    HTML_ONLY = ("Jumlah tercatat adalah angka", "Dari ", "Penyumbang sedikit", "Unduh panduan (PDF)", "Tentang berkas ini",
+    HTML_ONLY = ("Jumlah tercatat adalah angka", "Dari ", "Penyumbang sedikit", "Buka ", "Unduh ", "Tentang berkas ini",
                  "Ini adalah salinan statis", "Grafik dibuat dari")
     TEXT_JS = """() => {
       const out = [];
@@ -540,19 +607,23 @@ class ParityWithStreamlitTests(unittest.TestCase):
         compared = 0
         for name in self.PARITY_PAGES:
             with self.subTest(page=name):
-                reference = self.streamlit_tiles(name)
+                reference = self.streamlit_tiles(name)  # Streamlit draws every tab, so it holds the tiles of all of them
                 self.web.show(name)
-                tiles = self.web.page.evaluate(METRICS_JS)
-                self.assertTrue(tiles, f"no tiles on {name}")
-                for label, value, delta in tiles:
-                    self.assertIn(label, reference, f"{label} is not a tile of the Streamlit page")
-                    values = [v for v, _ in reference[label]]
-                    self.assertIn(value, values, f"{name} / {label}: HTML shows {value}, Streamlit shows {values}")
-                    if delta:
-                        deltas = [d for _, d in reference[label]]
-                        self.assertIn(delta.strip(), deltas, f"{name} / {label}: HTML delta {delta}, Streamlit {deltas}")
-                    compared += 1
-        self.assertGreater(compared, 25)
+                tab_count = self.web.page.locator(".tab").count()
+                for tab in (range(tab_count) if tab_count else [None]):
+                    self.web.show(name)
+                    if tab is not None:
+                        self.web.page.locator(".tab").nth(tab).click()
+                        self.web.settle()
+                    for label, value, delta in self.web.page.evaluate(METRICS_JS):
+                        self.assertIn(label, reference, f"{label} is not a tile of the Streamlit page")
+                        values = [v for v, _ in reference[label]]
+                        self.assertIn(value, values, f"{name} / {label}: HTML shows {value}, Streamlit shows {values}")
+                        if delta:
+                            deltas = [d for _, d in reference[label]]
+                            self.assertIn(delta.strip(), deltas, f"{name} / {label}: HTML delta {delta}, Streamlit {deltas}")
+                        compared += 1
+        self.assertGreater(compared, 30)
 
 
 if __name__ == "__main__":

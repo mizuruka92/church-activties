@@ -55,6 +55,11 @@ of expected row counts is the summary table in [DATA_DICTIONARY.md](DATA_DICTION
 
 Steps 1 to 6 can be repeated at any time. Step 6 only reads data and can be run on its own whenever you want to re-check.
 
+**Step 7 (optional): PDF files on a stage.** `sql/07_dokumen_pdf.sql` creates the stage `ANALISIS.DOKUMEN_PAROKI` and the view `ANALISIS.BERKAS_DOKUMEN`, which gives the
+dashboard a link to each PDF. It is not part of `full_setup.sql` and not needed for anything else. After running it, upload the PDFs and run
+`ALTER STAGE PUSAT_INFORMASI_PAROKI.ANALISIS.DOKUMEN_PAROKI REFRESH;`. The steps, the check query and the security notes (a pre-signed link opens the file for anyone who
+holds it) are in the [starter guide, part 8b](STARTER_GUIDE.md#8b-optional-open-the-pdf-files-from-the-dashboard). Not tried in a real Snowflake account.
+
 ## 3. Run the setup from a command line (optional)
 
 You only need this if you prefer a terminal. The commands below were **not** run against a real
