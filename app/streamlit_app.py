@@ -440,6 +440,8 @@ def forecast_frames(frame):
     data["Teks selisih"] = [signed_percent(v) for v in data["SELISIH_PERSEN"]]
     data["Teks peristiwa"] = [text(v) if isinstance(v, str) else "-" for v in data["NAMA_PERISTIWA"]]
     data["Teks kalender"] = [text(v) if isinstance(v, str) else "-" for v in data["CATATAN_KALENDER"]]
+    for column, label in (("JENIS_PERISTIWA", "Teks jenis"), ("TINGKAT_GANGGUAN", "Teks tingkat")):
+        data[label] = [str(v) if isinstance(v, str) else "-" for v in (data[column] if column in data else [None] * len(data))]
     data["Nilai titik"] = data["KOLEKTE_AKTUAL"].fillna(data["JUMLAH_PERKIRAAN"])
 
     actual = data.dropna(subset=["KOLEKTE_AKTUAL"])
@@ -450,6 +452,35 @@ def forecast_frames(frame):
     struck = data[data["NAMA_PERISTIWA"].map(lambda n: isinstance(n, str))].copy()
     struck["Seri"] = SERIES_EVENT
     return data, long, struck
+
+
+def event_labels(struck):
+    """One row per event drawn on a chart: its code, the middle of its weeks (where the code is written) and its name."""
+    if struck.empty or "ID_PERISTIWA" not in struck:
+        return pd.DataFrame(columns=["Kode", "Tengah", "Nama"])
+    grouped = struck.groupby("ID_PERISTIWA", as_index=False).agg(Mulai=("AWAL_PEKAN", "min"), Selesai=("Akhir", "max"),
+                                                                 Nama=("NAMA_PERISTIWA", "first"))
+    grouped["Tengah"] = grouped["Mulai"] + (grouped["Selesai"] - grouped["Mulai"]) / 2
+    grouped["Kode"] = grouped["ID_PERISTIWA"]
+    return grouped.sort_values("Mulai").reset_index(drop=True)
+
+
+def show_event_list(struck):
+    """Name the shaded weeks: one line per event with its code, kind, severity and dates (from the event view)."""
+    labels = event_labels(struck)
+    if labels.empty:
+        return
+    known = get("DAMPAK_PERISTIWA_LUAR_BIASA").set_index("ID_PERISTIWA")
+    lines = []
+    for _, event in labels.iterrows():
+        code = event["Kode"]
+        if code in known.index:
+            row = known.loc[code]
+            lines.append(f"- **{code}**: {row['NAMA_PERISTIWA']} ({row['JENIS_PERISTIWA']}, gangguan {str(row['TINGKAT_GANGGUAN']).lower()}), "
+                         f"{long_date(row['TANGGAL_MULAI'])} sampai {long_date(row['TANGGAL_SELESAI'])}")
+        else:
+            lines.append(f"- **{code}**: {event['Nama']}")
+    st.markdown("**Peristiwa pada pekan berlatar abu-abu**  \n" + "\n".join(lines))
 
 
 def forecast_chart(frame, height=360, close_up=False):
@@ -471,7 +502,13 @@ def forecast_chart(frame, height=360, close_up=False):
 
     layers = []
     if not struck.empty:
-        layers.append(alt.Chart(struck).mark_rect(opacity=0.22).encode(x=alt.X("AWAL_PEKAN:T"), x2="Akhir:T", color=band_colour))
+        layers.append(alt.Chart(struck).mark_rect(opacity=0.22).encode(
+            x=alt.X("AWAL_PEKAN:T"), x2="Akhir:T", color=band_colour,
+            tooltip=[alt.Tooltip("Teks peristiwa:N", title="Peristiwa"), alt.Tooltip("ID_PERISTIWA:N", title="Kode"),
+                     alt.Tooltip("Teks jenis:N", title="Jenis"), alt.Tooltip("Teks tingkat:N", title="Tingkat gangguan"),
+                     alt.Tooltip("Pekan:N", title="Pekan")]))
+        layers.append(alt.Chart(event_labels(struck)).mark_text(angle=270, align="right", baseline="middle", fontSize=11, color=NEUTRAL)
+                      .encode(x="Tengah:T", y=alt.value(6), text="Kode:N", tooltip=[alt.Tooltip("Nama:N", title="Peristiwa")]))
     layers.append(alt.Chart(data).mark_area(opacity=0.16, color=palette()[1]).encode(
         x=alt.X("AWAL_PEKAN:T"), y=alt.Y("BATAS_BAWAH:Q"), y2="BATAS_ATAS:Q"))
     lines = alt.Chart(long).mark_line(strokeWidth=2, strokeJoin="round").encode(
@@ -496,6 +533,7 @@ def forecast_chart(frame, height=360, close_up=False):
         layers.append(alt.Chart(marker).mark_text(align="right", dx=-6, fontSize=12, color=NEUTRAL)
                       .encode(x="AWAL_PEKAN:T", y=alt.value(12), text="Teks:N"))
     show_chart(alt.layer(*layers).resolve_scale(color="independent", strokeDash="independent"), height=height)
+    show_event_list(struck)
 
 
 def event_gap_chart(events, typical):
@@ -562,7 +600,8 @@ def weekly_with_forecast(weekly, forecasts):
     """The complete weeks of KOLEKTE_MINGGUAN_DAN_PERISTIWA with the stored forecast beside each week that has one.
     Weeks before the first forecast (the model needs about half a year of history) keep their actual value and have
     no forecast. The result has the columns forecast_chart expects."""
-    base = weekly[["AWAL_PEKAN", "TOTAL_KOLEKTE", "ID_PERISTIWA", "NAMA_PERISTIWA"]].rename(columns={"TOTAL_KOLEKTE": "KOLEKTE_AKTUAL"})
+    base = weekly[["AWAL_PEKAN", "TOTAL_KOLEKTE", "ID_PERISTIWA", "NAMA_PERISTIWA", "JENIS_PERISTIWA", "TINGKAT_GANGGUAN"]].rename(
+        columns={"TOTAL_KOLEKTE": "KOLEKTE_AKTUAL"})
     columns = ["AWAL_PEKAN", "JUMLAH_PERKIRAAN", "BATAS_BAWAH", "BATAS_ATAS", "SELISIH_PERSEN", "POSISI_TERHADAP_RENTANG",
                "PENJELASAN_SELISIH", "CATATAN_KALENDER"]
     merged = base.merge(forecasts[columns], on="AWAL_PEKAN", how="left")

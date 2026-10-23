@@ -38,6 +38,7 @@ and available as PDFs.
 | Synthetic rows | about 14,300, six regions, 18 communities, nine parish sections, 227 households, 653 people |
 | Validation checks | 384 result rows, returned as one result table |
 | Dashboard | One Streamlit file, 11 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
+| Offline dashboard | One HTML file, the same 11 pages as charts and dropdowns, opens by double-click with no installation or account ([docs/HTML_DASHBOARD.md](docs/HTML_DASHBOARD.md)) |
 | Mock source documents | 132 PDF post-event reports, one per report row, as if the rows had been extracted from them ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
 | Public service guides | 6 PDF guides in `app/public_documents/`, generated from the same rows the dashboard page shows ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
 
@@ -118,6 +119,10 @@ GitHub repository. What each page shows and why it was designed that way is in
 
 The dashboard runs inside Snowflake, needs no installation, and reads only aggregate views. Every page carries the
 "DATA SIMULASI" notice, and no page ranks regions, communities or Mass sessions.
+
+**No Snowflake, or the trial has ended?** Open [`app/html/pusat_informasi_paroki.html`](app/html/pusat_informasi_paroki.html) by double-click. It is
+the same eleven pages as charts and dropdowns, in a single file that needs no installation, account or internet. It is a snapshot of the data at the time
+it was built, without data tables. See [docs/HTML_DASHBOARD.md](docs/HTML_DASHBOARD.md).
 
 ## Try it
 
@@ -236,7 +241,7 @@ Run the tests:
 
 ```bash
 python -m unittest discover -s tests -v          # the SQL and dashboard tests skip themselves without the packages below
-pip install -r tests/requirements.txt            # optional: DuckDB, sqlglot, Streamlit, Altair, pandas
+pip install -r tests/requirements.txt            # optional: DuckDB, sqlglot, Streamlit, Altair, pandas, Playwright
 ```
 
 ## Verification status: please read
@@ -249,6 +254,7 @@ What has been **tested locally**:
 * The shadow forecast is tested for **no look-ahead** (changing every later week, or the later event log, leaves each forecast unchanged), for accuracy on ordinary weeks, and for missing by a wide margin where an unforeseen event struck. The service guides are tested by reading each committed PDF back and finding every step and requirement of the tables in it.
 * The analysis stories are tested as properties of the views (offertory growth slows, spending overtakes the offertory trend, payday and attendance effects, every event shows a dip, Christmas goes into deficit while Easter stays in surplus, mean differs from median in the large-donor communities). The figures in [docs/USE_CASES.md](docs/USE_CASES.md) come from that local run.
 * Every SQL file parses with the Snowflake grammar of `sqlglot` (a syntax lint, not Snowflake).
+* The offline HTML dashboard was opened from disk in headless Chromium: every page, every option of every dropdown, light and dark themes, three time zones, a phone-width screen, and its tile figures were compared with the Streamlit dashboard on the same stand-in data ([docs/HTML_DASHBOARD.md](docs/HTML_DASHBOARD.md)).
 * The dashboard was driven page by page with Streamlit's test runner against the same DuckDB stand-in, and viewed in a headless browser in light and dark themes. It was also run on an older stack (Python 3.11, Streamlit 1.35, Altair 4.2) and the current one (Streamlit 1.66). It reads only allowed views, and a test fails if a page shows ranking words.
 
 What has **not** been done: **nothing has been executed in Snowflake.** No connection to Snowflake
@@ -278,17 +284,20 @@ sql/                          SQL steps 00-06, 99 (destructive) and full_setup.s
   03, 04a-04g, 06, 99, full_setup  GENERATED, do not edit by hand
 scripts/
   generate_mock_data.py       Command line entry point
+  build_html_dashboard.py     Builds the offline HTML dashboard (--check tells whether the committed file is current)
   mockdata/                   Generator modules (reference, liturgy, peristiwa, parish, surveys, planning, donations, forecast, layanan, ...)
 app/                          The Streamlit dashboard (Phase 2)
   streamlit_app.py            The whole app in one file; reads only ANALISIS views
   public_documents/           6 generated PDF service guides offered for download on the services page
   README.md                   Developer notes
+  html/                       The offline HTML copy: pusat_informasi_paroki.html (generated) and its sources
   requirements.txt            Only for running it on your own computer
   .streamlit/secrets.toml.example   Template for local connection settings (the real file is ignored by Git)
 tests/                        Unit tests; SQL and dashboard tests run on DuckDB
 docs/
   STARTER_GUIDE.md            From no account to a running dashboard, for people new to Snowflake
   DASHBOARD.md                Dashboard pages, views used, design decisions (English)
+  HTML_DASHBOARD.md           The offline HTML dashboard: what it is, how to rebuild and test it (English)
   DOCUMENTS.md                The mock PDF reports and the public service guides: layout, field mapping, round-trip checks (English)
   DATA_MODEL.md               Relationships, grain, design decisions (English)
   USE_CASES.md                Analysis stories, expected results, judgement calls (English)
