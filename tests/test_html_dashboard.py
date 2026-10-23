@@ -47,7 +47,7 @@ except ImportError:  # pragma: no cover
     HAVE_STREAMLIT = False
 
 PAGES = ["Ringkasan", "Kegiatan mendatang", "Pemasukan dan pengeluaran", "Kolekte dan kehadiran", "Perkiraan kolekte", "Peristiwa luar biasa",
-         "Sumbangan khusus", "Rencana, anggaran, kegiatan", "Survei umat", "Layanan dan prosedur", "Tentang data"]
+         "Sumbangan khusus", "Rencana, anggaran, kegiatan", "Survei umat", "Demografi umat", "Layanan dan prosedur", "Tentang data"]
 NO_CHARTS = ("Layanan dan prosedur", "Tentang data")
 NEEDS_BROWSER = "playwright with a Chromium browser is not installed"
 
@@ -194,7 +194,7 @@ class BrowserTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.web.close()
 
-    def test_menu_lists_the_same_eleven_pages_as_streamlit(self):
+    def test_menu_lists_the_same_pages_as_streamlit(self):
         self.assertEqual(self.web.page.evaluate("window.__dashboard.pages"), PAGES)
 
     def test_every_page_renders_and_draws_every_chart(self):
@@ -428,7 +428,7 @@ class ThemeAndTimeZoneTests(unittest.TestCase):
 class ParityWithStreamlitTests(unittest.TestCase):
     """The tiles of the HTML file must show the same figures as the Streamlit dashboard on the same data."""
 
-    PARITY_PAGES = ["Ringkasan", "Kegiatan mendatang", "Kolekte dan kehadiran", "Perkiraan kolekte", "Peristiwa luar biasa",
+    PARITY_PAGES = ["Ringkasan", "Kegiatan mendatang", "Kolekte dan kehadiran", "Perkiraan kolekte", "Peristiwa luar biasa", "Demografi umat",
                     "Rencana, anggaran, kegiatan"]
 
     @classmethod

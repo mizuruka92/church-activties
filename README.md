@@ -34,11 +34,11 @@ and available as PDFs.
 |---|---|
 | Schemas | `MASTER_DATA`, `DATA_OPERASIONAL`, `ANALISIS` in database `PUSAT_INFORMASI_PAROKI` |
 | Tables | 43 (22 master and reference, 21 operational) |
-| Summary views | 29, aggregates only |
+| Summary views | 33, aggregates only |
 | Synthetic rows | about 14,300, six regions, 18 communities, nine parish sections, 227 households, 653 people |
 | Validation checks | 384 result rows, returned as one result table |
-| Dashboard | One Streamlit file, 11 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
-| Offline dashboard | One HTML file, the same 11 pages as charts and dropdowns, opens by double-click with no installation or account ([docs/HTML_DASHBOARD.md](docs/HTML_DASHBOARD.md)) |
+| Dashboard | One Streamlit file, 12 pages in Bahasa Indonesia, reads only the `ANALISIS` views |
+| Offline dashboard | One HTML file, the same 12 pages as charts and dropdowns, opens by double-click with no installation or account ([docs/HTML_DASHBOARD.md](docs/HTML_DASHBOARD.md)) |
 | PDFs in the dashboards | The offline HTML dashboard opens all 138 PDFs from inside the file. The Streamlit dashboard can open them from a Snowflake stage after the optional step 7 ([starter guide, part 8b](docs/STARTER_GUIDE.md#8b-optional-open-the-pdf-files-from-the-dashboard)) |
 | Mock source documents | 132 PDF post-event reports, one per report row, as if the rows had been extracted from them ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
 | Public service guides | 6 PDF guides in `app/public_documents/`, generated from the same rows the dashboard page shows ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
@@ -95,7 +95,7 @@ them **in this order**:
 | 4e | [`sql/04e_load_plans_and_events.sql`](sql/04e_load_plans_and_events.sql) | Annual plans, budgets, expenditure, events, reports. | yes (`MERGE`) |
 | 4f | [`sql/04f_load_donations.sql`](sql/04f_load_donations.sql) | Donation campaigns, household gifts, regional summaries. Needs 4c and 4e. | yes (`MERGE`) |
 | 4g | [`sql/04g_load_forecast.sql`](sql/04g_load_forecast.sql) | The shadow forecast of the weekly offertory (stored as issued). Needs step 3 for the model. | yes (`MERGE`) |
-| 5 | [`sql/05_create_views.sql`](sql/05_create_views.sql) | Creates the 29 views in `ANALISIS`. | yes (`CREATE OR REPLACE VIEW`) |
+| 5 | [`sql/05_create_views.sql`](sql/05_create_views.sql) | Creates the 33 views in `ANALISIS`. | yes (`CREATE OR REPLACE VIEW`) |
 | 6 | [`sql/06_validate_data.sql`](sql/06_validate_data.sql) | Read-only checks. Run it whenever you like. | yes |
 | 99 | [`sql/99_reset_demo.sql`](sql/99_reset_demo.sql) | **Destructive.** Every statement is commented out. Not part of the setup. | n/a |
 
@@ -122,7 +122,7 @@ The dashboard runs inside Snowflake, needs no installation, and reads only aggre
 "DATA SIMULASI" notice, and no page ranks regions, communities or Mass sessions.
 
 **No Snowflake, or the trial has ended?** Open [`app/html/pusat_informasi_paroki.html`](app/html/pusat_informasi_paroki.html) by double-click. It is
-the same eleven pages as charts and dropdowns, in a single file that needs no installation, account or internet. It is a snapshot of the data at the time
+the same twelve pages as charts and dropdowns, in a single file that needs no installation, account or internet. It is a snapshot of the data at the time
 it was built, without data tables. See [docs/HTML_DASHBOARD.md](docs/HTML_DASHBOARD.md).
 
 ## Try it
@@ -178,7 +178,7 @@ FROM PUSAT_INFORMASI_PAROKI.ANALISIS.TITIK_IMPAS_KAMPANYE
 ORDER BY TAHUN, NAMA_KESEMPATAN;
 ```
 
-All 29 views are described in the data dictionary. Every view has a `SUMBER_DATA` column that says
+All 33 views are described in the data dictionary. Every view has a `SUMBER_DATA` column that says
 `Data simulasi (fiktif)`. No view ranks regions, communities or Mass sessions.
 
 ## Reading the validation result

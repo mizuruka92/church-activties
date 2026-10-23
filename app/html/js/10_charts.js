@@ -306,3 +306,57 @@ function upcomingTimelineChart(rows) {
               {field: "Tahap", type: "nominal"}, {field: "Anggaran", type: "nominal", title: "Anggaran rencana"}]}};
   return chartBox(spec, Math.max(220, 32 * sections.length + 70));
 }
+
+// ------------------------------------------------------------------------------------------------
+// Demographics
+// ------------------------------------------------------------------------------------------------
+var GENDERS = ["Laki-laki", "Perempuan"];
+var STAGE_RAMPS = {light: ["#cfe0f7", "#8db8ec", "#2a78d6", "#154c93"], dark: ["#274b7a", "#3a73bd", "#5e9ae8", "#a9c9f4"]};
+function stageScale(labels) { // four ordered life stages are one quantity, young to old: one hue from light to dark
+  return {domain: labels.slice(), range: STAGE_RAMPS[theme].slice(0, labels.length)};
+}
+// Back-to-back bars: men to the left, women to the right, the oldest group on top. A hidden cell has no count and no bar.
+function populationPyramid(rows) {
+  var data = rows.map(function (r) {
+    var n = missing(r.JUMLAH_UMAT) ? null : Number(r.JUMLAH_UMAT);
+    return {Usia: r.KELOMPOK_USIA, Urut: r.URUTAN_KELOMPOK, Jenis: r.JENIS_KELAMIN, Nilai: n === null ? null : (r.JENIS_KELAMIN === GENDERS[0] ? -n : n),
+            Teks: n === null ? "disembunyikan" : whole(n)};
+  });
+  var order = uniq(col(sortBy(data, ["Urut"], [true]), "Usia"));
+  var base = {
+    y: {field: "Usia", type: "nominal", sort: order, axis: {title: "Usia (tahun)", labelLimit: 160}},
+    x: {field: "Nilai", type: "quantitative", axis: {title: "Jumlah umat", labelExpr: "abs(datum.value)"}, scale: {zero: true}},
+    tooltip: [{field: "Usia", type: "nominal", title: "Usia"}, {field: "Jenis", type: "nominal", title: "Jenis kelamin"}, {field: "Teks", type: "nominal", title: "Jumlah umat"}]
+  };
+  var shown = data.filter(function (d) { return d.Nilai !== null; });
+  var layers = [
+    {data: {values: data}, mark: {type: "bar", size: 18},
+     encoding: Object.assign({}, base, {color: {field: "Jenis", type: "nominal", scale: colorScale(GENDERS), legend: {title: null}}})}
+  ];
+  [[function (d) { return d.Nilai < 0; }, "right", -5], [function (d) { return d.Nilai >= 0; }, "left", 5]].forEach(function (side) {
+    var part = shown.filter(side[0]);
+    if (part.length) {
+      layers.push({data: {values: part}, mark: {type: "text", align: side[1], dx: side[2], fontSize: 11, color: ink()},
+                   encoding: Object.assign({}, base, {text: {field: "Teks", type: "nominal"}})});
+    }
+  });
+  layers.push({data: {values: [{Nol: 0}]}, mark: {type: "rule", color: NEUTRAL, strokeWidth: 1}, encoding: {x: {field: "Nol", type: "quantitative"}}});
+  return chartBox({layer: layers}, Math.max(260, 34 * order.length + 60));
+}
+// Life stages per region, stacked. share = true draws the percentage within the region instead of the number of people.
+function regionStageChart(rows, share) {
+  var data = sortBy(rows, ["NAMA_WILAYAH", "URUTAN_KELOMPOK"]).map(function (r) {
+    var v = share ? r.PERSEN_DALAM_WILAYAH : r.JUMLAH_UMAT;
+    return {Wilayah: r.NAMA_WILAYAH, Kelompok: r.KELOMPOK_KEHIDUPAN, Urut: r.URUTAN_KELOMPOK, Nilai: missing(v) ? null : Number(v),
+            Teks: missing(v) ? "disembunyikan" : (share ? percent(v) : whole(v))};
+  });
+  var regions = uniq(col(data, "Wilayah"));
+  var stages = uniq(col(sortBy(data, ["Urut"]), "Kelompok"));
+  return chartBox({data: {values: data.filter(function (d) { return d.Nilai !== null; })}, mark: {type: "bar", size: 22}, encoding: {
+    y: {field: "Wilayah", type: "nominal", sort: regions, axis: {title: null, labelLimit: 240}},
+    x: {field: "Nilai", type: "quantitative", axis: {title: share ? "% umat aktif di wilayah" : "Jumlah umat aktif"}, stack: "zero"},
+    color: {field: "Kelompok", type: "nominal", scale: stageScale(stages), legend: {title: null}},
+    order: {field: "Urut", type: "quantitative", sort: "ascending"},
+    tooltip: [{field: "Wilayah", type: "nominal", title: "Wilayah"}, {field: "Kelompok", type: "nominal", title: "Kelompok"}, {field: "Teks", type: "nominal", title: "Nilai"}]}},
+    Math.max(240, 44 * regions.length + 70));
+}

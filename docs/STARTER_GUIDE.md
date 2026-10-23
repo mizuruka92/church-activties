@@ -15,7 +15,7 @@ Python. You will copy and paste.
 ## 0. What you will have at the end
 
 1. A Snowflake account (a free trial is enough).
-2. A database called `PUSAT_INFORMASI_PAROKI` with 43 tables of simulated parish data and 29 summary views.
+2. A database called `PUSAT_INFORMASI_PAROKI` with 43 tables of simulated parish data and 33 summary views.
 3. A dashboard in Bahasa Indonesia, running inside Snowflake, that shows income versus spending, upcoming activities, offertory and
    attendance, unforeseen events, Lent and Advent donations versus Easter and Christmas costs, plans and budgets,
    survey results, a forecast of the weekly offertory set against what was actually collected, and public guides to parish services (steps and requirements for baptism, confirmation, marriage, joining a neighbourhood community and what to do when someone dies).
@@ -131,7 +131,7 @@ replace the text, then Run All again.
 | 4e | [`sql/04e_load_plans_and_events.sql`](../sql/04e_load_plans_and_events.sql) | Plans, budgets, spending, events, reports. |
 | 4f | [`sql/04f_load_donations.sql`](../sql/04f_load_donations.sql) | Donation campaigns and gifts. Needs 4c and 4e. |
 | 4g | [`sql/04g_load_forecast.sql`](../sql/04g_load_forecast.sql) | The stored weekly offertory forecast. `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN;` gives 274. |
-| 5 | [`sql/05_create_views.sql`](../sql/05_create_views.sql) | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 29 views. |
+| 5 | [`sql/05_create_views.sql`](../sql/05_create_views.sql) | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 33 views. |
 | 6 | [`sql/06_validate_data.sql`](../sql/06_validate_data.sql) | The first two rows say `FAIL = 0` and `WARN = 1`, both `PASS`. See part 7. |
 
 Good to know:
@@ -369,10 +369,10 @@ and have not been tried here.
   (Easter above 100%, Christmas about 66%), and the number of unforeseen events (10).
 * A chart with two solid lines (offertory in blue, spending in orange) and dashed trend lines crossing at 2029.
 * A short list **Kegiatan terdekat** (the three nearest upcoming activities) further down the page.
-* A menu on the left with eleven pages. Click through them. The forecast of the weekly offertory is drawn in the same chart as the real offertory on the **Kolekte** tab of **Kolekte dan kehadiran**,
+* A menu on the left with twelve pages. Click through them. The forecast of the weekly offertory is drawn in the same chart as the real offertory on the **Kolekte** tab of **Kolekte dan kehadiran**,
   and **Perkiraan kolekte** adds how accurate it is and which unforeseen events explain the big misses. **Layanan dan prosedur** shows the steps and
   requirements of six parish services as text. The button to download each guide as a PDF appears only when the PDF files are next to the app
-  (Option 2, which copies the whole `app` folder) and the runtime offers a download button. With Option 1 you see the text only. Neither was tried in Snowflake. **Kegiatan mendatang** shows what is coming up: 11 activities after the data
+  (Option 2, which copies the whole `app` folder) and the runtime offers a download button. With Option 1 you see the text only. Neither was tried in Snowflake. **Demografi umat** shows who the active parishioners are (age and gender pyramid, life stages, age structure per region, household size), as counts only, with groups of 1 to 4 people hidden. **Kegiatan mendatang** shows what is coming up: 11 activities after the data
   date (3 already scheduled, 8 still only in the annual plan), 4 postponed ones that need a new date, and the 25 Masses scheduled for October.
 
 If you see a red box saying **"Data belum dapat dimuat dari Snowflake"**, open **"Detail teknis untuk pengelola"** and go to part 11.

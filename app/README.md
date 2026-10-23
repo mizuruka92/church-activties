@@ -5,7 +5,7 @@ data is fictional, and every page says so.
 
 * `streamlit_app.py` is the whole app, in one file on purpose: it can be pasted into the Snowsight Streamlit
   editor or deployed from the Git repository.
-* It reads **only the 27 views of the `ANALISIS` schema**, never the detail tables. It shows no
+* It reads **only the 31 views of the `ANALISIS` schema**, never the detail tables. It shows no
   names, households or single gifts.
 * One more view is read **only when it exists**: `ANALISIS.BERKAS_DOKUMEN` of the optional step 7 (`sql/07_dokumen_pdf.sql`), which gives links to the PDF files on a stage. Without it, every page works and says that the links are not set up. See [../docs/DASHBOARD.md](../docs/DASHBOARD.md).
 * `public_documents/` holds the six public service guides (PDF) that the page **Layanan dan prosedur** offers for download. They are

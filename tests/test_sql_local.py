@@ -1042,6 +1042,186 @@ class ServiceViewTests(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
+class DemographicsViewTests(unittest.TestCase):
+    """The four demographic views of the active parishioners: correct counts, complete grids, small cells hidden, nobody identifiable."""
+
+    VIEW_NAMES = ("RINGKASAN_DEMOGRAFI_UMAT", "DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN", "DEMOGRAFI_UMAT_PER_WILAYAH", "DEMOGRAFI_KELUARGA")
+    STAGES = (("Anak dan remaja (0-16)", 0, 16), ("Orang muda (17-35)", 17, 35), ("Dewasa (36-59)", 36, 59), ("Lansia (60 ke atas)", 60, 200))
+
+    @classmethod
+    def setUpClass(cls):
+        cls.connection = shim.build_database(keep_constraints=False)
+        cls.year = config.AS_OF.year
+        people = {u["ID_UMAT"]: u for u in DATA["DATA_OPERASIONAL.UMAT"]}
+        families = {f["ID_KELUARGA"]: f for f in DATA["DATA_OPERASIONAL.KELUARGA"]}
+        community_of = {a["ID_KELUARGA"]: a["ID_LINGKUNGAN"] for a in DATA["DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN"] if a["TANGGAL_AKHIR_BERLAKU"] is None}
+        region_of = {c["ID_LINGKUNGAN"]: c["ID_WILAYAH"] for c in DATA["MASTER_DATA.MASTER_LINGKUNGAN"]}
+        # an independent count: Aktif, with a current assignment to a household that is Aktif
+        cls.active = []
+        for a in DATA["DATA_OPERASIONAL.PENUGASAN_KELUARGA"]:
+            person, family = people[a["ID_UMAT"]], families[a["ID_KELUARGA"]]
+            if a["TANGGAL_AKHIR_BERLAKU"] is None and person["STATUS_KEANGGOTAAN"] == "Aktif" and family["STATUS_KELUARGA"] == "Aktif":
+                cls.active.append({"age": cls.year - person["TAHUN_LAHIR"], "gender": person["JENIS_KELAMIN"], "family": a["ID_KELUARGA"],
+                                   "region": region_of[community_of[a["ID_KELUARGA"]]]})
+
+    def rows(self, view, connection=None):
+        cursor = (connection or self.connection).execute(f"SELECT * FROM ANALISIS.{view}")
+        names = [d[0] for d in cursor.description]
+        return [dict(zip(names, row)) for row in cursor.fetchall()]
+
+    def test_no_view_exposes_a_person_a_household_or_a_year_of_birth(self):
+        forbidden = {"ID_UMAT", "ID_KELUARGA", "NAMA_FIKTIF", "NAMA_KELUARGA_FIKTIF", "TAHUN_LAHIR", "TANGGAL_TERDAFTAR", "ID_LINGKUNGAN", "NAMA_LINGKUNGAN"}
+        for view in self.VIEW_NAMES:
+            columns = set(self.rows(view)[0])
+            self.assertTrue(columns.isdisjoint(forbidden), f"{view}: {columns & forbidden}")
+            self.assertIn("SUMBER_DATA", columns)
+            self.assertIn("CATATAN_PRIVASI", columns)
+
+    def test_headline_figures_equal_an_independent_count(self):
+        (row,) = self.rows("RINGKASAN_DEMOGRAFI_UMAT")
+        ages = sorted(p["age"] for p in self.active)
+        families = {p["family"] for p in self.active}
+        self.assertEqual(row["JUMLAH_UMAT_AKTIF"], len(self.active))
+        self.assertEqual(row["JUMLAH_UMAT_TIDAK_DIHITUNG"], len(DATA["DATA_OPERASIONAL.UMAT"]) - len(self.active))
+        self.assertEqual(row["JUMLAH_KELUARGA_AKTIF"], len(families))
+        self.assertAlmostEqual(row["RATA_RATA_ANGGOTA_KELUARGA"], round(len(self.active) / len(families), 1), places=1)
+        middle = len(ages) // 2
+        self.assertEqual(row["USIA_MEDIAN"], ages[middle] if len(ages) % 2 else (ages[middle - 1] + ages[middle]) / 2)
+        self.assertAlmostEqual(row["PERSEN_PEREMPUAN"], round(100 * sum(p["gender"] == "Perempuan" for p in self.active) / len(self.active), 1), places=1)
+        shares = [row["PERSEN_ANAK_REMAJA"], row["PERSEN_ORANG_MUDA"], row["PERSEN_DEWASA"], row["PERSEN_LANSIA"]]
+        self.assertAlmostEqual(sum(shares), 100, delta=0.2)
+        for share, (_, low, high) in zip(shares, self.STAGES):
+            self.assertAlmostEqual(share, round(100 * sum(low <= p["age"] <= high for p in self.active) / len(self.active), 1), places=1)
+        self.assertEqual(row["JUMLAH_KELUARGA_DENGAN_ANAK_REMAJA"], len({p["family"] for p in self.active if p["age"] < 17}))
+        self.assertEqual(row["TANGGAL_DATA"], config.AS_OF)
+
+    def test_the_pyramid_is_a_complete_grid_that_adds_up(self):
+        rows = self.rows("DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN")
+        self.assertEqual(len(rows), 16)
+        self.assertEqual({r["KELOMPOK_USIA"] for r in rows},
+                         {"0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70 ke atas"})
+        self.assertEqual({r["JENIS_KELAMIN"] for r in rows}, {"Laki-laki", "Perempuan"})
+        for row in rows:
+            expected = sum(1 for p in self.active if min(p["age"] // 10 * 10, 70) == (row["URUTAN_KELOMPOK"] - 1) * 10 and p["gender"] == row["JENIS_KELAMIN"])
+            self.assertEqual(row["JUMLAH_UMAT"], expected, row)
+            self.assertFalse(row["DISEMBUNYIKAN"])
+        self.assertEqual(sum(r["JUMLAH_UMAT"] for r in rows), len(self.active))
+
+    def test_regions_by_life_stage_add_up_and_follow_the_stage_boundaries(self):
+        rows = self.rows("DEMOGRAFI_UMAT_PER_WILAYAH")
+        regions = {r["ID_WILAYAH"] for r in DATA["MASTER_DATA.MASTER_WILAYAH"] if r["STATUS_AKTIF"]}
+        self.assertEqual(len(rows), len(regions) * 4)
+        for row in rows:
+            _, low, high = self.STAGES[row["URUTAN_KELOMPOK"] - 1]
+            expected = sum(1 for p in self.active if p["region"] == row["ID_WILAYAH"] and low <= p["age"] <= high)
+            self.assertEqual(row["JUMLAH_UMAT"], expected, row)
+            total = sum(1 for p in self.active if p["region"] == row["ID_WILAYAH"])
+            self.assertEqual(row["JUMLAH_UMAT_WILAYAH"], total)
+            self.assertAlmostEqual(row["PERSEN_DALAM_WILAYAH"], round(100 * expected / total, 1), places=1)
+        self.assertEqual(sum(r["JUMLAH_UMAT"] for r in rows), len(self.active))
+
+    def test_households_by_size_add_up(self):
+        rows = self.rows("DEMOGRAFI_KELUARGA")
+        self.assertEqual([r["UKURAN_KELUARGA"] for r in sorted(rows, key=lambda r: r["URUTAN_UKURAN"])],
+                         ["1 orang", "2 orang", "3 orang", "4 orang", "5 orang atau lebih"])
+        sizes = {}
+        for p in self.active:
+            sizes[p["family"]] = sizes.get(p["family"], 0) + 1
+        for row in rows:
+            size = row["URUTAN_UKURAN"]
+            members = [n for n in sizes.values() if (n == size or (size == 5 and n >= 5))]
+            self.assertEqual(row["JUMLAH_KELUARGA"], len(members), row)
+            self.assertEqual(row["JUMLAH_UMAT"], sum(members), row)
+        self.assertEqual(sum(r["JUMLAH_KELUARGA"] for r in rows), len(sizes))
+
+    def test_the_demo_data_has_no_small_cell(self):
+        for view in self.VIEW_NAMES[1:]:
+            for row in self.rows(view):
+                self.assertFalse(row["DISEMBUNYIKAN"], f"{view}: {row}")
+
+    def test_a_cell_of_one_to_four_is_hidden_and_an_empty_cell_is_shown_as_zero(self):
+        connection = shim.build_database(keep_constraints=False)
+        # leave exactly three active men aged 70 or more, and no active women of that age
+        old = "(SELECT ID_UMAT FROM DATA_OPERASIONAL.UMAT WHERE STATUS_KEANGGOTAAN = 'Aktif' AND %d - TAHUN_LAHIR >= 70 AND JENIS_KELAMIN = '%s' ORDER BY ID_UMAT)"
+        men = [r[0] for r in connection.execute(old % (self.year, "Laki-laki")).fetchall()]
+        women = [r[0] for r in connection.execute(old % (self.year, "Perempuan")).fetchall()]
+        self.assertGreater(len(men), 3)
+        for person in men[3:] + women:
+            connection.execute("UPDATE DATA_OPERASIONAL.UMAT SET STATUS_KEANGGOTAAN = 'Pindah Paroki' WHERE ID_UMAT = ?", [person])
+        cells = {(r["KELOMPOK_USIA"], r["JENIS_KELAMIN"]): r for r in self.rows("DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN", connection)}
+        hidden = cells[("70 ke atas", "Laki-laki")]
+        self.assertIsNone(hidden["JUMLAH_UMAT"])
+        self.assertTrue(hidden["DISEMBUNYIKAN"])
+        empty = cells[("70 ke atas", "Perempuan")]
+        self.assertEqual(empty["JUMLAH_UMAT"], 0)
+        self.assertFalse(empty["DISEMBUNYIKAN"])
+        self.assertEqual(cells[("40-49", "Laki-laki")]["JUMLAH_UMAT"], sum(1 for p in self.active if 40 <= p["age"] <= 49 and p["gender"] == "Laki-laki"))
+        # the headline figure still counts everybody: only the detailed cells are hidden
+        (summary,) = self.rows("RINGKASAN_DEMOGRAFI_UMAT", connection)
+        self.assertEqual(summary["JUMLAH_UMAT_AKTIF"], len(self.active) - len(men[3:]) - len(women))
+
+    def test_a_small_household_group_is_hidden(self):
+        connection = shim.build_database(keep_constraints=False)
+        # keep only three households with five or more active members
+        big = [r[0] for r in connection.execute(
+            "SELECT pk.ID_KELUARGA FROM DATA_OPERASIONAL.PENUGASAN_KELUARGA pk JOIN DATA_OPERASIONAL.UMAT u ON u.ID_UMAT = pk.ID_UMAT "
+            "WHERE pk.TANGGAL_AKHIR_BERLAKU IS NULL AND u.STATUS_KEANGGOTAAN = 'Aktif' GROUP BY pk.ID_KELUARGA HAVING COUNT(*) >= 5 "
+            "ORDER BY pk.ID_KELUARGA").fetchall()]
+        self.assertGreater(len(big), 3)
+        for family in big[3:]:
+            connection.execute("UPDATE DATA_OPERASIONAL.KELUARGA SET STATUS_KELUARGA = 'Pindah Paroki' WHERE ID_KELUARGA = ?", [family])
+        group = {r["URUTAN_UKURAN"]: r for r in self.rows("DEMOGRAFI_KELUARGA", connection)}[5]
+        self.assertIsNone(group["JUMLAH_KELUARGA"])
+        self.assertIsNone(group["JUMLAH_UMAT"])
+        self.assertTrue(group["DISEMBUNYIKAN"])
+
+    def test_a_region_with_a_handful_of_people_shows_no_count_and_no_percentage(self):
+        connection = shim.build_database(keep_constraints=False)
+        region = self.active[0]["region"]
+        in_region = [r[0] for r in connection.execute(
+            "SELECT u.ID_UMAT FROM DATA_OPERASIONAL.UMAT u "
+            "JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk ON pk.ID_UMAT = u.ID_UMAT AND pk.TANGGAL_AKHIR_BERLAKU IS NULL "
+            "JOIN DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN pl ON pl.ID_KELUARGA = pk.ID_KELUARGA AND pl.TANGGAL_AKHIR_BERLAKU IS NULL "
+            "JOIN MASTER_DATA.MASTER_LINGKUNGAN l ON l.ID_LINGKUNGAN = pl.ID_LINGKUNGAN "
+            "WHERE l.ID_WILAYAH = ? AND u.STATUS_KEANGGOTAAN = 'Aktif' ORDER BY u.ID_UMAT", [region]).fetchall()]
+        self.assertGreater(len(in_region), 10)
+        for person in in_region[3:]:   # three people stay
+            connection.execute("UPDATE DATA_OPERASIONAL.UMAT SET STATUS_KEANGGOTAAN = 'Pindah Paroki' WHERE ID_UMAT = ?", [person])
+        mine = [r for r in self.rows("DEMOGRAFI_UMAT_PER_WILAYAH", connection) if r["ID_WILAYAH"] == region]
+        self.assertEqual(len(mine), 4)
+        for row in mine:
+            self.assertIsNone(row["JUMLAH_UMAT_WILAYAH"])
+            self.assertIsNone(row["PERSEN_DALAM_WILAYAH"])
+            self.assertNotIn(row["JUMLAH_UMAT"], (1, 2, 3, 4))
+        self.assertTrue(any(r["DISEMBUNYIKAN"] for r in mine))
+        self.assertEqual(sum(r["JUMLAH_UMAT"] or 0 for r in mine if not r["DISEMBUNYIKAN"]), 0)
+        others = [r for r in self.rows("DEMOGRAFI_UMAT_PER_WILAYAH", connection) if r["ID_WILAYAH"] != region]
+        self.assertTrue(all(r["JUMLAH_UMAT_WILAYAH"] is not None for r in others))
+
+    def test_the_figures_quoted_in_the_dashboard_notes_match_the_data(self):
+        notes = (ROOT / "docs" / "DASHBOARD.md").read_text(encoding="utf-8")
+        by_band = {}
+        for row in self.rows("DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN"):
+            by_band[row["KELOMPOK_USIA"]] = by_band.get(row["KELOMPOK_USIA"], 0) + row["JUMLAH_UMAT"]
+        self.assertIn(f"Few parishioners are aged 20 to 29 ({by_band['20-29']} people, against {by_band['10-19']} aged 10 to 19, "
+                      f"{by_band['40-49']} aged 40 to 49 and {by_band['50-59']} aged 50 to 59) or 60 to 69 ({by_band['60-69']})", notes)
+        (summary,) = self.rows("RINGKASAN_DEMOGRAFI_UMAT")
+        self.assertIn(f"and the large group is aged 36 to 59 ({round(summary['PERSEN_DEWASA'])}%)", notes)
+        smallest = min(r["JUMLAH_UMAT"] for r in self.rows("DEMOGRAFI_UMAT_PER_WILAYAH"))
+        self.assertIn(f"the smallest is {smallest} people", notes)
+        self.assertIn(f"The {summary['JUMLAH_UMAT_AKTIF']} active parishioners add up to the 6 regions", notes)
+        self.assertIn(f"and the {summary['JUMLAH_KELUARGA_AKTIF']} households", notes)
+
+    def test_age_follows_the_snapshot_date_and_not_the_clock(self):
+        connection = shim.build_database(keep_constraints=False)
+        (before,) = self.rows("RINGKASAN_DEMOGRAFI_UMAT", connection)
+        connection.execute("UPDATE MASTER_DATA.INFO_DATASET SET TANGGAL_SNAPSHOT = TANGGAL_SNAPSHOT + INTERVAL 10 YEAR")
+        (after,) = self.rows("RINGKASAN_DEMOGRAFI_UMAT", connection)
+        self.assertEqual(after["USIA_MEDIAN"], before["USIA_MEDIAN"] + 10)
+        self.assertEqual(after["TANGGAL_DATA"].year, before["TANGGAL_DATA"].year + 10)
+
+
+@unittest.skipUnless(HAVE_DUCKDB, "duckdb is not installed (pip install -r tests/requirements.txt)")
 class DocumentedQueryTests(unittest.TestCase):
     """Every SQL example in the README, the use-case guide and the starter guide (SELECTs on the views) runs and returns rows."""
 

@@ -43,6 +43,9 @@ VIEWS = (
     "ANGGARAN_VS_REALISASI_SEKSI",
     "BIAS_PERKIRAAN_PER_PERISTIWA",
     "DAMPAK_PERISTIWA_LUAR_BIASA",
+    "DEMOGRAFI_KELUARGA",
+    "DEMOGRAFI_UMAT_PER_WILAYAH",
+    "DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN",
     "HASIL_SURVEI",
     "KEGIATAN_DAN_LAPORAN",
     "KEGIATAN_MENDATANG",
@@ -60,6 +63,7 @@ VIEWS = (
     "PERSYARATAN_LAYANAN_PUBLIK",
     "POLA_KOLEKTE_HARI_DALAM_BULAN",
     "PROYEKSI_PEMASUKAN_PENGELUARAN",
+    "RINGKASAN_DEMOGRAFI_UMAT",
     "RINGKASAN_SKOR_LIKERT",
     "SUMBANGAN_KELUARGA_PER_LINGKUNGAN",
     "SUMBANGAN_KHUSUS_PER_WILAYAH",
@@ -1713,6 +1717,124 @@ def page_surveys():
 
 
 # --------------------------------------------------------------------------------------------
+# Page: Demografi umat
+# --------------------------------------------------------------------------------------------
+GENDERS = ["Laki-laki", "Perempuan"]
+STAGE_RAMPS = {"light": ["#cfe0f7", "#8db8ec", "#2a78d6", "#154c93"], "dark": ["#274b7a", "#3a73bd", "#5e9ae8", "#a9c9f4"]}
+
+
+def stage_scale(labels):
+    """Four ordered life stages are one ordered quantity (young to old), so they get one hue from light to dark."""
+    return alt.Scale(domain=list(labels), range=STAGE_RAMPS["dark" if is_dark() else "light"][: len(labels)])
+
+
+def population_pyramid(frame):
+    """Back-to-back bars: men to the left, women to the right, the oldest group on top. A hidden cell (no count) has no bar."""
+    data = frame.copy()
+    data["Jumlah"] = data["JUMLAH_UMAT"].astype(float)
+    data["Nilai"] = [(-n if g == GENDERS[0] else n) for n, g in zip(data["Jumlah"], data["JENIS_KELAMIN"])]
+    data["Teks"] = [whole(n) if not pd.isna(n) else "disembunyikan" for n in data["Jumlah"]]
+    order = list(data.sort_values("URUTAN_KELOMPOK", ascending=False)["KELOMPOK_USIA"].unique())
+    base = alt.Chart(data).encode(
+        y=alt.Y("KELOMPOK_USIA:N", sort=order, axis=alt.Axis(title="Usia (tahun)", labelLimit=160)),
+        x=alt.X("Nilai:Q", axis=alt.Axis(title="Jumlah umat", labelExpr="abs(datum.value)"), scale=alt.Scale(zero=True)),
+        tooltip=[alt.Tooltip("KELOMPOK_USIA:N", title="Usia"), alt.Tooltip("JENIS_KELAMIN:N", title="Jenis kelamin"),
+                 alt.Tooltip("Teks:N", title="Jumlah umat")])
+    layers = [base.mark_bar(size=18).encode(color=alt.Color("JENIS_KELAMIN:N", scale=color_scale(GENDERS), legend=alt.Legend(title=None)))]
+    layers.append(base.transform_filter(alt.datum.Nilai < 0).mark_text(align="right", dx=-5, fontSize=11, color=ink()).encode(text="Teks:N"))
+    layers.append(base.transform_filter(alt.datum.Nilai >= 0).mark_text(align="left", dx=5, fontSize=11, color=ink()).encode(text="Teks:N"))
+    layers.append(alt.Chart(pd.DataFrame({"Nol": [0]})).mark_rule(color=NEUTRAL, strokeWidth=1).encode(x="Nol:Q"))
+    show_chart(alt.layer(*layers), height=max(260, 34 * len(order) + 60))
+
+
+def page_demographics():
+    st.title("Demografi umat")
+    banner()
+    st.info("Halaman ini hanya memuat angka agregat umat aktif: tidak ada nama, keluarga, atau data perorangan. Kelompok yang hanya berisi 1 sampai 4 orang "
+            "(atau keluarga) disembunyikan agar tidak ada yang dapat dikenali. Angka ini menggambarkan susunan umat, bukan ukuran iman, "
+            "dan tidak boleh dipakai untuk memeringkat wilayah atau lingkungan.")
+    summary = get("RINGKASAN_DEMOGRAFI_UMAT").iloc[0]
+    pyramid = get("DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN").sort_values(["URUTAN_KELOMPOK", "JENIS_KELAMIN"])
+    regions = get("DEMOGRAFI_UMAT_PER_WILAYAH")
+    households = get("DEMOGRAFI_KELUARGA").sort_values("URUTAN_UKURAN")
+
+    cols = st.columns(4)
+    cols[0].metric("Umat aktif", whole(summary["JUMLAH_UMAT_AKTIF"]), help="Umat berstatus aktif pada keluarga yang masih aktif.")
+    cols[1].metric("Keluarga aktif", whole(summary["JUMLAH_KELUARGA_AKTIF"]))
+    cols[2].metric("Rata-rata anggota per keluarga", number(summary["RATA_RATA_ANGGOTA_KELUARGA"], 1))
+    cols[3].metric("Usia median", f"{number(summary['USIA_MEDIAN'], 0)} tahun", help="Separuh umat aktif lebih muda dan separuh lebih tua dari usia ini.")
+    cols = st.columns(4)
+    cols[0].metric("Perempuan", percent(summary["PERSEN_PEREMPUAN"]))
+    cols[1].metric("Anak dan remaja (0-16)", percent(summary["PERSEN_ANAK_REMAJA"]))
+    cols[2].metric("Lansia (60 ke atas)", percent(summary["PERSEN_LANSIA"]))
+    cols[3].metric("Umat tercatat yang tidak dihitung", whole(summary["JUMLAH_UMAT_TIDAK_DIHITUNG"]),
+                   help="Umat yang pindah paroki, tidak aktif, atau meninggal dunia, atau yang tidak berada pada keluarga aktif.")
+    st.caption(f"Data per {long_date(summary['TANGGAL_DATA'])}. Usia dihitung dari tahun lahir pada tanggal data, sehingga bisa meleset satu tahun.")
+
+    by_age, by_region, by_family = st.tabs(["Usia dan jenis kelamin", "Susunan umur per wilayah", "Keluarga"])
+
+    with by_age:
+        st.subheader("Piramida umat menurut usia dan jenis kelamin")
+        population_pyramid(pyramid)
+        st.caption("Batang ke kiri adalah laki-laki dan batang ke kanan adalah perempuan, per kelompok usia sepuluh tahunan. "
+                   "Kelompok teratas, 70 tahun ke atas, dijadikan satu.")
+        hidden = int(pyramid["DISEMBUNYIKAN"].sum())
+        if hidden:
+            st.info(f"{hidden} kelompok dengan 1 sampai 4 orang disembunyikan dan tidak digambar.")
+        st.subheader("Kelompok kehidupan")
+        stages = pd.DataFrame({
+            "Kelompok": ["Anak dan remaja (0-16)", "Orang muda (17-35)", "Dewasa (36-59)", "Lansia (60 ke atas)"],
+            "Persen": [summary["PERSEN_ANAK_REMAJA"], summary["PERSEN_ORANG_MUDA"], summary["PERSEN_DEWASA"], summary["PERSEN_LANSIA"]]})
+        stages["Teks"] = [percent(v) for v in stages["Persen"]]
+        horizontal_bar_chart(stages, "Kelompok", "Persen", "% umat aktif", list(stages["Kelompok"]), label_column="Teks", max_value=60, height=200)
+        st.caption("Kelompok kehidupan memudahkan merencanakan pelayanan: anak dan remaja, orang muda, dewasa, dan lansia. Batasnya 16, 35, dan 59 tahun.")
+
+    with by_region:
+        st.subheader("Susunan umur setiap wilayah")
+        choice = st.radio("Tampilkan", ["Jumlah umat", "Persentase dalam wilayah"], horizontal=True, key="ukuran_demografi")
+        shown = regions.sort_values(["NAMA_WILAYAH", "URUTAN_KELOMPOK"]).copy()
+        order = list(shown["NAMA_WILAYAH"].unique())
+        stage_order = list(shown.sort_values("URUTAN_KELOMPOK")["KELOMPOK_KEHIDUPAN"].unique())
+        shown["Nilai"] = shown["PERSEN_DALAM_WILAYAH"] if choice == "Persentase dalam wilayah" else shown["JUMLAH_UMAT"].astype(float)
+        shown["Teks"] = [(percent(v) if choice == "Persentase dalam wilayah" else whole(v)) if not pd.isna(v) else "disembunyikan" for v in shown["Nilai"]]
+        chart = alt.Chart(shown).mark_bar(size=22).encode(
+            y=alt.Y("NAMA_WILAYAH:N", sort=order, axis=alt.Axis(title=None, labelLimit=240)),
+            x=alt.X("Nilai:Q", axis=alt.Axis(title="% umat aktif di wilayah" if choice == "Persentase dalam wilayah" else "Jumlah umat aktif"), stack="zero"),
+            color=alt.Color("KELOMPOK_KEHIDUPAN:N", scale=stage_scale(stage_order), legend=alt.Legend(title=None)),
+            order=alt.Order("URUTAN_KELOMPOK:Q", sort="ascending"),
+            tooltip=[alt.Tooltip("NAMA_WILAYAH:N", title="Wilayah"), alt.Tooltip("KELOMPOK_KEHIDUPAN:N", title="Kelompok"),
+                     alt.Tooltip("Teks:N", title="Nilai")])
+        show_chart(chart, height=max(240, 44 * len(order) + 70))
+        st.caption("Wilayah diurutkan menurut abjad. Grafik ini menggambarkan susunan umur di setiap wilayah, untuk membantu merencanakan pelayanan, "
+                   "bukan untuk membandingkan atau memeringkat wilayah.")
+        hidden = int(regions["DISEMBUNYIKAN"].sum())
+        if hidden:
+            st.info(f"{hidden} kelompok dengan 1 sampai 4 orang disembunyikan dan tidak digambar.")
+
+    with by_family:
+        st.subheader("Keluarga menurut banyaknya anggota")
+        sizes = households.copy()
+        sizes["Keluarga"] = sizes["JUMLAH_KELUARGA"].astype(float)
+        sizes["Teks"] = [whole(v) if not pd.isna(v) else "disembunyikan" for v in sizes["Keluarga"]]
+        bar_chart(sizes, "UKURAN_KELUARGA", "Keluarga", "Jumlah keluarga aktif", list(sizes["UKURAN_KELUARGA"]), label_column="Teks")
+        with_children = summary["JUMLAH_KELUARGA_DENGAN_ANAK_REMAJA"]
+        st.write(f"Sebanyak **{whole(with_children)}** dari {whole(summary['JUMLAH_KELUARGA_AKTIF'])} keluarga aktif "
+                 f"({percent(100 * with_children / summary['JUMLAH_KELUARGA_AKTIF'], 0)}) memiliki anak atau remaja di bawah 17 tahun.")
+        st.caption("Keluarga dihitung dari umat aktif pada keluarga yang masih aktif. Kelompok terakhir menggabungkan keluarga dengan lima anggota atau lebih.")
+        hidden = int(households["DISEMBUNYIKAN"].sum())
+        if hidden:
+            st.info(f"{hidden} kelompok dengan 1 sampai 4 keluarga disembunyikan dan tidak digambar.")
+
+    how_to_read(
+        "**Umat aktif** adalah umat berstatus aktif pada keluarga yang masih aktif. Umat yang pindah paroki, tidak aktif, atau meninggal dunia tidak dihitung.",
+        "**Usia** dihitung dari tahun lahir pada tanggal data, bukan dari tanggal hari ini, sehingga bisa meleset satu tahun.",
+        "**Angka kecil disembunyikan.** Bila suatu kelompok hanya berisi 1 sampai 4 orang, jumlahnya tidak ditampilkan. Ini aturan sederhana untuk demonstrasi, "
+        "bukan perlindungan formal; untuk data nyata perlu ditinjau lebih lanjut.",
+        "Halaman ini tidak memeringkat wilayah atau lingkungan dan tidak mengukur iman atau komitmen umat.",
+    )
+
+
+# --------------------------------------------------------------------------------------------
 # Page: Tentang data
 # --------------------------------------------------------------------------------------------
 def read_guide(file_name):
@@ -1811,7 +1933,7 @@ dirapikan, dihubungkan, dan disajikan. Ini bukti konsep, bukan sistem produksi.
 **Seluruh data fiktif.** Nama, keluarga, wilayah, lingkungan, kegiatan, angka kolekte, dan peristiwa dibuat oleh program.
 Batas wilayah dan peta, bila ada pada versi mendatang, hanya ilustrasi dan bukan batas resmi.
 
-**Privasi.** Dasbor hanya membaca ringkasan agregat. Tidak ada nama, keluarga, atau sumbangan perorangan yang ditampilkan.
+**Privasi.** Dasbor hanya membaca ringkasan agregat. Tidak ada nama, keluarga, atau sumbangan perorangan yang ditampilkan. Halaman Demografi umat hanya memuat jumlah dan persentase, dan kelompok yang hanya berisi 1 sampai 4 orang disembunyikan.
 
 **Tentang angka sumbangan dan kolekte.** Angka ini menggambarkan administrasi keuangan dan kapasitas ekonomi. Angka ini bukan ukuran iman,
 komitmen rohani, atau kemurahan hati, dan tidak dipakai untuk memeringkat wilayah atau lingkungan.
@@ -1846,6 +1968,7 @@ PAGES = {
     "Sumbangan khusus": page_donations,
     "Rencana, anggaran, kegiatan": page_plans,
     "Survei umat": page_surveys,
+    "Demografi umat": page_demographics,
     "Layanan dan prosedur": page_services,
     "Tentang data": page_about,
 }

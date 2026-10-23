@@ -246,6 +246,77 @@ function pageSurveys() {
 }
 
 // ------------------------------------------------------------------------------------------------
+function pageDemographics() {
+  var out = [title("Demografi umat"), banner()];
+  out.push(info("Halaman ini hanya memuat angka agregat umat aktif: tidak ada nama, keluarga, atau data perorangan. Kelompok yang hanya berisi 1 sampai 4 orang " +
+    "(atau keluarga) disembunyikan agar tidak ada yang dapat dikenali. Angka ini menggambarkan susunan umat, bukan ukuran iman, " +
+    "dan tidak boleh dipakai untuk memeringkat wilayah atau lingkungan."));
+  var s = V("RINGKASAN_DEMOGRAFI_UMAT")[0];
+  var pyramid = sortBy(V("DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN"), ["URUTAN_KELOMPOK", "JENIS_KELAMIN"]);
+  var regions = V("DEMOGRAFI_UMAT_PER_WILAYAH");
+  var households = sortBy(V("DEMOGRAFI_KELUARGA"), ["URUTAN_UKURAN"]);
+
+  out.push(tiles([
+    metric("Umat aktif", whole(s.JUMLAH_UMAT_AKTIF), "Umat berstatus aktif pada keluarga yang masih aktif."),
+    metric("Keluarga aktif", whole(s.JUMLAH_KELUARGA_AKTIF)),
+    metric("Rata-rata anggota per keluarga", number(s.RATA_RATA_ANGGOTA_KELUARGA, 1)),
+    metric("Usia median", number(s.USIA_MEDIAN, 0) + " tahun", "Separuh umat aktif lebih muda dan separuh lebih tua dari usia ini.")
+  ]));
+  out.push(tiles([
+    metric("Perempuan", percent(s.PERSEN_PEREMPUAN)),
+    metric("Anak dan remaja (0-16)", percent(s.PERSEN_ANAK_REMAJA)),
+    metric("Lansia (60 ke atas)", percent(s.PERSEN_LANSIA)),
+    metric("Umat tercatat yang tidak dihitung", whole(s.JUMLAH_UMAT_TIDAK_DIHITUNG),
+      "Umat yang pindah paroki, tidak aktif, atau meninggal dunia, atau yang tidak berada pada keluarga aktif.")
+  ]));
+  out.push(caption("Data per " + esc(longDate(s.TANGGAL_DATA)) + ". Usia dihitung dari tahun lahir pada tanggal data, sehingga bisa meleset satu tahun."));
+
+  var t = tabs("tab.demografi", ["Usia dan jenis kelamin", "Susunan umur per wilayah", "Keluarga"]);
+  out.push(t.html);
+  if (t.active === "Usia dan jenis kelamin") {
+    out.push(sub("Piramida umat menurut usia dan jenis kelamin"));
+    out.push(populationPyramid(pyramid));
+    out.push(caption("Batang ke kiri adalah laki-laki dan batang ke kanan adalah perempuan, per kelompok usia sepuluh tahunan. " +
+      "Kelompok teratas, 70 tahun ke atas, dijadikan satu."));
+    var hiddenAge = pyramid.filter(function (r) { return r.DISEMBUNYIKAN; }).length;
+    if (hiddenAge) { out.push(info(hiddenAge + " kelompok dengan 1 sampai 4 orang disembunyikan dan tidak digambar.")); }
+    out.push(sub("Kelompok kehidupan"));
+    var stages = [["Anak dan remaja (0-16)", s.PERSEN_ANAK_REMAJA], ["Orang muda (17-35)", s.PERSEN_ORANG_MUDA], ["Dewasa (36-59)", s.PERSEN_DEWASA],
+                  ["Lansia (60 ke atas)", s.PERSEN_LANSIA]].map(function (x) { return {Kelompok: x[0], Persen: x[1], Teks: percent(x[1])}; });
+    out.push(hbarChart(stages, "Kelompok", "Persen", "% umat aktif", col(stages, "Kelompok"), "Teks", null, 200, 0, 60));
+    out.push(caption("Kelompok kehidupan memudahkan merencanakan pelayanan: anak dan remaja, orang muda, dewasa, dan lansia. Batasnya 16, 35, dan 59 tahun."));
+  } else if (t.active === "Susunan umur per wilayah") {
+    out.push(sub("Susunan umur setiap wilayah"));
+    out.push(radio("ukuran_demografi", "Tampilkan", ["Jumlah umat", "Persentase dalam wilayah"]));
+    out.push(regionStageChart(regions, val("ukuran_demografi", "Jumlah umat") === "Persentase dalam wilayah"));
+    out.push(caption("Wilayah diurutkan menurut abjad. Grafik ini menggambarkan susunan umur di setiap wilayah, untuk membantu merencanakan pelayanan, " +
+      "bukan untuk membandingkan atau memeringkat wilayah."));
+    var hiddenRegion = regions.filter(function (r) { return r.DISEMBUNYIKAN; }).length;
+    if (hiddenRegion) { out.push(info(hiddenRegion + " kelompok dengan 1 sampai 4 orang disembunyikan dan tidak digambar.")); }
+  } else {
+    out.push(sub("Keluarga menurut banyaknya anggota"));
+    var sizes = households.filter(function (r) { return !r.DISEMBUNYIKAN; }).map(function (r) {
+      return {Ukuran: r.UKURAN_KELUARGA, Keluarga: Number(r.JUMLAH_KELUARGA), Teks: whole(r.JUMLAH_KELUARGA)};
+    });
+    out.push(barChart(sizes, "Ukuran", "Keluarga", "Jumlah keluarga aktif", col(households, "UKURAN_KELUARGA"), "Teks", 300, 0));
+    var withChildren = s.JUMLAH_KELUARGA_DENGAN_ANAK_REMAJA;
+    out.push(para("Sebanyak <strong>" + whole(withChildren) + "</strong> dari " + whole(s.JUMLAH_KELUARGA_AKTIF) + " keluarga aktif (" +
+      percent(100 * withChildren / s.JUMLAH_KELUARGA_AKTIF, 0) + ") memiliki anak atau remaja di bawah 17 tahun."));
+    out.push(caption("Keluarga dihitung dari umat aktif pada keluarga yang masih aktif. Kelompok terakhir menggabungkan keluarga dengan lima anggota atau lebih."));
+    var hiddenFamily = households.filter(function (r) { return r.DISEMBUNYIKAN; }).length;
+    if (hiddenFamily) { out.push(info(hiddenFamily + " kelompok dengan 1 sampai 4 keluarga disembunyikan dan tidak digambar.")); }
+  }
+  out.push(howToRead([
+    "**Umat aktif** adalah umat berstatus aktif pada keluarga yang masih aktif. Umat yang pindah paroki, tidak aktif, atau meninggal dunia tidak dihitung.",
+    "**Usia** dihitung dari tahun lahir pada tanggal data, bukan dari tanggal hari ini, sehingga bisa meleset satu tahun.",
+    "**Angka kecil disembunyikan.** Bila suatu kelompok hanya berisi 1 sampai 4 orang, jumlahnya tidak ditampilkan. Ini aturan sederhana untuk demonstrasi, " +
+      "bukan perlindungan formal; untuk data nyata perlu ditinjau lebih lanjut.",
+    "Halaman ini tidak memeringkat wilayah atau lingkungan dan tidak mengukur iman atau komitmen umat."
+  ]));
+  return out.join("");
+}
+
+// ------------------------------------------------------------------------------------------------
 function pageServices() {
   var services = sortBy(V("LAYANAN_PUBLIK"), ["ID_LAYANAN"]);
   var steps = sortBy(V("LANGKAH_LAYANAN_PUBLIK"), ["ID_LAYANAN", "NOMOR_URUT"]);
@@ -300,7 +371,7 @@ function pageAbout() {
   [
     "**Apa ini?** Demonstrasi Pusat Informasi Paroki: contoh bagaimana informasi dari berbagai fungsi paroki dapat dikumpulkan, dirapikan, dihubungkan, dan disajikan. Ini bukti konsep, bukan sistem produksi.",
     "**Seluruh data fiktif.** Nama, keluarga, wilayah, lingkungan, kegiatan, angka kolekte, dan peristiwa dibuat oleh program. Batas wilayah dan peta, bila ada pada versi mendatang, hanya ilustrasi dan bukan batas resmi.",
-    "**Privasi.** Dasbor hanya membaca ringkasan agregat. Tidak ada nama, keluarga, atau sumbangan perorangan yang ditampilkan.",
+    "**Privasi.** Dasbor hanya membaca ringkasan agregat. Tidak ada nama, keluarga, atau sumbangan perorangan yang ditampilkan. Halaman Demografi umat hanya memuat jumlah dan persentase, dan kelompok yang hanya berisi 1 sampai 4 orang disembunyikan.",
     "**Tentang angka sumbangan dan kolekte.** Angka ini menggambarkan administrasi keuangan dan kapasitas ekonomi. Angka ini bukan ukuran iman, komitmen rohani, atau kemurahan hati, dan tidak dipakai untuk memeringkat wilayah atau lingkungan.",
     "**Tentang perkiraan bayangan.** Perkiraan kolekte mingguan dibuat empat pekan sebelumnya dan disimpan tanpa pernah diubah. Dasbor membandingkannya dengan kolekte aktual agar terlihat seberapa tepat perkiraan itu dan peristiwa apa yang membuatnya meleset.",
     "**Tentang layanan dan prosedur.** Halaman layanan memuat panduan contoh (langkah dan persyaratan) yang fiktif dan bukan ketentuan resmi.",

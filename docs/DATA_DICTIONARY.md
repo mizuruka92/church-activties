@@ -1315,6 +1315,10 @@ View hanya berisi data agregat atau ringkasan operasional. Tidak ada view yang m
 | `ANALISIS.LAYANAN_PUBLIK` | Layanan paroki yang boleh dibaca umum (klasifikasi yang dapat tampil publik): ringkasan, waktu proses, seksi pengelola, nama berkas PDF panduan, dan jumlah langkah serta persyaratan. Isi panduan fiktif dan bukan ketentuan resmi. Data simulasi. |
 | `ANALISIS.LANGKAH_LAYANAN_PUBLIK` | Langkah berurutan setiap layanan publik, dengan pelaku langkah (pemohon, sekretariat, pastor, seksi, atau ketua lingkungan). Hanya layanan yang boleh dibaca umum. Data simulasi. |
 | `ANALISIS.PERSYARATAN_LAYANAN_PUBLIK` | Persyaratan setiap layanan publik: dokumen, pembinaan, dan ketentuan umum, ditandai wajib atau hanya jika berlaku. Hanya layanan yang boleh dibaca umum. Data simulasi. |
+| `ANALISIS.RINGKASAN_DEMOGRAFI_UMAT` | Satu baris angka pokok demografi umat aktif: jumlah umat dan keluarga, rata-rata anggota keluarga, usia median, persentase perempuan dan persentase menurut kelompok kehidupan. Hanya angka agregat, tanpa nama atau identitas individu. Usia dihitung dari tahun lahir pada tanggal data. Data simulasi. |
+| `ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN` | Jumlah umat aktif menurut kelompok usia sepuluh tahunan (70 tahun ke atas dijadikan satu) dan jenis kelamin, untuk piramida penduduk. Sel berisi 1 sampai 4 orang disembunyikan (JUMLAH_UMAT kosong, DISEMBUNYIKAN benar). Hanya angka agregat. Data simulasi. |
+| `ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH` | Jumlah umat aktif menurut wilayah dan kelompok kehidupan (anak dan remaja, orang muda, dewasa, lansia), dengan persentase di dalam wilayah. Untuk membaca susunan umur, bukan untuk membandingkan wilayah. Sel berisi 1 sampai 4 orang disembunyikan. Hanya angka agregat. Data simulasi. |
+| `ANALISIS.DEMOGRAFI_KELUARGA` | Jumlah keluarga aktif menurut banyaknya anggota aktif (1, 2, 3, 4, 5 atau lebih), dengan jumlah umat di dalamnya. Hanya angka agregat, tanpa nama atau identitas keluarga. Sel berisi 1 sampai 4 keluarga disembunyikan. Data simulasi. |
 
 ## Catatan kewajaran dan privasi
 
