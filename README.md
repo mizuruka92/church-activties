@@ -42,7 +42,7 @@ and available as PDFs.
 | PDFs in the dashboards | The offline HTML dashboard opens all 138 PDFs from inside the file. The Streamlit dashboard can open them from a Snowflake stage after the optional step 7 ([starter guide, part 8b](docs/STARTER_GUIDE.md#8b-optional-open-the-pdf-files-from-the-dashboard)) |
 | Mock source documents | 132 PDF post-event reports, one per report row, as if the rows had been extracted from them ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
 | Public service guides | 6 PDF guides in `app/public_documents/`, generated from the same rows the dashboard page shows ([docs/DOCUMENTS.md](docs/DOCUMENTS.md)) |
-| Council presentation | A 14-slide PowerPoint deck in Bahasa Indonesia, non-technical, built around three steps: collect, share, understand. Simulated figures only ([docs/presentation/README.md](docs/presentation/README.md)) |
+| Council presentation | A 15-slide PowerPoint deck in Bahasa Indonesia, non-technical. It shows what an information bank can do beyond storing data, in three steps: collect, share, understand. Simulated figures only ([docs/presentation/README.md](docs/presentation/README.md)) |
 
 The nine business domains (plus one added domain for the public service guides) and their tables are listed in
 [docs/DATA_MODEL.md](docs/DATA_MODEL.md). Column meanings, grain and allowed values are in the
