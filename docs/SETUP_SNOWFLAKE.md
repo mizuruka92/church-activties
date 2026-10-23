@@ -46,7 +46,7 @@ selects the database itself, so you can also use one worksheet per file.
 | 4e | `sql/04e_load_plans_and_events.sql` | `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.RENCANA_KEGIATAN;` returns 179. |
 | 4f | `sql/04f_load_donations.sql` | Needs 4c and 4e. `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.KAMPANYE_SUMBANGAN;` returns 14. |
 | 4g | `sql/04g_load_forecast.sql` | Needs step 3 (the forecast model is reference data). `SELECT COUNT(*) FROM PUSAT_INFORMASI_PAROKI.DATA_OPERASIONAL.PERKIRAAN_KOLEKTE_MINGGUAN;` returns 274. To compare the forecast with the real offertory, steps 4a and 4b are needed as well. |
-| 5 | `sql/05_create_views.sql` | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 29 views. |
+| 5 | `sql/05_create_views.sql` | `SHOW VIEWS IN SCHEMA PUSAT_INFORMASI_PAROKI.ANALISIS;` lists 33 views. |
 | 6 | `sql/06_validate_data.sql` | The first two rows say `Checks with result FAIL = 0` and `Checks with result WARN = 1`, both `PASS`. |
 
 The `STRUCTURE` rows of the validation compare every table's row count with the bundled data

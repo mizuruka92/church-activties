@@ -340,6 +340,10 @@ class CommittedFilesTests(GeneratorTestCase):
         self.assertEqual(len(re.findall(r"CREATE OR REPLACE VIEW ANALISIS\.\w+\s+COMMENT = '", views)), len(names))
         self.assertEqual(views.count("AS SUMBER_DATA"), len(names))
         selects = re.sub(r"COUNT\(DISTINCT [^)]*\)", "", views)
+        # The demographic views compute an age from the year of birth, inside a CTE, and show only age groups.
+        age = r"YEAR\(i\.TANGGAL_SNAPSHOT\) - u\.TAHUN_LAHIR AS USIA"
+        self.assertEqual(len(re.findall(age, selects)), 3, "only the three demographic views that need an age may read the year of birth")
+        selects = re.sub(age, "", selects)
         for forbidden in ("NAMA_FIKTIF", "NAMA_KELUARGA_FIKTIF", "TAHUN_LAHIR"):
             self.assertNotIn(forbidden, selects)
 

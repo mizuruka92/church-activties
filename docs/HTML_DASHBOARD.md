@@ -11,8 +11,8 @@ It exists so that the demo can still be shown when the Snowflake trial has ended
 | | Streamlit dashboard | HTML dashboard |
 |---|---|---|
 | Where it runs | Inside Snowflake (Streamlit in Snowflake) | In the browser, from the file |
-| Data | Read live from the 27 `ANALISIS` views | A snapshot, embedded in the file when it was built |
-| Pages | 11 | The same 11, in the same order, with the same names |
+| Data | Read live from the 31 `ANALISIS` views | A snapshot, embedded in the file when it was built |
+| Pages | 12 | The same 12, in the same order, with the same names |
 | Charts | Altair (Vega-Lite) | The same Vega-Lite charts, drawn by the Vega libraries stored in the file |
 | Dropdowns, radio buttons, tabs | Yes | Yes. A year range is two dropdowns ("Dari" and "Sampai") instead of a slider |
 | Data tables | Yes | **No.** Only charts, tiles, short lists and the dropdowns that steer them |
@@ -36,7 +36,7 @@ forecast for the coming weeks, the requirements and steps of each service, and t
 
 ## Using it
 
-1. Open the file. The menu on the left (above the page on a phone) lists the eleven pages.
+1. Open the file. The menu on the left (above the page on a phone) lists the twelve pages.
 2. Use the dropdowns, radio buttons and tabs on each page. A page keeps its choices while you stay on it and starts again from its defaults when you
    return to it.
 3. Hover or tap a point or bar for its details.
@@ -63,7 +63,7 @@ app/html/
   dashboard.css          Layout and light/dark colours
   js/00_core.js          Formatting (Indonesian conventions), data access, small helpers, controls
   js/10_charts.js        The Vega-Lite chart builders (ports of the Altair charts)
-  js/20_pages_overview.js, 30_pages_offertory.js, 40_pages_other.js   The eleven pages
+  js/20_pages_overview.js, 30_pages_offertory.js, 40_pages_other.js   The twelve pages
   js/90_main.js          Menu, routing, theme, drawing the charts
   vendor/                The Vega libraries and their licences (see vendor/README.md)
   pusat_informasi_paroki.html   The generated file
@@ -88,7 +88,7 @@ stand-in, and writes the rows as JSON into the page. The output depends only on 
 `tests/test_html_dashboard.py` opens the file in headless Chromium directly from disk (`file://`, no server) and checks:
 
 * the committed file is what the build script produces now, and nothing in it is loaded from the network (a request to any other address fails the test);
-* all eleven pages draw all their charts, with no JavaScript error or console warning, and no horizontal scrolling on a 390 px wide phone screen;
+* all twelve pages draw all their charts, with no JavaScript error or console warning, and no horizontal scrolling on a 390 px wide phone screen;
 * **every option of every dropdown and radio button, on every tab of every page**, draws without error (about 200 combinations), plus every survey with every question;
 * each service shows its requirements and steps, and its PDF downloads and starts with `%PDF-`;
 * the 138 embedded PDFs are byte for byte the files in the repository, and exactly the files that the tables name; for six of the 132 reports (the first, the last and some in between) the "Buka" button opens a new tab with `application/pdf` and the "Unduh" button saves the same bytes;

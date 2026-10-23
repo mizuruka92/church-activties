@@ -8,7 +8,7 @@ All data is simulated. Every page shows a notice that says so.
 
 ## 1. Pages
 
-The sidebar menu has eleven pages. The text on screen is Bahasa Indonesia; this document is English.
+The sidebar menu has twelve pages. The text on screen is Bahasa Indonesia; this document is English.
 
 | Page | Question it answers | Views it reads |
 |---|---|---|
@@ -21,6 +21,7 @@ The sidebar menu has eleven pages. The text on screen is Bahasa Indonesia; this 
 | Sumbangan khusus | Do Lent and Advent gifts cover Easter and Christmas? How are gifts distributed over communities (mean versus median, total versus per person)? Which regions have reported? | `TITIK_IMPAS_KAMPANYE`, `SUMBANGAN_KELUARGA_PER_LINGKUNGAN`, `SUMBANGAN_KHUSUS_PER_WILAYAH` |
 | Rencana, anggaran, kegiatan | How much of the budget was used, and how complete are the reports? Budget use per section and year, programme list with filters, report completeness, target versus actual participants, an event list that names the source document of each report ("Berkas laporan"), and a picker "Laporan kegiatan (PDF)" with a button that opens the report from the stage when the optional step 7 has been run. | `ANGGARAN_VS_REALISASI_SEKSI`, `ANGGARAN_VS_REALISASI_PROGRAM`, `KEGIATAN_DAN_LAPORAN`, `KELENGKAPAN_LAPORAN_PER_SEKSI` |
 | Survei umat | What do the survey results say? One survey and question at a time, percentages with response counts, Likert summary. | `HASIL_SURVEI`, `RINGKASAN_SKOR_LIKERT` |
+| Demografi umat | Who are the active parishioners? Eight figures (people, households, household size, median age, share of women, of children and teenagers, of the elderly, and the people not counted), a population pyramid (age group by gender), the four life stages, the age structure of each region (numbers or percentages, listed alphabetically), and households by size. Aggregates only, small cells hidden. | `RINGKASAN_DEMOGRAFI_UMAT`, `DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN`, `DEMOGRAFI_UMAT_PER_WILAYAH`, `DEMOGRAFI_KELUARGA` |
 | Layanan dan prosedur | What do I need, and what are the steps, to be baptised, confirmed or married, to join a community, or when someone dies? A disclaimer, a list of the six services, a selector, two tabs (requirements as a checklist, numbered steps with who does each), the important notes, a download button for the PDF guide (when the file is next to the app) and a button that opens it from the stage (when the optional step 7 has been run). Public information: it never shows personal data. | `LAYANAN_PUBLIK`, `LANGKAH_LAYANAN_PUBLIK`, `PERSYARATAN_LAYANAN_PUBLIK` |
 | Tentang data | What is this data and how far does it go? Purpose, privacy, how to read the projection, the list of views, the date of the latest held Mass. | `PELAKSANAAN_MISA` |
 
@@ -33,8 +34,12 @@ registered event with date, place and participant target, then the post-event re
 The 45-day threshold for "close to its date but still only a plan" is the constant `PREPARATION_DAYS` in the app.
 
 Two `ANALISIS` views are deliberately not used: `STRUKTUR_WILAYAH` (no page needs the region tree) and
-`RINGKASAN_UMAT_PER_LINGKUNGAN` (household and people counts per community; leaving it out keeps the
-parishioner data out of the dashboard entirely).
+`RINGKASAN_UMAT_PER_LINGKUNGAN` (people counts per community: with about 35 people per community, a split by age or gender would
+come close to describing individuals, so no page goes below the region level).
+
+The page "Demografi umat" is the one place where parishioners appear, and only as aggregates: four views (`RINGKASAN_DEMOGRAFI_UMAT`,
+`DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN`, `DEMOGRAFI_UMAT_PER_WILAYAH`, `DEMOGRAFI_KELUARGA`) with no name, no identifier and no year of birth.
+Ages are counted from the snapshot date, and any cell that holds 1 to 4 people or households is hidden (see the section on demographics below).
 
 ## 2. Design decisions
 
@@ -42,7 +47,7 @@ parishioner data out of the dashboard entirely).
    least fragile way for a first-time user. It is also what a Git-based deployment points at. The price is a long file,
    organised in labelled sections (data access, formatting, charts, one function per page).
 2. **Only the `ANALISIS` views.** The app has exactly one query shape, `SELECT * FROM <database>.ANALISIS.<view>`, for a
-   fixed list of 27 views (`VIEWS`). Filtering and charting happen in pandas, because the views are small (the largest has
+   fixed list of 31 views (`VIEWS`). Filtering and charting happen in pandas, because the views are small (the largest has
    about 1,800 rows). This keeps SQL out of the app and means the app cannot read a detail table even by mistake.
    Tests check the query shape, that every listed view exists in `sql/05_create_views.sql`, and that each is used.
 3. **One function talks to Snowflake.** `run_query` uses the active Snowpark session when running inside Streamlit in
@@ -115,7 +120,7 @@ there. `tests/test_html_dashboard.py` compares the figures on the tiles of both 
 ### The PDF links (optional step 7)
 
 `sql/07_dokumen_pdf.sql` adds the stage `ANALISIS.DOKUMEN_PAROKI` and the view `ANALISIS.BERKAS_DOKUMEN` (one row per PDF that the tables name, with `ADA_DI_STAGE` and a
-pre-signed `TAUTAN_BERKAS`). It is the only view outside the fixed list of 27: the app reads it through `OPTIONAL_VIEWS`, caches it like the others, and treats any error
+pre-signed `TAUTAN_BERKAS`). It is the only view outside the fixed list of 31: the app reads it through `OPTIONAL_VIEWS`, caches it like the others, and treats any error
 (the view does not exist, or may not be read) as "step 7 was not run": the pages then say so in one sentence and everything else works. Design notes:
 
 * A pre-signed link needs `SNOWFLAKE_SSE` encryption and is open to anyone who holds it until it expires (one hour). The dashboard caches the view for ten minutes, so a link on screen
@@ -124,3 +129,20 @@ pre-signed `TAUTAN_BERKAS`). It is the only view outside the fixed list of 27: t
   every browser opens the link from inside the app was not recorded, which is why "Tautan langsung" is there.
 * Tests: `tests/test_app.py` (`PdfLinkTests`) replaces the view with a DuckDB stand-in that has the same columns and invents the links (host `.invalid`). It checks the button, the sentence for a file that is
   not on the stage, the page when the view does not exist, that the picker matches the files of `KEGIATAN_DAN_LAPORAN`, and that `sql/07` is non-destructive and absent from `full_setup.sql`. It cannot show that Snowflake produces working links; that rests on the owner's report.
+
+### Demographics of the parishioners
+
+The page "Demografi umat" is the only page about people, so its rules are stricter than those of the other pages:
+
+* **Aggregates only.** The four views (see section 1) hold counts and percentages, never a row per person. They expose no name, no identifier, no community and no year of birth;
+  a validation check and a test fail if an `ANALISIS` view has such a column. The age is computed inside the view from the year of birth and the snapshot date, then thrown away.
+* **Who is counted.** A parishioner with status *Aktif* and a current assignment to a household with status *Aktif*. The people who are not counted (moved away, inactive, deceased) are
+  one figure on the page, not a breakdown. The 623 active parishioners add up to the 6 regions, the 8 age groups by 2 genders, and the 221 households; validation checks it.
+* **Small cells are hidden.** A cell with 1 to 4 people (or households) has no count (`NULL`) and `DISEMBUNYIKAN = TRUE`; the pages draw no bar for it and say how many were hidden. A cell with 0 is shown as 0.
+  The mock data has no such cell (the smallest is 6 people), so nothing is hidden in the demo; tests change the data to prove that the rule works. This is a simple minimum-size rule, not a formal
+  disclosure-control method: someone who can subtract a visible total from another total could still work out a hidden cell, and real data would need a proper review before it goes on a screen.
+* **No community level.** A community has about 35 people, so splitting it by age or gender would come close to describing individuals. The finest level is the region.
+* **No ranking.** Regions are listed alphabetically, and the wording says the chart shows the age structure, not a comparison. The page does not say which region has most children or elderly.
+* **Age bands.** Ten-year bands for the pyramid (the top band is 70 and over), and four life stages for the planning charts: 0-16, 17-35, 36-59 and 60 or older. 17 is the age below which the data
+  classification treats a person as a minor (see `docs/DATA_MODEL.md`).
+* **What the mock data shows.** Few parishioners are aged 20 to 29 (37 people, against 104 aged 10 to 19, 119 aged 40 to 49 and 133 aged 50 to 59) or 60 to 69 (28), and the large group is aged 36 to 59 (48%). That is how the generator built the household cohorts, not a statement about any real parish.

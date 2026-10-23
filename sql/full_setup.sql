@@ -17521,6 +17521,216 @@ JOIN ANALISIS.LAYANAN_PUBLIK l
     ON l.ID_LAYANAN = r.ID_LAYANAN;
 
 -- =============================================================================
+-- Demographics of the active parishioners: aggregates only, small cells hidden
+--
+-- Who is counted: parishioners whose membership status is Aktif and who belong to an active household
+-- (a current assignment in a household with status Aktif). Age is the year of the snapshot date minus the
+-- year of birth, so it can be one year off. It is never read from the clock.
+-- Privacy: no view exposes a person, a household or a year of birth. A cell that holds 1 to 4 people (or
+-- households) is hidden: its count is NULL and DISEMBUNYIKAN is TRUE. A cell with 0 is shown as 0. This is a
+-- simple minimum-size rule for a demo, not a formal disclosure-control method.
+-- No view ranks regions or communities. The pages list them alphabetically.
+-- =============================================================================
+
+-- 30. Headline figures of the parishioner demographics (one row) ------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.RINGKASAN_DEMOGRAFI_UMAT
+    COMMENT = 'Satu baris angka pokok demografi umat aktif: jumlah umat dan keluarga, rata-rata anggota keluarga, usia median, persentase perempuan dan persentase menurut kelompok kehidupan. Hanya angka agregat, tanpa nama atau identitas individu. Usia dihitung dari tahun lahir pada tanggal data. Data simulasi.'
+AS
+WITH AKTIF AS (
+    SELECT pk.ID_KELUARGA,
+           u.JENIS_KELAMIN,
+           YEAR(i.TANGGAL_SNAPSHOT) - u.TAHUN_LAHIR AS USIA,
+           i.TANGGAL_SNAPSHOT
+    FROM DATA_OPERASIONAL.UMAT u
+    CROSS JOIN MASTER_DATA.INFO_DATASET i
+    JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk
+        ON pk.ID_UMAT = u.ID_UMAT
+       AND pk.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN DATA_OPERASIONAL.KELUARGA k
+        ON k.ID_KELUARGA = pk.ID_KELUARGA
+       AND k.STATUS_KELUARGA = 'Aktif'
+    WHERE u.STATUS_KEANGGOTAAN = 'Aktif'
+)
+SELECT
+    MAX(a.TANGGAL_SNAPSHOT) AS TANGGAL_DATA,
+    COUNT(*) AS JUMLAH_UMAT_AKTIF,
+    (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT) - COUNT(*) AS JUMLAH_UMAT_TIDAK_DIHITUNG,
+    COUNT(DISTINCT a.ID_KELUARGA) AS JUMLAH_KELUARGA_AKTIF,
+    ROUND(1.0 * COUNT(*) / COUNT(DISTINCT a.ID_KELUARGA), 1) AS RATA_RATA_ANGGOTA_KELUARGA,
+    MEDIAN(a.USIA) AS USIA_MEDIAN,
+    ROUND(100.0 * SUM(CASE WHEN a.JENIS_KELAMIN = 'Perempuan' THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_PEREMPUAN,
+    ROUND(100.0 * SUM(CASE WHEN a.USIA < 17 THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_ANAK_REMAJA,
+    ROUND(100.0 * SUM(CASE WHEN a.USIA BETWEEN 17 AND 35 THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_ORANG_MUDA,
+    ROUND(100.0 * SUM(CASE WHEN a.USIA BETWEEN 36 AND 59 THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_DEWASA,
+    ROUND(100.0 * SUM(CASE WHEN a.USIA >= 60 THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_LANSIA,
+    COUNT(DISTINCT CASE WHEN a.USIA < 17 THEN a.ID_KELUARGA END) AS JUMLAH_KELUARGA_DENGAN_ANAK_REMAJA,
+    'Hanya angka agregat. Kelompok dengan 1 sampai 4 orang disembunyikan pada tampilan rinci.' AS CATATAN_PRIVASI,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM AKTIF a;
+
+-- 31. Age group by gender (the population pyramid) ----------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN
+    COMMENT = 'Jumlah umat aktif menurut kelompok usia sepuluh tahunan (70 tahun ke atas dijadikan satu) dan jenis kelamin, untuk piramida penduduk. Sel berisi 1 sampai 4 orang disembunyikan (JUMLAH_UMAT kosong, DISEMBUNYIKAN benar). Hanya angka agregat. Data simulasi.'
+AS
+WITH AKTIF AS (
+    SELECT u.JENIS_KELAMIN,
+           YEAR(i.TANGGAL_SNAPSHOT) - u.TAHUN_LAHIR AS USIA
+    FROM DATA_OPERASIONAL.UMAT u
+    CROSS JOIN MASTER_DATA.INFO_DATASET i
+    JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk
+        ON pk.ID_UMAT = u.ID_UMAT
+       AND pk.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN DATA_OPERASIONAL.KELUARGA k
+        ON k.ID_KELUARGA = pk.ID_KELUARGA
+       AND k.STATUS_KELUARGA = 'Aktif'
+    WHERE u.STATUS_KEANGGOTAAN = 'Aktif'
+),
+KELOMPOK AS (
+    SELECT 0 AS USIA_MULAI, '0-9' AS KELOMPOK_USIA, 1 AS URUTAN_KELOMPOK
+    UNION ALL SELECT 10, '10-19', 2
+    UNION ALL SELECT 20, '20-29', 3
+    UNION ALL SELECT 30, '30-39', 4
+    UNION ALL SELECT 40, '40-49', 5
+    UNION ALL SELECT 50, '50-59', 6
+    UNION ALL SELECT 60, '60-69', 7
+    UNION ALL SELECT 70, '70 ke atas', 8
+),
+JENIS AS (
+    SELECT 'Laki-laki' AS JENIS_KELAMIN
+    UNION ALL SELECT 'Perempuan'
+),
+HITUNG AS (
+    SELECT LEAST(CAST(FLOOR(USIA / 10) AS INTEGER) * 10, 70) AS USIA_MULAI,
+           JENIS_KELAMIN,
+           COUNT(*) AS JUMLAH
+    FROM AKTIF
+    GROUP BY LEAST(CAST(FLOOR(USIA / 10) AS INTEGER) * 10, 70), JENIS_KELAMIN
+)
+SELECT
+    k.KELOMPOK_USIA,
+    k.URUTAN_KELOMPOK,
+    j.JENIS_KELAMIN,
+    CASE WHEN COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(h.JUMLAH, 0) END AS JUMLAH_UMAT,
+    COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 AS DISEMBUNYIKAN,
+    'Usia dihitung dari tahun lahir, sehingga bisa meleset satu tahun. Kelompok dengan 1 sampai 4 orang disembunyikan.' AS CATATAN_PRIVASI,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM KELOMPOK k
+CROSS JOIN JENIS j
+LEFT JOIN HITUNG h
+    ON h.USIA_MULAI = k.USIA_MULAI
+   AND h.JENIS_KELAMIN = j.JENIS_KELAMIN;
+
+-- 32. Life stage by region ------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH
+    COMMENT = 'Jumlah umat aktif menurut wilayah dan kelompok kehidupan (anak dan remaja, orang muda, dewasa, lansia), dengan persentase di dalam wilayah. Untuk membaca susunan umur, bukan untuk membandingkan wilayah. Sel berisi 1 sampai 4 orang disembunyikan. Hanya angka agregat. Data simulasi.'
+AS
+WITH AKTIF AS (
+    SELECT w.ID_WILAYAH,
+           YEAR(i.TANGGAL_SNAPSHOT) - u.TAHUN_LAHIR AS USIA
+    FROM DATA_OPERASIONAL.UMAT u
+    CROSS JOIN MASTER_DATA.INFO_DATASET i
+    JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk
+        ON pk.ID_UMAT = u.ID_UMAT
+       AND pk.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN DATA_OPERASIONAL.KELUARGA k
+        ON k.ID_KELUARGA = pk.ID_KELUARGA
+       AND k.STATUS_KELUARGA = 'Aktif'
+    JOIN DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN pl
+        ON pl.ID_KELUARGA = k.ID_KELUARGA
+       AND pl.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN MASTER_DATA.MASTER_LINGKUNGAN l
+        ON l.ID_LINGKUNGAN = pl.ID_LINGKUNGAN
+       AND l.STATUS_AKTIF = TRUE
+    JOIN MASTER_DATA.MASTER_WILAYAH w
+        ON w.ID_WILAYAH = l.ID_WILAYAH
+       AND w.STATUS_AKTIF = TRUE
+    WHERE u.STATUS_KEANGGOTAAN = 'Aktif'
+),
+TAHAP AS (
+    SELECT 1 AS URUTAN_KELOMPOK, 'Anak dan remaja (0-16)' AS KELOMPOK_KEHIDUPAN, 0 AS USIA_DARI, 16 AS USIA_SAMPAI
+    UNION ALL SELECT 2, 'Orang muda (17-35)', 17, 35
+    UNION ALL SELECT 3, 'Dewasa (36-59)', 36, 59
+    UNION ALL SELECT 4, 'Lansia (60 ke atas)', 60, 200
+),
+HITUNG AS (
+    SELECT a.ID_WILAYAH,
+           t.URUTAN_KELOMPOK,
+           COUNT(*) AS JUMLAH
+    FROM AKTIF a
+    JOIN TAHAP t
+        ON a.USIA BETWEEN t.USIA_DARI AND t.USIA_SAMPAI
+    GROUP BY a.ID_WILAYAH, t.URUTAN_KELOMPOK
+),
+TOTAL AS (
+    SELECT ID_WILAYAH, COUNT(*) AS JUMLAH
+    FROM AKTIF
+    GROUP BY ID_WILAYAH
+)
+SELECT
+    w.ID_WILAYAH,
+    w.NAMA_WILAYAH,
+    t.KELOMPOK_KEHIDUPAN,
+    t.URUTAN_KELOMPOK,
+    CASE WHEN COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(h.JUMLAH, 0) END AS JUMLAH_UMAT,
+    COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 AS DISEMBUNYIKAN,
+    CASE WHEN COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 OR COALESCE(s.JUMLAH, 0) < 5 THEN NULL
+         ELSE ROUND(100.0 * COALESCE(h.JUMLAH, 0) / s.JUMLAH, 1) END AS PERSEN_DALAM_WILAYAH,
+    CASE WHEN COALESCE(s.JUMLAH, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(s.JUMLAH, 0) END AS JUMLAH_UMAT_WILAYAH,
+    'Menggambarkan susunan umur di setiap wilayah, bukan peringkat wilayah. Kelompok dengan 1 sampai 4 orang disembunyikan.' AS CATATAN_PRIVASI,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM MASTER_DATA.MASTER_WILAYAH w
+CROSS JOIN TAHAP t
+LEFT JOIN HITUNG h
+    ON h.ID_WILAYAH = w.ID_WILAYAH
+   AND h.URUTAN_KELOMPOK = t.URUTAN_KELOMPOK
+LEFT JOIN TOTAL s
+    ON s.ID_WILAYAH = w.ID_WILAYAH
+WHERE w.STATUS_AKTIF = TRUE;
+
+-- 33. Household size -----------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.DEMOGRAFI_KELUARGA
+    COMMENT = 'Jumlah keluarga aktif menurut banyaknya anggota aktif (1, 2, 3, 4, 5 atau lebih), dengan jumlah umat di dalamnya. Hanya angka agregat, tanpa nama atau identitas keluarga. Sel berisi 1 sampai 4 keluarga disembunyikan. Data simulasi.'
+AS
+WITH ANGGOTA AS (
+    SELECT pk.ID_KELUARGA,
+           COUNT(*) AS JUMLAH_ANGGOTA
+    FROM DATA_OPERASIONAL.UMAT u
+    JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk
+        ON pk.ID_UMAT = u.ID_UMAT
+       AND pk.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN DATA_OPERASIONAL.KELUARGA k
+        ON k.ID_KELUARGA = pk.ID_KELUARGA
+       AND k.STATUS_KELUARGA = 'Aktif'
+    WHERE u.STATUS_KEANGGOTAAN = 'Aktif'
+    GROUP BY pk.ID_KELUARGA
+),
+UKURAN AS (
+    SELECT 1 AS BATAS_BAWAH, '1 orang' AS UKURAN_KELUARGA, 1 AS URUTAN_UKURAN
+    UNION ALL SELECT 2, '2 orang', 2
+    UNION ALL SELECT 3, '3 orang', 3
+    UNION ALL SELECT 4, '4 orang', 4
+    UNION ALL SELECT 5, '5 orang atau lebih', 5
+),
+HITUNG AS (
+    SELECT LEAST(JUMLAH_ANGGOTA, 5) AS BATAS_BAWAH,
+           COUNT(*) AS JUMLAH_KELUARGA,
+           SUM(JUMLAH_ANGGOTA) AS JUMLAH_UMAT
+    FROM ANGGOTA
+    GROUP BY LEAST(JUMLAH_ANGGOTA, 5)
+)
+SELECT
+    k.UKURAN_KELUARGA,
+    k.URUTAN_UKURAN,
+    CASE WHEN COALESCE(h.JUMLAH_KELUARGA, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(h.JUMLAH_KELUARGA, 0) END AS JUMLAH_KELUARGA,
+    CASE WHEN COALESCE(h.JUMLAH_KELUARGA, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(h.JUMLAH_UMAT, 0) END AS JUMLAH_UMAT,
+    COALESCE(h.JUMLAH_KELUARGA, 0) BETWEEN 1 AND 4 AS DISEMBUNYIKAN,
+    'Keluarga dihitung dari umat aktif pada keluarga yang masih aktif. Kelompok dengan 1 sampai 4 keluarga disembunyikan.' AS CATATAN_PRIVASI,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM UKURAN k
+LEFT JOIN HITUNG h
+    ON h.BATAS_BAWAH = k.BATAS_BAWAH;
+
+-- =============================================================================
 -- >>> sql/06_validate_data.sql
 -- =============================================================================
 
@@ -19664,177 +19874,243 @@ WITH CHECKS AS (
            NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
            'Deliberate demo scenario: a planned survey has no responses and no aggregates.' AS NOTE
     UNION ALL
-    SELECT 3540 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3540 AS SORT_ORDER, 'DEMOGRAPHICS' AS CHECK_GROUP, 'Parishioner with an implausible age or an unknown gender' AS CHECK_NAME,
+           'DATA_OPERASIONAL.UMAT' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE 2026 - TAHUN_LAHIR NOT BETWEEN 0 AND 110 OR JENIS_KELAMIN NOT IN ('Laki-laki', 'Perempuan')) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'The age groups run from 0 and the pyramid has the two genders of the data. Anyone else would silently drop out of the counts.' AS NOTE
+    UNION ALL
+    SELECT 3550 AS SORT_ORDER, 'DEMOGRAPHICS' AS CHECK_GROUP, 'Active parishioners the demographic views cannot place' AS CHECK_NAME,
+           'ANALISIS.RINGKASAN_DEMOGRAFI_UMAT' AS OBJECT_NAME,
+           (SELECT (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT WHERE STATUS_KEANGGOTAAN = 'Aktif') - (SELECT JUMLAH_UMAT_AKTIF FROM ANALISIS.RINGKASAN_DEMOGRAFI_UMAT)) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
+           'An active parishioner without a current household in an active household is not counted. The people not counted are listed in the summary.' AS NOTE
+    UNION ALL
+    SELECT 3560 AS SORT_ORDER, 'DEMOGRAPHICS' AS CHECK_GROUP, 'Pyramid does not add up to the active parishioners' AS CHECK_NAME,
+           'ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_DEMOGRAFI_UMAT s WHERE NOT EXISTS (SELECT 1 FROM ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN WHERE DISEMBUNYIKAN = TRUE) AND s.JUMLAH_UMAT_AKTIF <> (SELECT SUM(JUMLAH_UMAT) FROM ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN)) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'When no cell is hidden, the age and gender cells must add up to the headline figure.' AS NOTE
+    UNION ALL
+    SELECT 3570 AS SORT_ORDER, 'DEMOGRAPHICS' AS CHECK_GROUP, 'Households by size do not add up' AS CHECK_NAME,
+           'ANALISIS.DEMOGRAFI_KELUARGA' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_DEMOGRAFI_UMAT s WHERE NOT EXISTS (SELECT 1 FROM ANALISIS.DEMOGRAFI_KELUARGA WHERE DISEMBUNYIKAN = TRUE) AND (s.JUMLAH_KELUARGA_AKTIF <> (SELECT SUM(JUMLAH_KELUARGA) FROM ANALISIS.DEMOGRAFI_KELUARGA) OR s.JUMLAH_UMAT_AKTIF <> (SELECT SUM(JUMLAH_UMAT) FROM ANALISIS.DEMOGRAFI_KELUARGA))) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'When no cell is hidden, households and people by household size must add up to the headline figures.' AS NOTE
+    UNION ALL
+    SELECT 3580 AS SORT_ORDER, 'DEMOGRAPHICS' AS CHECK_GROUP, 'Regions do not add up to the active parishioners' AS CHECK_NAME,
+           'ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_DEMOGRAFI_UMAT s WHERE NOT EXISTS (SELECT 1 FROM ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH WHERE DISEMBUNYIKAN = TRUE) AND s.JUMLAH_UMAT_AKTIF <> (SELECT SUM(JUMLAH_UMAT) FROM ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH)) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_WARN' AS RULE_TYPE,
+           'A household without a current community, or in an inactive region, is in the headline figure but in no region.' AS NOTE
+    UNION ALL
+    SELECT 3590 AS SORT_ORDER, 'DEMOGRAPHICS' AS CHECK_GROUP, 'Small cell shown in a demographic view' AS CHECK_NAME,
+           'ANALISIS.RINGKASAN_DEMOGRAFI_UMAT' AS OBJECT_NAME,
+           (SELECT (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN WHERE JUMLAH_UMAT BETWEEN 1 AND 4) + (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH WHERE JUMLAH_UMAT BETWEEN 1 AND 4 OR JUMLAH_UMAT_WILAYAH BETWEEN 1 AND 4) + (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_KELUARGA WHERE JUMLAH_KELUARGA BETWEEN 1 AND 4)) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'ZERO_FAIL' AS RULE_TYPE,
+           'A cell of 1 to 4 people or households must be hidden (NULL), so that nobody can be picked out of a small group.' AS NOTE
+    UNION ALL
+    SELECT 3600 AS SORT_ORDER, 'DEMOGRAPHICS' AS CHECK_GROUP, 'Hidden cells in the demographic views' AS CHECK_NAME,
+           'ANALISIS.RINGKASAN_DEMOGRAFI_UMAT' AS OBJECT_NAME,
+           (SELECT (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN WHERE DISEMBUNYIKAN = TRUE) + (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH WHERE DISEMBUNYIKAN = TRUE) + (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_KELUARGA WHERE DISEMBUNYIKAN = TRUE)) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'INFO' AS RULE_TYPE,
+           'None in the demo data (every cell has at least 5). The rule is there for smaller groups, for example when the data is real.' AS NOTE
+    UNION ALL
+    SELECT 3610 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.STRUKTUR_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.STRUKTUR_WILAYAH) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3550 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3620 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PELAKSANAAN_MISA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PELAKSANAAN_MISA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3560 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3630 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEHADIRAN_MISA_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEHADIRAN_MISA_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3570 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3640 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KOLEKTE_MISA_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MISA_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3580 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3650 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.TREN_KEHADIRAN_PERIODE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.TREN_KEHADIRAN_PERIODE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3590 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3660 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.SUMBANGAN_KHUSUS_PER_WILAYAH' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.SUMBANGAN_KHUSUS_PER_WILAYAH) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3600 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3670 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.ANGGARAN_VS_REALISASI_PROGRAM) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3610 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3680 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.ANGGARAN_VS_REALISASI_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.ANGGARAN_VS_REALISASI_SEKSI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3620 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3690 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_DAN_LAPORAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_DAN_LAPORAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3630 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3700 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KELENGKAPAN_LAPORAN_PER_SEKSI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KELENGKAPAN_LAPORAN_PER_SEKSI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3640 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3710 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.HASIL_SURVEI' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.HASIL_SURVEI) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3650 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3720 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.RINGKASAN_SKOR_LIKERT' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_SKOR_LIKERT) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3660 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3730 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.RINGKASAN_UMAT_PER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_UMAT_PER_LINGKUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3670 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3740 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_MINGGUAN_DAN_PERISTIWA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3680 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3750 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.DAMPAK_PERISTIWA_LUAR_BIASA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3690 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3760 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.POLA_KOLEKTE_HARI_DALAM_BULAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3700 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3770 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KORELASI_KOLEKTE_KEHADIRAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KORELASI_KOLEKTE_KEHADIRAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3710 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3780 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PEMASUKAN_PENGELUARAN_BULANAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3720 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3790 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PEMASUKAN_PENGELUARAN_TAHUNAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3730 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3800 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PROYEKSI_PEMASUKAN_PENGELUARAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3740 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3810 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.SUMBANGAN_KELUARGA_PER_LINGKUNGAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3750 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3820 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.TITIK_IMPAS_KAMPANYE' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.TITIK_IMPAS_KAMPANYE) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3760 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3830 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KEGIATAN_MENDATANG' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KEGIATAN_MENDATANG) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3770 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3840 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.KOLEKTE_AKTUAL_VS_PERKIRAAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3780 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3850 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.BIAS_PERKIRAAN_PER_PERISTIWA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3790 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3860 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.AKURASI_PERKIRAAN_TAHUNAN' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.AKURASI_PERKIRAAN_TAHUNAN) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3800 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3870 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.LAYANAN_PUBLIK' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.LAYANAN_PUBLIK) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3810 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3880 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.LANGKAH_LAYANAN_PUBLIK' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.LANGKAH_LAYANAN_PUBLIK) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
     UNION ALL
-    SELECT 3820 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+    SELECT 3890 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
            'ANALISIS.PERSYARATAN_LAYANAN_PUBLIK' AS OBJECT_NAME,
            (SELECT COUNT(*) FROM ANALISIS.PERSYARATAN_LAYANAN_PUBLIK) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3900 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.RINGKASAN_DEMOGRAFI_UMAT' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.RINGKASAN_DEMOGRAFI_UMAT) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3910 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3920 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH) AS FOUND_COUNT,
+           NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
+           'Fails when the view is missing, broken, or empty.' AS NOTE
+    UNION ALL
+    SELECT 3930 AS SORT_ORDER, 'VIEWS' AS CHECK_GROUP, 'View returns rows' AS CHECK_NAME,
+           'ANALISIS.DEMOGRAFI_KELUARGA' AS OBJECT_NAME,
+           (SELECT COUNT(*) FROM ANALISIS.DEMOGRAFI_KELUARGA) AS FOUND_COUNT,
            NULL AS EXPECTED_COUNT, 'NONEMPTY' AS RULE_TYPE,
            'Fails when the view is missing, broken, or empty.' AS NOTE
 ),

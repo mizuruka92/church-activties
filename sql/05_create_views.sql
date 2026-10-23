@@ -1231,3 +1231,213 @@ SELECT
 FROM MASTER_DATA.PERSYARATAN_LAYANAN r
 JOIN ANALISIS.LAYANAN_PUBLIK l
     ON l.ID_LAYANAN = r.ID_LAYANAN;
+
+-- =============================================================================
+-- Demographics of the active parishioners: aggregates only, small cells hidden
+--
+-- Who is counted: parishioners whose membership status is Aktif and who belong to an active household
+-- (a current assignment in a household with status Aktif). Age is the year of the snapshot date minus the
+-- year of birth, so it can be one year off. It is never read from the clock.
+-- Privacy: no view exposes a person, a household or a year of birth. A cell that holds 1 to 4 people (or
+-- households) is hidden: its count is NULL and DISEMBUNYIKAN is TRUE. A cell with 0 is shown as 0. This is a
+-- simple minimum-size rule for a demo, not a formal disclosure-control method.
+-- No view ranks regions or communities. The pages list them alphabetically.
+-- =============================================================================
+
+-- 30. Headline figures of the parishioner demographics (one row) ------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.RINGKASAN_DEMOGRAFI_UMAT
+    COMMENT = 'Satu baris angka pokok demografi umat aktif: jumlah umat dan keluarga, rata-rata anggota keluarga, usia median, persentase perempuan dan persentase menurut kelompok kehidupan. Hanya angka agregat, tanpa nama atau identitas individu. Usia dihitung dari tahun lahir pada tanggal data. Data simulasi.'
+AS
+WITH AKTIF AS (
+    SELECT pk.ID_KELUARGA,
+           u.JENIS_KELAMIN,
+           YEAR(i.TANGGAL_SNAPSHOT) - u.TAHUN_LAHIR AS USIA,
+           i.TANGGAL_SNAPSHOT
+    FROM DATA_OPERASIONAL.UMAT u
+    CROSS JOIN MASTER_DATA.INFO_DATASET i
+    JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk
+        ON pk.ID_UMAT = u.ID_UMAT
+       AND pk.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN DATA_OPERASIONAL.KELUARGA k
+        ON k.ID_KELUARGA = pk.ID_KELUARGA
+       AND k.STATUS_KELUARGA = 'Aktif'
+    WHERE u.STATUS_KEANGGOTAAN = 'Aktif'
+)
+SELECT
+    MAX(a.TANGGAL_SNAPSHOT) AS TANGGAL_DATA,
+    COUNT(*) AS JUMLAH_UMAT_AKTIF,
+    (SELECT COUNT(*) FROM DATA_OPERASIONAL.UMAT) - COUNT(*) AS JUMLAH_UMAT_TIDAK_DIHITUNG,
+    COUNT(DISTINCT a.ID_KELUARGA) AS JUMLAH_KELUARGA_AKTIF,
+    ROUND(1.0 * COUNT(*) / COUNT(DISTINCT a.ID_KELUARGA), 1) AS RATA_RATA_ANGGOTA_KELUARGA,
+    MEDIAN(a.USIA) AS USIA_MEDIAN,
+    ROUND(100.0 * SUM(CASE WHEN a.JENIS_KELAMIN = 'Perempuan' THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_PEREMPUAN,
+    ROUND(100.0 * SUM(CASE WHEN a.USIA < 17 THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_ANAK_REMAJA,
+    ROUND(100.0 * SUM(CASE WHEN a.USIA BETWEEN 17 AND 35 THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_ORANG_MUDA,
+    ROUND(100.0 * SUM(CASE WHEN a.USIA BETWEEN 36 AND 59 THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_DEWASA,
+    ROUND(100.0 * SUM(CASE WHEN a.USIA >= 60 THEN 1 ELSE 0 END) / COUNT(*), 1) AS PERSEN_LANSIA,
+    COUNT(DISTINCT CASE WHEN a.USIA < 17 THEN a.ID_KELUARGA END) AS JUMLAH_KELUARGA_DENGAN_ANAK_REMAJA,
+    'Hanya angka agregat. Kelompok dengan 1 sampai 4 orang disembunyikan pada tampilan rinci.' AS CATATAN_PRIVASI,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM AKTIF a;
+
+-- 31. Age group by gender (the population pyramid) ----------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN
+    COMMENT = 'Jumlah umat aktif menurut kelompok usia sepuluh tahunan (70 tahun ke atas dijadikan satu) dan jenis kelamin, untuk piramida penduduk. Sel berisi 1 sampai 4 orang disembunyikan (JUMLAH_UMAT kosong, DISEMBUNYIKAN benar). Hanya angka agregat. Data simulasi.'
+AS
+WITH AKTIF AS (
+    SELECT u.JENIS_KELAMIN,
+           YEAR(i.TANGGAL_SNAPSHOT) - u.TAHUN_LAHIR AS USIA
+    FROM DATA_OPERASIONAL.UMAT u
+    CROSS JOIN MASTER_DATA.INFO_DATASET i
+    JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk
+        ON pk.ID_UMAT = u.ID_UMAT
+       AND pk.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN DATA_OPERASIONAL.KELUARGA k
+        ON k.ID_KELUARGA = pk.ID_KELUARGA
+       AND k.STATUS_KELUARGA = 'Aktif'
+    WHERE u.STATUS_KEANGGOTAAN = 'Aktif'
+),
+KELOMPOK AS (
+    SELECT 0 AS USIA_MULAI, '0-9' AS KELOMPOK_USIA, 1 AS URUTAN_KELOMPOK
+    UNION ALL SELECT 10, '10-19', 2
+    UNION ALL SELECT 20, '20-29', 3
+    UNION ALL SELECT 30, '30-39', 4
+    UNION ALL SELECT 40, '40-49', 5
+    UNION ALL SELECT 50, '50-59', 6
+    UNION ALL SELECT 60, '60-69', 7
+    UNION ALL SELECT 70, '70 ke atas', 8
+),
+JENIS AS (
+    SELECT 'Laki-laki' AS JENIS_KELAMIN
+    UNION ALL SELECT 'Perempuan'
+),
+HITUNG AS (
+    SELECT LEAST(CAST(FLOOR(USIA / 10) AS INTEGER) * 10, 70) AS USIA_MULAI,
+           JENIS_KELAMIN,
+           COUNT(*) AS JUMLAH
+    FROM AKTIF
+    GROUP BY LEAST(CAST(FLOOR(USIA / 10) AS INTEGER) * 10, 70), JENIS_KELAMIN
+)
+SELECT
+    k.KELOMPOK_USIA,
+    k.URUTAN_KELOMPOK,
+    j.JENIS_KELAMIN,
+    CASE WHEN COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(h.JUMLAH, 0) END AS JUMLAH_UMAT,
+    COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 AS DISEMBUNYIKAN,
+    'Usia dihitung dari tahun lahir, sehingga bisa meleset satu tahun. Kelompok dengan 1 sampai 4 orang disembunyikan.' AS CATATAN_PRIVASI,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM KELOMPOK k
+CROSS JOIN JENIS j
+LEFT JOIN HITUNG h
+    ON h.USIA_MULAI = k.USIA_MULAI
+   AND h.JENIS_KELAMIN = j.JENIS_KELAMIN;
+
+-- 32. Life stage by region ------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.DEMOGRAFI_UMAT_PER_WILAYAH
+    COMMENT = 'Jumlah umat aktif menurut wilayah dan kelompok kehidupan (anak dan remaja, orang muda, dewasa, lansia), dengan persentase di dalam wilayah. Untuk membaca susunan umur, bukan untuk membandingkan wilayah. Sel berisi 1 sampai 4 orang disembunyikan. Hanya angka agregat. Data simulasi.'
+AS
+WITH AKTIF AS (
+    SELECT w.ID_WILAYAH,
+           YEAR(i.TANGGAL_SNAPSHOT) - u.TAHUN_LAHIR AS USIA
+    FROM DATA_OPERASIONAL.UMAT u
+    CROSS JOIN MASTER_DATA.INFO_DATASET i
+    JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk
+        ON pk.ID_UMAT = u.ID_UMAT
+       AND pk.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN DATA_OPERASIONAL.KELUARGA k
+        ON k.ID_KELUARGA = pk.ID_KELUARGA
+       AND k.STATUS_KELUARGA = 'Aktif'
+    JOIN DATA_OPERASIONAL.PENUGASAN_LINGKUNGAN pl
+        ON pl.ID_KELUARGA = k.ID_KELUARGA
+       AND pl.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN MASTER_DATA.MASTER_LINGKUNGAN l
+        ON l.ID_LINGKUNGAN = pl.ID_LINGKUNGAN
+       AND l.STATUS_AKTIF = TRUE
+    JOIN MASTER_DATA.MASTER_WILAYAH w
+        ON w.ID_WILAYAH = l.ID_WILAYAH
+       AND w.STATUS_AKTIF = TRUE
+    WHERE u.STATUS_KEANGGOTAAN = 'Aktif'
+),
+TAHAP AS (
+    SELECT 1 AS URUTAN_KELOMPOK, 'Anak dan remaja (0-16)' AS KELOMPOK_KEHIDUPAN, 0 AS USIA_DARI, 16 AS USIA_SAMPAI
+    UNION ALL SELECT 2, 'Orang muda (17-35)', 17, 35
+    UNION ALL SELECT 3, 'Dewasa (36-59)', 36, 59
+    UNION ALL SELECT 4, 'Lansia (60 ke atas)', 60, 200
+),
+HITUNG AS (
+    SELECT a.ID_WILAYAH,
+           t.URUTAN_KELOMPOK,
+           COUNT(*) AS JUMLAH
+    FROM AKTIF a
+    JOIN TAHAP t
+        ON a.USIA BETWEEN t.USIA_DARI AND t.USIA_SAMPAI
+    GROUP BY a.ID_WILAYAH, t.URUTAN_KELOMPOK
+),
+TOTAL AS (
+    SELECT ID_WILAYAH, COUNT(*) AS JUMLAH
+    FROM AKTIF
+    GROUP BY ID_WILAYAH
+)
+SELECT
+    w.ID_WILAYAH,
+    w.NAMA_WILAYAH,
+    t.KELOMPOK_KEHIDUPAN,
+    t.URUTAN_KELOMPOK,
+    CASE WHEN COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(h.JUMLAH, 0) END AS JUMLAH_UMAT,
+    COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 AS DISEMBUNYIKAN,
+    CASE WHEN COALESCE(h.JUMLAH, 0) BETWEEN 1 AND 4 OR COALESCE(s.JUMLAH, 0) < 5 THEN NULL
+         ELSE ROUND(100.0 * COALESCE(h.JUMLAH, 0) / s.JUMLAH, 1) END AS PERSEN_DALAM_WILAYAH,
+    CASE WHEN COALESCE(s.JUMLAH, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(s.JUMLAH, 0) END AS JUMLAH_UMAT_WILAYAH,
+    'Menggambarkan susunan umur di setiap wilayah, bukan peringkat wilayah. Kelompok dengan 1 sampai 4 orang disembunyikan.' AS CATATAN_PRIVASI,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM MASTER_DATA.MASTER_WILAYAH w
+CROSS JOIN TAHAP t
+LEFT JOIN HITUNG h
+    ON h.ID_WILAYAH = w.ID_WILAYAH
+   AND h.URUTAN_KELOMPOK = t.URUTAN_KELOMPOK
+LEFT JOIN TOTAL s
+    ON s.ID_WILAYAH = w.ID_WILAYAH
+WHERE w.STATUS_AKTIF = TRUE;
+
+-- 33. Household size -----------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW ANALISIS.DEMOGRAFI_KELUARGA
+    COMMENT = 'Jumlah keluarga aktif menurut banyaknya anggota aktif (1, 2, 3, 4, 5 atau lebih), dengan jumlah umat di dalamnya. Hanya angka agregat, tanpa nama atau identitas keluarga. Sel berisi 1 sampai 4 keluarga disembunyikan. Data simulasi.'
+AS
+WITH ANGGOTA AS (
+    SELECT pk.ID_KELUARGA,
+           COUNT(*) AS JUMLAH_ANGGOTA
+    FROM DATA_OPERASIONAL.UMAT u
+    JOIN DATA_OPERASIONAL.PENUGASAN_KELUARGA pk
+        ON pk.ID_UMAT = u.ID_UMAT
+       AND pk.TANGGAL_AKHIR_BERLAKU IS NULL
+    JOIN DATA_OPERASIONAL.KELUARGA k
+        ON k.ID_KELUARGA = pk.ID_KELUARGA
+       AND k.STATUS_KELUARGA = 'Aktif'
+    WHERE u.STATUS_KEANGGOTAAN = 'Aktif'
+    GROUP BY pk.ID_KELUARGA
+),
+UKURAN AS (
+    SELECT 1 AS BATAS_BAWAH, '1 orang' AS UKURAN_KELUARGA, 1 AS URUTAN_UKURAN
+    UNION ALL SELECT 2, '2 orang', 2
+    UNION ALL SELECT 3, '3 orang', 3
+    UNION ALL SELECT 4, '4 orang', 4
+    UNION ALL SELECT 5, '5 orang atau lebih', 5
+),
+HITUNG AS (
+    SELECT LEAST(JUMLAH_ANGGOTA, 5) AS BATAS_BAWAH,
+           COUNT(*) AS JUMLAH_KELUARGA,
+           SUM(JUMLAH_ANGGOTA) AS JUMLAH_UMAT
+    FROM ANGGOTA
+    GROUP BY LEAST(JUMLAH_ANGGOTA, 5)
+)
+SELECT
+    k.UKURAN_KELUARGA,
+    k.URUTAN_UKURAN,
+    CASE WHEN COALESCE(h.JUMLAH_KELUARGA, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(h.JUMLAH_KELUARGA, 0) END AS JUMLAH_KELUARGA,
+    CASE WHEN COALESCE(h.JUMLAH_KELUARGA, 0) BETWEEN 1 AND 4 THEN NULL ELSE COALESCE(h.JUMLAH_UMAT, 0) END AS JUMLAH_UMAT,
+    COALESCE(h.JUMLAH_KELUARGA, 0) BETWEEN 1 AND 4 AS DISEMBUNYIKAN,
+    'Keluarga dihitung dari umat aktif pada keluarga yang masih aktif. Kelompok dengan 1 sampai 4 keluarga disembunyikan.' AS CATATAN_PRIVASI,
+    'Data simulasi (fiktif)' AS SUMBER_DATA
+FROM UKURAN k
+LEFT JOIN HITUNG h
+    ON h.BATAS_BAWAH = k.BATAS_BAWAH;

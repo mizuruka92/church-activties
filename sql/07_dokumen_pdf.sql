@@ -5,7 +5,7 @@
 --           ANALISIS.BERKAS_DOKUMEN, which the dashboard reads to offer "Buka ... (PDF)" links.
 -- Requires: steps 1-5 (the view reads two ANALISIS views). The PDFs themselves are not in this file:
 --           they are binary files that you upload to the stage (see docs/STARTER_GUIDE.md, part 8b).
--- Safe to re-run: yes (CREATE STAGE IF NOT EXISTS keeps the files that are on the stage; CREATE OR REPLACE
+-- Safe to re-run: yes (CREATE STAGE IF NOT EXISTS keeps the files that are on the stage. CREATE OR REPLACE
 --           VIEW only replaces the view).
 -- Not part of the normal setup: sql/full_setup.sql does not contain it, and the dashboard works without it.
 --

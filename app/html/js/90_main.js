@@ -11,6 +11,7 @@ var PAGES = [
   ["Sumbangan khusus", pageDonations],
   ["Rencana, anggaran, kegiatan", pagePlans],
   ["Survei umat", pageSurveys],
+  ["Demografi umat", pageDemographics],
   ["Layanan dan prosedur", pageServices],
   ["Tentang data", pageAbout]
 ];

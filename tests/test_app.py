@@ -40,7 +40,7 @@ if HAVE_APP_STACK:
 NEEDS = "streamlit, altair, pandas or duckdb is not installed (pip install -r tests/requirements.txt)"
 
 PAGES = ["Ringkasan", "Kegiatan mendatang", "Pemasukan dan pengeluaran", "Kolekte dan kehadiran", "Perkiraan kolekte", "Peristiwa luar biasa",
-         "Sumbangan khusus", "Rencana, anggaran, kegiatan", "Survei umat", "Layanan dan prosedur", "Tentang data"]
+         "Sumbangan khusus", "Rencana, anggaran, kegiatan", "Survei umat", "Demografi umat", "Layanan dan prosedur", "Tentang data"]
 CHART_PAGES = [p for p in PAGES if p not in ("Tentang data", "Layanan dan prosedur")]
 RANKING_WORDS = ("peringkat", "terbaik", "terburuk", "dermawan", "juara")
 

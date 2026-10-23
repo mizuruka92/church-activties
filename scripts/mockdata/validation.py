@@ -524,6 +524,38 @@ def _business_arms(views):
         f"SELECT COUNT(*) FROM {M}.SURVEI s WHERE NOT EXISTS (SELECT 1 FROM {rs} r WHERE r.ID_SURVEI = s.ID_SURVEI)", "INFO",
         "Deliberate demo scenario: a planned survey has no responses and no aggregates.")
 
+    # --- Demographics ----------------------------------------------------------------
+    um = f"{O}.UMAT"
+    ds, py, rg, fm = (f"{A}.RINGKASAN_DEMOGRAFI_UMAT", f"{A}.DEMOGRAFI_UMAT_USIA_JENIS_KELAMIN",
+                      f"{A}.DEMOGRAFI_UMAT_PER_WILAYAH", f"{A}.DEMOGRAFI_KELUARGA")
+    add("DEMOGRAPHICS", "Parishioner with an implausible age or an unknown gender", um,
+        f"SELECT COUNT(*) FROM {um} WHERE {config.AS_OF.year} - TAHUN_LAHIR NOT BETWEEN 0 AND 110 "
+        f"OR JENIS_KELAMIN NOT IN ('Laki-laki', 'Perempuan')", "ZERO_FAIL",
+        "The age groups run from 0 and the pyramid has the two genders of the data. Anyone else would silently drop out of the counts.")
+    add("DEMOGRAPHICS", "Active parishioners the demographic views cannot place", ds,
+        f"SELECT (SELECT COUNT(*) FROM {um} WHERE STATUS_KEANGGOTAAN = 'Aktif') - (SELECT JUMLAH_UMAT_AKTIF FROM {ds})", "ZERO_WARN",
+        "An active parishioner without a current household in an active household is not counted. The people not counted are listed in the summary.")
+    add("DEMOGRAPHICS", "Pyramid does not add up to the active parishioners", py,
+        f"SELECT COUNT(*) FROM {ds} s WHERE NOT EXISTS (SELECT 1 FROM {py} WHERE DISEMBUNYIKAN = TRUE) "
+        f"AND s.JUMLAH_UMAT_AKTIF <> (SELECT SUM(JUMLAH_UMAT) FROM {py})", "ZERO_FAIL",
+        "When no cell is hidden, the age and gender cells must add up to the headline figure.")
+    add("DEMOGRAPHICS", "Households by size do not add up", fm,
+        f"SELECT COUNT(*) FROM {ds} s WHERE NOT EXISTS (SELECT 1 FROM {fm} WHERE DISEMBUNYIKAN = TRUE) "
+        f"AND (s.JUMLAH_KELUARGA_AKTIF <> (SELECT SUM(JUMLAH_KELUARGA) FROM {fm}) OR s.JUMLAH_UMAT_AKTIF <> (SELECT SUM(JUMLAH_UMAT) FROM {fm}))",
+        "ZERO_FAIL", "When no cell is hidden, households and people by household size must add up to the headline figures.")
+    add("DEMOGRAPHICS", "Regions do not add up to the active parishioners", rg,
+        f"SELECT COUNT(*) FROM {ds} s WHERE NOT EXISTS (SELECT 1 FROM {rg} WHERE DISEMBUNYIKAN = TRUE) "
+        f"AND s.JUMLAH_UMAT_AKTIF <> (SELECT SUM(JUMLAH_UMAT) FROM {rg})", "ZERO_WARN",
+        "A household without a current community, or in an inactive region, is in the headline figure but in no region.")
+    add("DEMOGRAPHICS", "Small cell shown in a demographic view", ds,
+        f"SELECT (SELECT COUNT(*) FROM {py} WHERE JUMLAH_UMAT BETWEEN 1 AND 4) + (SELECT COUNT(*) FROM {rg} WHERE JUMLAH_UMAT BETWEEN 1 AND 4 "
+        f"OR JUMLAH_UMAT_WILAYAH BETWEEN 1 AND 4) + (SELECT COUNT(*) FROM {fm} WHERE JUMLAH_KELUARGA BETWEEN 1 AND 4)", "ZERO_FAIL",
+        "A cell of 1 to 4 people or households must be hidden (NULL), so that nobody can be picked out of a small group.")
+    add("DEMOGRAPHICS", "Hidden cells in the demographic views", ds,
+        f"SELECT (SELECT COUNT(*) FROM {py} WHERE DISEMBUNYIKAN = TRUE) + (SELECT COUNT(*) FROM {rg} WHERE DISEMBUNYIKAN = TRUE) "
+        f"+ (SELECT COUNT(*) FROM {fm} WHERE DISEMBUNYIKAN = TRUE)", "INFO",
+        "None in the demo data (every cell has at least 5). The rule is there for smaller groups, for example when the data is real.")
+
     for view in views:
         add("VIEWS", "View returns rows", f"{A}.{view}", f"SELECT COUNT(*) FROM {A}.{view}", "NONEMPTY",
             "Fails when the view is missing, broken, or empty.")
