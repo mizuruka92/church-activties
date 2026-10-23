@@ -495,6 +495,9 @@ If one of these fails for you, copy the message into a new note for the project.
 * **Revoke the GitHub token** (Path B, private repository) on GitHub when you no longer need it.
 * **When the trial ends:** the data is only simulated, so nothing is lost. You can recreate it any time by running the setup again.
   Check Snowflake's current terms on what happens to a trial account after it expires.
+* **To keep showing the dashboard without Snowflake:** open [`app/html/pusat_informasi_paroki.html`](../app/html/pusat_informasi_paroki.html) by
+  double-click. It is a single offline file with the same pages as charts and dropdowns (no tables), made from a snapshot of the data. See
+  [HTML_DASHBOARD.md](HTML_DASHBOARD.md).
 
 ## 14. Where to go next
 

@@ -105,3 +105,9 @@ comma for decimals); the numeric tick labels on axes follow the browser locale.
 * The PDF download on "Layanan dan prosedur" needs the files next to the app and a runtime that offers `st.download_button`. Snowflake's documentation for Native Apps lists that button as unsupported on the warehouse runtime and the general limitations page does not mention it, so it is unverified for an ordinary Streamlit in Snowflake app. The page works either way: it shows the whole guide as text, and says in a caption when the file or the button is missing.
 * The close-up chart on the forecast page labels its date axis with a small Vega expression (Indonesian month abbreviations, because the axis library would otherwise print English months). It rendered correctly on Streamlit 1.35 and 1.66 in a headless browser, but not in Streamlit in Snowflake.
 * Charts are drawn by Vega-Lite through Altair, so very old Streamlit releases that predate Altair 4 are not supported.
+
+## 6. The offline HTML copy
+
+[HTML_DASHBOARD.md](HTML_DASHBOARD.md) describes a single-file copy of this dashboard (charts and dropdowns, no tables, a snapshot of the data) that opens
+without Snowflake, Streamlit or internet. It ports the pages and charts of `streamlit_app.py` to JavaScript, so a change to a page here needs the same change
+there. `tests/test_html_dashboard.py` compares the figures on the tiles of both dashboards and fails when they differ.
