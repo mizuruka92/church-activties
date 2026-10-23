@@ -26,8 +26,9 @@
 --     after the stage exists. If you created the stage with another type, drop the (empty) stage and create it again.
 --   * The link is made when the view is queried. The dashboard caches the view for ten minutes, so a link
 --     shown in the dashboard is at most ten minutes old and has at least fifty minutes left.
---   * Nothing in this file has been run in Snowflake; the SQL follows the Snowflake documentation for
---     GET_PRESIGNED_URL and directory tables. Report differences from your first run.
+--   * By the project owner's report the stage, the upload and the dashboard's links worked in a real Snowflake
+--     account. The SQL follows the Snowflake documentation for GET_PRESIGNED_URL and directory tables. Report
+--     differences from your own run.
 -- =============================================================================
 
 USE DATABASE PUSAT_INFORMASI_PAROKI;

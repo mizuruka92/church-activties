@@ -4,9 +4,9 @@ This guide expands the quick start in the [README](../README.md). If you have ne
 [starter guide](STARTER_GUIDE.md) instead: it also covers creating the account, connecting GitHub and creating the dashboard. Nothing in this repository connects
 to Snowflake for you: you run the SQL files yourself, in Snowsight or from a command line.
 
-> **Verification status.** The SQL was tested locally (DuckDB as a stand-in engine and a syntax lint),
-> but it has **not** been executed in Snowflake yet. The first real run is the real test. See
-> [Troubleshooting](#troubleshooting) and the checklist in the README.
+> **Verification status.** The SQL was tested locally (DuckDB as a stand-in engine and a syntax lint). The project owner reports that it also ran in a
+> real Snowflake account, both pasted by hand and from a Git repository, with no other setup than uploading the PDFs to a stage. The details of that run were not
+> written down. See [Troubleshooting](#troubleshooting) and the checklist in the README.
 
 ## 1. Four words you need
 
@@ -58,7 +58,7 @@ Steps 1 to 6 can be repeated at any time. Step 6 only reads data and can be run 
 **Step 7 (optional): PDF files on a stage.** `sql/07_dokumen_pdf.sql` creates the stage `ANALISIS.DOKUMEN_PAROKI` and the view `ANALISIS.BERKAS_DOKUMEN`, which gives the
 dashboard a link to each PDF. It is not part of `full_setup.sql` and not needed for anything else. After running it, upload the PDFs and run
 `ALTER STAGE PUSAT_INFORMASI_PAROKI.ANALISIS.DOKUMEN_PAROKI REFRESH;`. The steps, the check query and the security notes (a pre-signed link opens the file for anyone who
-holds it) are in the [starter guide, part 8b](STARTER_GUIDE.md#8b-optional-open-the-pdf-files-from-the-dashboard). Not tried in a real Snowflake account.
+holds it) are in the [starter guide, part 8b](STARTER_GUIDE.md#8b-optional-open-the-pdf-files-from-the-dashboard). By the project owner's report it worked in a real Snowflake account.
 
 ## 3. Run the setup from a command line (optional)
 
@@ -110,7 +110,7 @@ demo does not need. The Git-to-Snowflake route is not tested here.
 | "Insufficient privileges" on `CREATE DATABASE` | Switch to a role that can create databases, for example `SYSADMIN` or `ACCOUNTADMIN`. |
 | "Database ... does not exist or not authorized" | Run step 1 first, or use the role that created the database. |
 | "Object ... does not exist" for a table | A previous step was skipped. Run the steps in order. |
-| A statement fails with a syntax error | Note the file and statement and report it. The generated files should never be edited by hand. See the verification status above: this SQL has not run in Snowflake yet. |
+| A statement fails with a syntax error | Note the file and statement and report it. The generated files should never be edited by hand. See the verification status above: this SQL has run in Snowflake by the owner's report, but your account may differ. |
 | The validation shows `FAIL` rows | Filter `RESULT = 'FAIL'`. Row-count or `VIEWS` failures mean a step did not finish. Re-run steps 3, 4a to 4g and 5. They are safe to repeat. |
 | Row counts show `WARN` (count differs from the bundled data) | The data was only partly loaded or was changed after loading. Re-run steps 3 and 4a to 4g to restore the bundled rows. |
 | `Report participants differ from the event` shows `WARN` | Expected. It is the one deliberate inconsistency. |

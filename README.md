@@ -247,6 +247,8 @@ pip install -r tests/requirements.txt            # optional: DuckDB, sqlglot, St
 
 ## Verification status: please read
 
+What has been **confirmed in Snowflake**: by the project owner's report, the repository ran in a real Snowflake account, both when its files were copied and pasted and when it was connected as a Git repository, and the dashboard worked, including the PDF files on a stage. No other setup was needed than uploading the PDFs by hand. The details were not written down: the Snowflake edition and region, the Streamlit runtime and version, and the figures of the validation. No automated test runs against Snowflake.
+
 What has been **tested locally**:
 
 * The generator is deterministic and its output is identical on Python 3.11, 3.12 and 3.13.
@@ -258,9 +260,9 @@ What has been **tested locally**:
 * The offline HTML dashboard was opened from disk in headless Chromium: every page, every option of every dropdown, light and dark themes, three time zones, a phone-width screen, and its tile figures were compared with the Streamlit dashboard on the same stand-in data ([docs/HTML_DASHBOARD.md](docs/HTML_DASHBOARD.md)).
 * The dashboard was driven page by page with Streamlit's test runner against the same DuckDB stand-in, and viewed in a headless browser in light and dark themes. It was also run on an older stack (Python 3.11, Streamlit 1.35, Altair 4.2) and the current one (Streamlit 1.66). It reads only allowed views, and a test fails if a page shows ranking words.
 
-What has **not** been done: **nothing has been executed in Snowflake.** No connection to Snowflake
-was made while building this repository, so successful loading in your account has not been
-verified. Points most worth watching on the first real run:
+What was **not** done while building this repository: no connection to Snowflake was made from here, and the confirmation above is the owner's own run,
+not something these tests can repeat. Because no other setup was needed, the points below are not known problems. They are the places to look first if your
+account, edition or region behaves differently:
 
 1. `COMMENT` placed after `NOT NULL` in column definitions (`sql/02`).
 2. The `MERGE ... USING (SELECT ... FROM (VALUES ...) AS v (...))` form (`sql/03`, `sql/04a`-`04g`), with up to 1,000 rows per statement.
